@@ -14,6 +14,11 @@ export const KIND_REACTION = 7;
 /** Chat message in a stream channel (NIP-29 group chat). What clients write. */
 export const KIND_STREAM_MESSAGE = 9;
 export const KIND_NIP29_DELETE_EVENT = 9005;
+/**
+ * Presence heartbeat. Ephemeral, so never stored: current status lives in the
+ * relay's Redis and is synthesized for an authored `POST /query`.
+ */
+export const KIND_PRESENCE_UPDATE = 20001;
 export const KIND_TYPING_INDICATOR = 20002;
 /** NIP-29 group metadata — the relay-signed channel descriptor. */
 export const KIND_NIP29_GROUP_METADATA = 39000;

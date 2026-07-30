@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { TimelineRow } from "@/features/chat/timeline";
 import { ChannelSidebar } from "@/features/chat/ui/ChannelSidebar";
@@ -8,6 +8,7 @@ import {
 } from "@/features/chat/ui/MessageComposer";
 import { MessageTimeline } from "@/features/chat/ui/MessageTimeline";
 import { RelayStatus } from "@/features/chat/ui/RelayStatus";
+import { TypingIndicator } from "@/features/chat/ui/TypingIndicator";
 import {
   useChannelActivity,
   useChannelMessages,
@@ -15,6 +16,7 @@ import {
   useToggleReaction,
 } from "@/features/chat/use-chat";
 import { useReadState } from "@/features/chat/use-read-state";
+import { usePresence, useTyping } from "@/features/chat/use-presence";
 
 /** First line of a message, for the reply banner. */
 function previewOf(content: string): string {
@@ -28,6 +30,14 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
   const toggleReaction = useToggleReaction();
   const activity = useChannelActivity();
   const readState = useReadState();
+  const typing = useTyping(channelId);
+  // Only the authors on screen: presence is read per-author, so asking about
+  // everyone would grow the query with the community rather than the viewport.
+  const visibleAuthors = useMemo(
+    () => timeline.rows.map((row) => row.message.pubkey),
+    [timeline.rows],
+  );
+  const presence = usePresence(visibleAuthors);
   // The reply target is stored with the channel it belongs to and read back only
   // for a match, so switching channels cannot post a reply into a thread that
   // does not exist in the new room — and no render sees a stale target.
@@ -51,6 +61,22 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
     if (!channelId || newestShown === null || !timeline.loaded) return;
     readState.markRead(channelId, newestShown);
   }, [channelId, newestShown, timeline.loaded, readState.markRead]);
+
+  // Any author's message ends their typing indicator, not just this client's.
+  // Without this someone stays "typing…" for the rest of the TTL after the
+  // message they were writing is already on screen.
+  const newestRow =
+    timeline.rows.length > 0 ? timeline.rows[timeline.rows.length - 1] : null;
+  const newestRowId = newestRow?.message.id ?? null;
+  const completeTyping = typing.complete;
+  useEffect(() => {
+    if (!newestRow || newestRowId === null) return;
+    completeTyping({
+      pubkey: newestRow.message.pubkey,
+      threadHeadId: newestRow.message.parentId,
+    });
+    // Keyed on the id so this fires once per message, not on every re-render.
+  }, [newestRowId, newestRow, completeTyping]);
 
   const isChannelUnread = useCallback(
     (id: string) => readState.isChannelUnread(id, activity.get(id) ?? null),
@@ -114,16 +140,20 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
               loaded={timeline.loaded}
               error={timeline.error}
               actions={{
+                statusOf: presence.statusOf,
                 onToggleReaction,
                 onReply,
                 pending: toggleReaction.isPending,
               }}
             />
+            <TypingIndicator typists={typing.typists} />
             <MessageComposer
               channelId={channelId}
               channelName={activeChannel?.name ?? channelId}
               replyTo={replyTo}
               onCancelReply={() => setReply(null)}
+              onComposing={typing.announce}
+              onSent={typing.complete}
             />
           </>
         ) : (

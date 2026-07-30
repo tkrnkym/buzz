@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { TimelineRow } from "@/features/chat/timeline";
 import { MessageContent } from "@/features/chat/ui/MessageContent";
 import { ReactionBar } from "@/features/chat/ui/ReactionBar";
+import { cn } from "@/shared/lib/cn";
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { relativeTime } from "@/shared/lib/relative-time";
 
@@ -29,6 +30,8 @@ function systemMessageLabel(content: string): string {
 }
 
 export interface TimelineActions {
+  /** Presence for an author, or null when unknown. */
+  statusOf: (pubkey: string) => string | null;
   onToggleReaction: (input: {
     messageId: string;
     emoji: string;
@@ -36,6 +39,32 @@ export interface TimelineActions {
   }) => void;
   onReply: (row: TimelineRow) => void;
   pending?: boolean;
+}
+
+/**
+ * Presence marker beside an author.
+ *
+ * Unknown presence renders nothing rather than a grey dot: the relay only knows
+ * who is currently connected, so "no status" means "not established", not
+ * "offline", and showing them as away would be a claim the client cannot make.
+ */
+function PresenceDot({ status }: { status: string | null }) {
+  if (status === null || status === "offline") return null;
+  return (
+    <>
+      {/* The dot is decoration; the status is announced as text so a screen
+          reader hears it rather than skipping a bare span. */}
+      <span className="sr-only">{`Status: ${status}`}</span>
+      <span
+        aria-hidden
+        title={status}
+        className={cn(
+          "size-1.5 shrink-0 rounded-full",
+          status === "online" ? "bg-primary" : "bg-muted-foreground",
+        )}
+      />
+    </>
+  );
 }
 
 function MessageRow({
@@ -69,6 +98,7 @@ function MessageRow({
   return (
     <li className="group px-4 py-1.5">
       <div className="flex items-baseline gap-2">
+        <PresenceDot status={actions.statusOf(message.pubkey)} />
         <span className="font-semibold text-base">
           {truncatePubkey(message.pubkey)}
         </span>

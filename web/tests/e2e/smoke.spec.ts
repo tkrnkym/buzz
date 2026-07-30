@@ -366,6 +366,8 @@ function mockRelay(
     extraChannels?: unknown[];
     /** Served to the kind:30078 read-state read. */
     readStateEvents?: unknown[];
+    /** Served to the kind:20002 typing subscription. */
+    typingEvents?: unknown[];
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -444,6 +446,10 @@ function mockRelay(
                 // Unscoped by channel: the activity read behind unread badges.
                 for (const activity of options.activityEvents ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, activity]));
+                }
+              } else if (filter.kinds.includes(20002)) {
+                for (const typing of options.typingEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, typing]));
                 }
               } else if (filter.kinds.includes(7)) {
                 // The #e-keyed auxiliary read: reactions and NIP-09 deletes,
@@ -712,8 +718,12 @@ test("replying publishes thread tags and shows the reply count", async ({
 
   await expect(rootRow.getByText("1 reply")).toBeVisible();
 
-  const reply = relay.published.find((event) =>
-    (event as { tags: string[][] }).tags.some((tag) => tag[3] === "reply"),
+  // Scoped to kind 9: a typing announcement carries the same thread tags, so a
+  // tag-only match would find the indicator instead of the message.
+  const reply = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { tags: string[][] }).tags.some((tag) => tag[3] === "reply"),
   ) as { kind: number; tags: string[][] };
   expect(reply.kind).toBe(9);
   // Root === parent for a direct reply, which buzz-sdk collapses to one tag.
@@ -910,4 +920,102 @@ test("a channel with activity past its cursor shows as unread", async ({
   // The badge is on the other room; the open one is being read right now.
   const nav = page.getByRole("navigation", { name: "Channels" });
   await expect(nav.getByText("Unread messages")).toHaveCount(1);
+});
+
+test("a typing indicator appears and clears when the message lands", async ({
+  page,
+}) => {
+  const typist = "cc".repeat(32);
+  const relay = mockRelay(page, {
+    typingEvents: [
+      {
+        id: "11".repeat(32),
+        pubkey: typist,
+        kind: 20002,
+        // Within the 8s TTL of "now", so the indicator is live on arrival.
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [["h", CHANNEL_UUID]],
+        content: "",
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText(/is typing…/)).toBeVisible();
+
+  // Sending clears the reader's own row; the typist's clears when their message
+  // arrives, which the mock echoes back on the live subscription.
+  const composer = page.getByRole("textbox", { name: /^Message #/ });
+  await composer.fill("done");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("done")).toBeVisible();
+});
+
+test("typing while composing publishes kind:20002 scoped to the channel", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByRole("textbox", { name: /^Message #/ }).fill("half a thou");
+
+  await expect
+    .poll(() =>
+      relay.published.some(
+        (event) => (event as { kind: number }).kind === 20002,
+      ),
+    )
+    .toBe(true);
+
+  const typing = relay.published.find(
+    (event) => (event as { kind: number }).kind === 20002,
+  ) as { tags: string[][]; content: string };
+  expect(typing.tags).toContainEqual(["h", CHANNEL_UUID]);
+  // Content is empty: the indicator says "someone is composing", never what.
+  expect(typing.content).toBe("");
+});
+
+test("presence comes from the HTTP snapshot, which is the only path that has it", async ({
+  page,
+}) => {
+  // Ephemeral events are never stored, so a WebSocket REQ has nothing to
+  // return; `POST /query` is where the relay synthesizes status out of Redis.
+  let presenceQueried = false;
+  await page.route("**/query", async (route) => {
+    presenceQueried = true;
+    const body = JSON.parse(route.request().postData() ?? "{}") as {
+      filters: Array<{ kinds: number[]; authors?: string[] }>;
+    };
+    expect(body.filters[0].kinds).toEqual([20001]);
+    // The relay only synthesizes for filters that name authors explicitly.
+    expect(body.filters[0].authors?.length).toBeGreaterThan(0);
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "22".repeat(32),
+          pubkey: "e".repeat(64),
+          kind: 20001,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [],
+          content: "online",
+          sig: "f".repeat(128),
+        },
+      ]),
+    });
+  });
+
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("hello from the mocked relay")).toBeVisible();
+
+  await expect.poll(() => presenceQueried).toBe(true);
+  await expect(page.getByText("Status: online")).toBeAttached();
 });

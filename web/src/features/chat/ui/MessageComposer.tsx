@@ -18,11 +18,17 @@ export function MessageComposer({
   channelName,
   replyTo,
   onCancelReply,
+  onComposing,
+  onSent,
 }: {
   channelId: string;
   channelName: string;
   replyTo: ReplyTarget | null;
   onCancelReply: () => void;
+  /** Called as the user types; throttling is the caller's business. */
+  onComposing: (thread?: { rootId: string; parentId: string }) => void;
+  /** Called once a message lands, so this author stops showing as typing. */
+  onSent: (input: { pubkey: string; threadHeadId: string | null }) => void;
 }) {
   const [draft, setDraft] = useState("");
   const sendMessage = useSendMessage(channelId);
@@ -43,8 +49,12 @@ export function MessageComposer({
           : {}),
       },
       {
-        onSuccess: () => {
+        onSuccess: (event) => {
           setDraft("");
+          onSent({
+            pubkey: event.pubkey,
+            threadHeadId: replyTo?.parentId ?? null,
+          });
           onCancelReply();
         },
       },
@@ -80,7 +90,16 @@ export function MessageComposer({
       <div className="flex items-center gap-2">
         <Input
           value={draft}
-          onChange={(changeEvent) => setDraft(changeEvent.target.value)}
+          onChange={(changeEvent) => {
+            setDraft(changeEvent.target.value);
+            if (changeEvent.target.value.trim()) {
+              onComposing(
+                replyTo
+                  ? { rootId: replyTo.rootId, parentId: replyTo.parentId }
+                  : undefined,
+              );
+            }
+          }}
           placeholder={label}
           aria-label={label}
           autoComplete="off"
