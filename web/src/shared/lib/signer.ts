@@ -31,8 +31,11 @@
 import {
   type SignedNostrEvent,
   type UnsignedNostrEvent,
+  canEncryptToSelf,
   getSigningPublicKey,
   hasNip07Provider,
+  nip44DecryptFromSelf,
+  nip44EncryptToSelf,
   signNostrEvent,
 } from "@/shared/lib/nostr-signer";
 
@@ -48,13 +51,26 @@ export interface Signer {
   readonly kind: SignerKind;
   /** Whether the identity survives a page reload. */
   readonly durable: boolean;
+  /**
+   * Whether NIP-44 encryption is available.
+   *
+   * Buzz keeps personal state (read positions, sections, mutes) on the relay as
+   * ciphertext, so a signer without this cannot sync it. NIP-44 is *optional* in
+   * NIP-07 and some extensions omit it, so this has to be feature-detected and
+   * surfaced rather than assumed.
+   */
+  readonly canEncrypt: boolean;
   getPublicKey(): Promise<string>;
   sign(template: EventTemplate): Promise<SignedNostrEvent>;
+  /** Encrypt to the signer's own key. Rejects when {@link canEncrypt} is false. */
+  encryptToSelf(plaintext: string): Promise<string>;
+  decryptFromSelf(ciphertext: string): Promise<string>;
 }
 
 class Nip07Signer implements Signer {
   readonly kind = "nip07" as const;
   readonly durable = true;
+  readonly canEncrypt = canEncryptToSelf();
 
   getPublicKey(): Promise<string> {
     return getSigningPublicKey();
@@ -63,11 +79,22 @@ class Nip07Signer implements Signer {
   sign(template: EventTemplate): Promise<SignedNostrEvent> {
     return signNostrEvent(template, { requireNip07: true });
   }
+
+  encryptToSelf(plaintext: string): Promise<string> {
+    return nip44EncryptToSelf(plaintext);
+  }
+
+  decryptFromSelf(ciphertext: string): Promise<string> {
+    return nip44DecryptFromSelf(ciphertext);
+  }
 }
 
 class EphemeralSigner implements Signer {
   readonly kind = "ephemeral" as const;
   readonly durable = false;
+  // The page holds the key itself, so encryption always works — though state
+  // encrypted to a key that dies with the tab is only readable this session.
+  readonly canEncrypt = true;
 
   getPublicKey(): Promise<string> {
     return getSigningPublicKey();
@@ -75,6 +102,14 @@ class EphemeralSigner implements Signer {
 
   sign(template: EventTemplate): Promise<SignedNostrEvent> {
     return signNostrEvent(template);
+  }
+
+  encryptToSelf(plaintext: string): Promise<string> {
+    return nip44EncryptToSelf(plaintext);
+  }
+
+  decryptFromSelf(ciphertext: string): Promise<string> {
+    return nip44DecryptFromSelf(ciphertext);
   }
 }
 

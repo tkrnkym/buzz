@@ -15,11 +15,13 @@ export function ChannelSidebar({
   activeChannelId,
   isLoading,
   error,
+  isUnread,
 }: {
   channels: Channel[];
   activeChannelId: string | null;
   isLoading: boolean;
   error: Error | null;
+  isUnread: (channelId: string) => boolean;
 }) {
   return (
     <nav
@@ -46,6 +48,9 @@ export function ChannelSidebar({
 
       {channels.map((channel) => {
         const isActive = channel.id === activeChannelId;
+        // The open channel is being read right now, so it never shows a badge
+        // even before the cursor round-trips to the relay.
+        const unread = !isActive && isUnread(channel.id);
         return (
           <Link
             key={channel.id}
@@ -65,7 +70,20 @@ export function ChannelSidebar({
             ) : (
               <Hash aria-hidden className="size-3.5 shrink-0 opacity-70" />
             )}
-            <span className="truncate">{channel.name}</span>
+            <span className={cn("truncate", unread && "font-semibold")}>
+              {channel.name}
+            </span>
+            {unread && (
+              <>
+                {/* The dot is decoration; the state is announced as text so a
+                    screen reader hears it rather than skipping a bare span. */}
+                <span className="sr-only">Unread messages</span>
+                <span
+                  aria-hidden
+                  className="ml-auto size-1.5 shrink-0 rounded-full bg-primary"
+                />
+              </>
+            )}
           </Link>
         );
       })}

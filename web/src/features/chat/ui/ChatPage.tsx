@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { TimelineRow } from "@/features/chat/timeline";
 import { ChannelSidebar } from "@/features/chat/ui/ChannelSidebar";
@@ -9,10 +9,12 @@ import {
 import { MessageTimeline } from "@/features/chat/ui/MessageTimeline";
 import { RelayStatus } from "@/features/chat/ui/RelayStatus";
 import {
+  useChannelActivity,
   useChannelMessages,
   useChannels,
   useToggleReaction,
 } from "@/features/chat/use-chat";
+import { useReadState } from "@/features/chat/use-read-state";
 
 /** First line of a message, for the reply banner. */
 function previewOf(content: string): string {
@@ -24,6 +26,8 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
   const channels = useChannels();
   const timeline = useChannelMessages(channelId);
   const toggleReaction = useToggleReaction();
+  const activity = useChannelActivity();
+  const readState = useReadState();
   // The reply target is stored with the channel it belongs to and read back only
   // for a match, so switching channels cannot post a reply into a thread that
   // does not exist in the new room — and no render sees a stale target.
@@ -35,6 +39,23 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
 
   const activeChannel =
     channels.data?.find((channel) => channel.id === channelId) ?? null;
+
+  // Reading the room marks it read up to its newest message. Driven by the
+  // loaded timeline rather than the global activity feed, so the cursor never
+  // jumps past a message this client has not actually shown.
+  const newestShown =
+    timeline.rows.length > 0
+      ? timeline.rows[timeline.rows.length - 1].message.createdAt
+      : null;
+  useEffect(() => {
+    if (!channelId || newestShown === null || !timeline.loaded) return;
+    readState.markRead(channelId, newestShown);
+  }, [channelId, newestShown, timeline.loaded, readState.markRead]);
+
+  const isChannelUnread = useCallback(
+    (id: string) => readState.isChannelUnread(id, activity.get(id) ?? null),
+    [readState.isChannelUnread, activity],
+  );
 
   const onReply = useCallback(
     (row: TimelineRow) => {
@@ -68,6 +89,7 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
         activeChannelId={channelId}
         isLoading={channels.isLoading}
         error={channels.error instanceof Error ? channels.error : null}
+        isUnread={isChannelUnread}
       />
 
       <section className="flex min-w-0 flex-1 flex-col">

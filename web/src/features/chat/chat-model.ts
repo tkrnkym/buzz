@@ -322,3 +322,14 @@ export function buildReactionWithdrawalTemplate(reactionEventId: string): {
     content: "",
   };
 }
+
+/**
+ * Recent messages across every channel the reader can see.
+ *
+ * Unscoped by channel on purpose: unread badges need activity for the channels
+ * the reader is *not* looking at. `kinds` is still explicit, since an open-ended
+ * filter trips the relay's p-gate.
+ */
+export function buildGlobalActivityFilter(limit: number): NostrFilter {
+  return { kinds: CHANNEL_TIMELINE_CONTENT_KINDS, limit };
+}

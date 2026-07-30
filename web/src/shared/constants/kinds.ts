@@ -23,6 +23,13 @@ export const KIND_NIP29_GROUP_MEMBERS = 39002;
 export const KIND_STREAM_MESSAGE_V2 = 40002;
 export const KIND_STREAM_MESSAGE_EDIT = 40003;
 export const KIND_SYSTEM_MESSAGE = 40099;
+/**
+ * NIP-RS personal state: read positions, channel sections, mutes, stars.
+ *
+ * One addressable kind for several payloads, told apart by the `d` tag and a `t`
+ * marker — so a filter for read state must scope on both.
+ */
+export const KIND_READ_STATE = 30078;
 
 /**
  * Kinds that render as a row in a channel timeline.

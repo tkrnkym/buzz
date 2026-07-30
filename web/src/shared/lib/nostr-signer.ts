@@ -1,3 +1,4 @@
+import * as nip44 from "nostr-tools/nip44";
 import {
   finalizeEvent,
   generateSecretKey,
@@ -20,6 +21,14 @@ export type SignedNostrEvent = UnsignedNostrEvent & {
 type Nip07Provider = {
   getPublicKey(): Promise<string>;
   signEvent(event: UnsignedNostrEvent): Promise<SignedNostrEvent>;
+  /**
+   * NIP-44 encryption. Optional in NIP-07, and genuinely absent from some
+   * extensions — callers must feature-detect rather than assume.
+   */
+  nip44?: {
+    encrypt(peerPubkey: string, plaintext: string): Promise<string>;
+    decrypt(peerPubkey: string, ciphertext: string): Promise<string>;
+  };
 };
 
 declare global {
@@ -61,6 +70,54 @@ export async function getSigningPublicKey(): Promise<string> {
     return provider.getPublicKey();
   }
   return getPublicKey(getEphemeralSecretKey());
+}
+
+/** Whether the current signing path can perform NIP-44 encryption. */
+export function canEncryptToSelf(): boolean {
+  const provider = typeof window === "undefined" ? undefined : window.nostr;
+  // With a provider, NIP-44 is only available if that provider implements it.
+  // Without one, the page holds the key itself and can always encrypt.
+  return provider ? provider.nip44 != null : true;
+}
+
+/**
+ * NIP-44 encrypt to self — the conversation partner is the signer's own key.
+ *
+ * Buzz stores personal state (read positions, channel sections, mutes) as
+ * kind:30078 events on the relay, encrypted this way so the relay operator holds
+ * ciphertext rather than a record of what each person has read.
+ */
+export async function nip44EncryptToSelf(plaintext: string): Promise<string> {
+  const provider = typeof window === "undefined" ? undefined : window.nostr;
+  if (provider) {
+    if (!provider.nip44) {
+      throw new Error("This browser extension does not support NIP-44.");
+    }
+    return provider.nip44.encrypt(await provider.getPublicKey(), plaintext);
+  }
+  const secretKey = getEphemeralSecretKey();
+  return nip44.encrypt(
+    plaintext,
+    nip44.getConversationKey(secretKey, getPublicKey(secretKey)),
+  );
+}
+
+/** Inverse of {@link nip44EncryptToSelf}. */
+export async function nip44DecryptFromSelf(
+  ciphertext: string,
+): Promise<string> {
+  const provider = typeof window === "undefined" ? undefined : window.nostr;
+  if (provider) {
+    if (!provider.nip44) {
+      throw new Error("This browser extension does not support NIP-44.");
+    }
+    return provider.nip44.decrypt(await provider.getPublicKey(), ciphertext);
+  }
+  const secretKey = getEphemeralSecretKey();
+  return nip44.decrypt(
+    ciphertext,
+    nip44.getConversationKey(secretKey, getPublicKey(secretKey)),
+  );
 }
 
 function sameUnsignedEvent(

@@ -357,7 +357,16 @@ test("invite download falls back for mobile and non-desktop devices", async ({
  */
 function mockRelay(
   page: import("@playwright/test").Page,
-  options: { extraMessages?: unknown[]; auxEvents?: unknown[] } = {},
+  options: {
+    extraMessages?: unknown[];
+    auxEvents?: unknown[];
+    /** Served to the unscoped activity read that drives unread badges. */
+    activityEvents?: unknown[];
+    /** Extra kind:39000 metadata, for rooms beyond the default one. */
+    extraChannels?: unknown[];
+    /** Served to the kind:30078 read-state read. */
+    readStateEvents?: unknown[];
+  } = {},
 ) {
   const published: unknown[][] = [];
 
@@ -419,10 +428,22 @@ function mockRelay(
               const [, subId, filter] = frame;
               if (filter.kinds.includes(39000)) {
                 ws.send(JSON.stringify(["EVENT", subId, channelMetadata]));
-              } else if (filter.kinds.includes(9)) {
+                for (const extra of options.extraChannels ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
+              } else if (filter.kinds.includes(30078)) {
+                for (const readState of options.readStateEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, readState]));
+                }
+              } else if (filter.kinds.includes(9) && filter["#h"]) {
                 ws.send(JSON.stringify(["EVENT", subId, message]));
                 for (const extra of options.extraMessages ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
+              } else if (filter.kinds.includes(9)) {
+                // Unscoped by channel: the activity read behind unread badges.
+                for (const activity of options.activityEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, activity]));
                 }
               } else if (filter.kinds.includes(7)) {
                 // The #e-keyed auxiliary read: reactions and NIP-09 deletes,
@@ -485,8 +506,12 @@ test("sending a message publishes kind:9 with the channel h tag", async ({
   await expect(composer).toHaveValue("");
   await expect(page.getByText("sent from the browser")).toBeVisible();
 
-  expect(relay.published).toHaveLength(1);
-  const event = relay.published[0] as {
+  // Read state publishes on the same stream, so scope to the message kind.
+  const messages = relay.published.filter(
+    (published) => (published as { kind: number }).kind === 9,
+  );
+  expect(messages).toHaveLength(1);
+  const event = messages[0] as {
     kind: number;
     tags: string[][];
     content: string;
@@ -726,4 +751,163 @@ test("a deleted message renders as a tombstone", async ({ page }) => {
     page.getByText("Message deleted — Removed as spam"),
   ).toBeVisible();
   await expect(page.getByText("will be removed")).toHaveCount(0);
+});
+
+/**
+ * Install a NIP-07 extension stub that also implements NIP-44.
+ *
+ * The reversible transform stands in for real encryption: the point under test
+ * is that the client stores read state as ciphertext on the relay and can read
+ * it back, not the cipher itself.
+ */
+async function installNip07WithNip44(
+  page: import("@playwright/test").Page,
+  pubkey: string,
+) {
+  await page.addInitScript((extensionPubkey) => {
+    const encode = (value: string) =>
+      `enc:${btoa(unescape(encodeURIComponent(value)))}`;
+    (
+      window as Window & {
+        nostr?: Record<string, unknown>;
+      }
+    ).nostr = {
+      async getPublicKey() {
+        return extensionPubkey;
+      },
+      async signEvent(event: Record<string, unknown>) {
+        return {
+          ...event,
+          id: `ab${Math.random().toString(16).slice(2)}`
+            .padEnd(64, "0")
+            .slice(0, 64),
+          pubkey: extensionPubkey,
+          sig: "ef".repeat(64),
+        };
+      },
+      nip44: {
+        async encrypt(_peer: string, plaintext: string) {
+          return encode(plaintext);
+        },
+        async decrypt(_peer: string, ciphertext: string) {
+          return decodeURIComponent(
+            escape(atob(ciphertext.replace(/^enc:/, ""))),
+          );
+        },
+      },
+    };
+  }, pubkey);
+}
+
+test("read state is published to the relay, not kept in the browser", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, "ab".repeat(32));
+  const relay = mockRelay(page, {
+    extraMessages: [markdownMessage("b", "something to read")],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("something to read")).toBeVisible();
+
+  await expect
+    .poll(() =>
+      relay.published.some(
+        (event) => (event as { kind: number }).kind === 30078,
+      ),
+    )
+    .toBe(true);
+
+  // Exactly one write for one channel opened once. An earlier cut re-resolved
+  // the signer every render, which changed the identity of the load effect's
+  // dependencies and turned this into a republish loop.
+  const writes = relay.published.filter(
+    (event) => (event as { kind: number }).kind === 30078,
+  );
+  expect(writes).toHaveLength(1);
+
+  const readState = writes[0] as { tags: string[][]; content: string };
+
+  // The relay's watermark trigger rejects anything that does not match these.
+  const dTag = readState.tags.find((tag) => tag[0] === "d");
+  expect(dTag?.[1]).toMatch(/^read-state:[0-9a-f]{32}$/);
+  expect(readState.tags).toContainEqual(["t", "read-state"]);
+
+  // Stored as ciphertext: the relay operator holds a blob, not a record of what
+  // this person has read.
+  expect(readState.content).toMatch(/^enc:/);
+  const blob = JSON.parse(
+    Buffer.from(readState.content.replace(/^enc:/, ""), "base64").toString(
+      "utf8",
+    ),
+  ) as { v: number; contexts: Record<string, number> };
+  expect(blob.v).toBe(1);
+  expect(blob.contexts[CHANNEL_UUID]).toBeGreaterThan(0);
+});
+
+test("a channel with activity past its cursor shows as unread", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, "ab".repeat(32));
+
+  const otherChannel = "22222222-2222-2222-2222-222222222222";
+  const relay = mockRelay(page, {
+    extraChannels: [
+      {
+        id: "ee".repeat(32),
+        pubkey: "b".repeat(64),
+        kind: 39000,
+        created_at: 1_700_000_000,
+        tags: [
+          ["d", otherChannel],
+          ["name", "elsewhere"],
+          ["public"],
+          ["t", "stream"],
+        ],
+        content: "",
+        sig: "c".repeat(128),
+      },
+    ],
+    // Channel metadata for a second room the reader is not looking at.
+    activityEvents: [
+      {
+        id: "cc".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 9,
+        created_at: 1_900_000_000,
+        tags: [["h", otherChannel]],
+        content: "newer than the cursor",
+        sig: "f".repeat(128),
+      },
+    ],
+    readStateEvents: [
+      {
+        id: "dd".repeat(32),
+        pubkey: "ab".repeat(32),
+        kind: 30078,
+        created_at: 1_700_000_000,
+        tags: [
+          ["d", `read-state:${"0".repeat(32)}`],
+          ["t", "read-state"],
+        ],
+        // Cursor sits before the activity above, so that room is unread.
+        content: `enc:${Buffer.from(
+          JSON.stringify({
+            v: 1,
+            client_id: "desktop",
+            contexts: { [otherChannel]: 1_800_000_000 },
+          }),
+        ).toString("base64")}`,
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  // The badge is on the other room; the open one is being read right now.
+  const nav = page.getByRole("navigation", { name: "Channels" });
+  await expect(nav.getByText("Unread messages")).toHaveCount(1);
 });
