@@ -355,7 +355,10 @@ test("invite download falls back for mobile and non-desktop devices", async ({
  * exercises the real NIP-42 handshake, REQ/EVENT/EOSE dispatch, and publish path
  * without a Postgres/Redis-backed relay.
  */
-function mockRelay(page: import("@playwright/test").Page) {
+function mockRelay(
+  page: import("@playwright/test").Page,
+  options: { extraMessages?: unknown[] } = {},
+) {
   const published: unknown[][] = [];
 
   const channelMetadata = {
@@ -418,6 +421,9 @@ function mockRelay(page: import("@playwright/test").Page) {
                 ws.send(JSON.stringify(["EVENT", subId, channelMetadata]));
               } else if (filter.kinds.includes(9)) {
                 ws.send(JSON.stringify(["EVENT", subId, message]));
+                for (const extra of options.extraMessages ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
               }
               ws.send(JSON.stringify(["EOSE", subId]));
             }
@@ -485,4 +491,114 @@ test("sending a message publishes kind:9 with the channel h tag", async ({
     "11111111-1111-1111-1111-111111111111",
   ]);
   expect(event.content).toBe("sent from the browser");
+});
+
+const CHANNEL_UUID = "11111111-1111-1111-1111-111111111111";
+
+function markdownMessage(id: string, content: string, tags: string[][] = []) {
+  return {
+    id: id.repeat(64).slice(0, 64),
+    pubkey: "e".repeat(64),
+    kind: 9,
+    created_at: 1_700_000_200,
+    tags: [["h", CHANNEL_UUID], ...tags],
+    content,
+    sig: "f".repeat(128),
+  };
+}
+
+test("message content renders markdown", async ({ page }) => {
+  const relay = mockRelay(page, {
+    extraMessages: [
+      markdownMessage(
+        "1",
+        "**bold** and `inline code`\n\n```\nconst x = 1;\n```\n\n- first\n- second",
+      ),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  await expect(page.getByText("bold", { exact: true })).toHaveJSProperty(
+    "tagName",
+    "STRONG",
+  );
+  await expect(page.getByText("inline code")).toBeVisible();
+  await expect(page.locator("pre code")).toContainText("const x = 1;");
+  // Anchored: a timeline row is itself an <li>, so a substring match would also
+  // hit the row wrapping this markdown list.
+  await expect(
+    page.getByRole("listitem").filter({ hasText: /^first$/ }),
+  ).toBeVisible();
+});
+
+test("external links open safely and unsafe schemes are not clickable", async ({
+  page,
+}) => {
+  const relay = mockRelay(page, {
+    extraMessages: [
+      markdownMessage(
+        "2",
+        "[docs](https://example.com/docs) and [do not click](javascript:alert(1))",
+      ),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  const external = page.getByRole("link", { name: "docs" });
+  await expect(external).toHaveAttribute("target", "_blank");
+  // `noopener` denies the opened page window.opener; `noreferrer` withholds the
+  // relay host from its Referer.
+  await expect(external).toHaveAttribute("rel", "noopener noreferrer");
+
+  // A javascript: URL must never become an activatable anchor.
+  await expect(page.getByText("do not click")).toBeVisible();
+  await expect(page.getByRole("link", { name: "do not click" })).toHaveCount(0);
+});
+
+test("a buzz://message autolink becomes in-app navigation", async ({
+  page,
+}) => {
+  const target = "a".repeat(64);
+  const relay = mockRelay(page, {
+    extraMessages: [
+      markdownMessage(
+        "3",
+        `see <buzz://message?channel=${CHANNEL_UUID}&id=${target}>`,
+      ),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  // An autolink has no author-written label, so it renders as a compact pill
+  // rather than the raw URL.
+  const pill = page.getByRole("link", { name: "message" });
+  await expect(pill).toHaveAttribute("href", `/c/${CHANNEL_UUID}?m=${target}`);
+});
+
+test("an image is sized from its NIP-92 imeta dim before it loads", async ({
+  page,
+}) => {
+  const url = "https://media.example.invalid/shot.png";
+  const relay = mockRelay(page, {
+    extraMessages: [
+      markdownMessage("4", `![shot](${url})`, [
+        ["imeta", `url ${url}`, "m image/png", "dim 800x600"],
+      ]),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  // Explicit intrinsic dimensions let the browser reserve aspect-correct space,
+  // so a late decode cannot shove the timeline down.
+  const image = page.locator('img[alt="shot"]');
+  await expect(image).toHaveAttribute("width", "800");
+  await expect(image).toHaveAttribute("height", "600");
 });

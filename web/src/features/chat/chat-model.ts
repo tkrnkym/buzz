@@ -13,6 +13,10 @@ import {
   KIND_STREAM_MESSAGE,
   KIND_SYSTEM_MESSAGE,
 } from "@/shared/constants/kinds";
+import {
+  type ImetaEntry,
+  parseImetaTags,
+} from "@/shared/ui/markdown/parse-imeta";
 
 export type ChannelType = "stream" | "forum" | "dm" | string;
 
@@ -41,6 +45,11 @@ export interface Message {
   rootId: string | null;
   /** Direct parent event id when this message is a reply. */
   parentId: string | null;
+  /**
+   * NIP-92 attachment metadata, keyed by URL. Absent when the message carries no
+   * `imeta` tag, so the common case allocates nothing.
+   */
+  imeta?: Map<string, ImetaEntry>;
 }
 
 function firstTag(event: NostrEvent, name: string): string | undefined {
@@ -151,6 +160,7 @@ export function parseThreadRefs(event: NostrEvent): {
 export function eventToMessage(event: NostrEvent): Message | null {
   if (!CHANNEL_TIMELINE_CONTENT_KINDS.includes(event.kind)) return null;
   const { rootId, parentId } = parseThreadRefs(event);
+  const imeta = parseImetaTags(event.tags);
   return {
     id: event.id,
     pubkey: event.pubkey,
@@ -159,6 +169,7 @@ export function eventToMessage(event: NostrEvent): Message | null {
     system: event.kind === KIND_SYSTEM_MESSAGE,
     rootId,
     parentId,
+    ...(imeta.size > 0 ? { imeta } : {}),
   };
 }
 

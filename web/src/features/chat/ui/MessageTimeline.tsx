@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import type { Message } from "@/features/chat/chat-model";
+import { MessageContent } from "@/features/chat/ui/MessageContent";
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { relativeTime } from "@/shared/lib/relative-time";
 
@@ -51,11 +52,9 @@ function MessageRow({ message }: { message: Message }) {
           <span className="text-2xs text-muted-foreground">reply</span>
         )}
       </div>
-      {/* `text-base` is the app's chat body size; whitespace-pre-wrap preserves
-          the author's line breaks until markdown rendering is ported. */}
-      <p className="whitespace-pre-wrap break-words text-base">
-        {message.content}
-      </p>
+      <div className="break-words">
+        <MessageContent content={message.content} imeta={message.imeta} />
+      </div>
     </li>
   );
 }
