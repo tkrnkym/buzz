@@ -5,10 +5,12 @@ use std::{collections::HashMap, sync::Arc};
 use axum::body::Bytes;
 use tracing::{debug, error, info, warn};
 
+use buzz_core::activity::ActivityShard;
 use buzz_core::event::StoredEvent;
 use buzz_core::kind::{
     event_kind_u32, is_ephemeral, is_unshared_persona_event, AUTHOR_ONLY_KINDS,
-    KIND_AGENT_OBSERVER_FRAME, KIND_GIFT_WRAP, KIND_PRESENCE_UPDATE,
+    KIND_AGENT_OBSERVER_FRAME, KIND_CHANNEL_ACTIVITY_SNAPSHOT, KIND_GIFT_WRAP,
+    KIND_PRESENCE_UPDATE,
 };
 use buzz_core::observer::{
     content_looks_like_nip44, OBSERVER_AGENT_TAG, OBSERVER_FRAME_CONTROL, OBSERVER_FRAME_TAG,
@@ -112,6 +114,50 @@ where
 /// absent bundle falls back to the fresh fail-closed lookup below, never to
 /// "assume open". Membership checks stay fresh either way; the threaded value
 /// only replaces the visibility SELECT.
+/// Who may receive an activity snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SnapshotAudience {
+    /// Every connection authenticated to this community.
+    Community,
+    /// Only connections authenticated as this pubkey.
+    Reader(Vec<u8>),
+    /// No one — the audience could not be determined.
+    Nobody,
+}
+
+/// Decide a snapshot's audience from its `d` tag.
+///
+/// Split out from [`filter_fanout_by_access`] because this is where the whole
+/// disclosure decision lives, and it is worth being able to test it directly
+/// rather than only through a fan-out that needs a database behind it.
+///
+/// Fails closed in every ambiguous case: a missing `d` tag, more than one (which
+/// would make "the" audience meaningless), or a tag whose grammar this relay
+/// does not recognise all resolve to [`SnapshotAudience::Nobody`].
+pub(crate) fn activity_snapshot_audience(event: &Event) -> SnapshotAudience {
+    let mut d_values = event.tags.iter().filter_map(|tag| {
+        let slice = tag.as_slice();
+        (slice.first().map(String::as_str) == Some("d"))
+            .then(|| slice.get(1))
+            .flatten()
+    });
+
+    let (Some(d_tag), None) = (d_values.next(), d_values.next()) else {
+        return SnapshotAudience::Nobody;
+    };
+
+    match ActivityShard::from_d_tag(d_tag) {
+        Some(ActivityShard::Shared { .. }) => SnapshotAudience::Community,
+        Some(ActivityShard::Member { pubkey_hex, .. }) => match hex::decode(&pubkey_hex) {
+            Ok(reader) => SnapshotAudience::Reader(reader),
+            // `from_d_tag` already validated the hex, so this is unreachable in
+            // practice; still not worth guessing an audience over.
+            Err(_) => SnapshotAudience::Nobody,
+        },
+        None => SnapshotAudience::Nobody,
+    }
+}
+
 pub async fn filter_fanout_by_access(
     state: &AppState,
     community_id: CommunityId,
@@ -173,6 +219,37 @@ pub async fn filter_fanout_by_access(
     } else {
         matches
     };
+
+    // Activity snapshots (kind 39007) span many channels, so they are stored
+    // globally and would otherwise fall through the channel-less return below
+    // with no membership filtering at all. They carry exactly the disclosure
+    // "this channel moved recently", which is real even when the bodies stay
+    // hidden — so they get their own gate here, above that return, alongside the
+    // other globally-stored kinds that need one.
+    //
+    // The audience comes from the `d` tag: a shared shard holds only open
+    // channels, which every pubkey in the community can already enumerate, so it
+    // goes to the whole community; a member shard is addressed to one reader and
+    // goes only to that reader's connections. A `d` tag this relay cannot parse
+    // has no determinable audience and is delivered to nobody.
+    if event_kind_u32(&stored_event.event) == KIND_CHANNEL_ACTIVITY_SNAPSHOT {
+        return match activity_snapshot_audience(&stored_event.event) {
+            SnapshotAudience::Community => matches,
+            SnapshotAudience::Reader(reader) => matches
+                .into_iter()
+                .filter(|(conn_id, _)| {
+                    state
+                        .conn_manager
+                        .pubkey_for_conn(*conn_id)
+                        .is_some_and(|pk| pk == reader)
+                })
+                .collect(),
+            SnapshotAudience::Nobody => {
+                warn!("activity snapshot: undeterminable audience; delivering to nobody");
+                Vec::new()
+            }
+        };
+    }
 
     let Some(channel_id) = stored_event.channel_id else {
         return matches;
@@ -1172,6 +1249,64 @@ mod tests {
     use tokio::sync::{mpsc, Mutex, RwLock};
     use tokio_util::sync::CancellationToken;
     use uuid::Uuid;
+
+    fn snapshot_with_d_tags(d_tags: &[&str]) -> nostr::Event {
+        let mut builder = EventBuilder::new(
+            Kind::Custom(buzz_core::kind::KIND_CHANNEL_ACTIVITY_SNAPSHOT as u16),
+            "{}",
+        );
+        for d in d_tags {
+            builder = builder.tag(Tag::parse(["d", d]).unwrap());
+        }
+        builder.sign_with_keys(&Keys::generate()).unwrap()
+    }
+
+    #[test]
+    fn a_shared_shard_goes_to_the_whole_community() {
+        // Safe because a shared shard holds only `visibility = 'open'` channels,
+        // which `get_accessible_channel_ids` already returns to every pubkey in
+        // the community.
+        assert_eq!(
+            super::activity_snapshot_audience(&snapshot_with_d_tags(&["activity:3"])),
+            super::SnapshotAudience::Community
+        );
+    }
+
+    #[test]
+    fn a_member_shard_goes_only_to_the_reader_it_names() {
+        let reader = "ab".repeat(32);
+        assert_eq!(
+            super::activity_snapshot_audience(&snapshot_with_d_tags(&[&format!(
+                "activity:3:{reader}"
+            )])),
+            super::SnapshotAudience::Reader(hex::decode(&reader).unwrap())
+        );
+    }
+
+    #[test]
+    fn a_snapshot_with_no_determinable_audience_reaches_nobody() {
+        // Every one of these must fail closed. A `Community` here would
+        // broadcast one reader's private-channel activity to the whole
+        // community, which is the exact leak the gate exists to prevent.
+        for d_tags in [
+            // No `d` tag at all.
+            vec![],
+            // Two `d` tags: "the" audience is not well defined.
+            vec!["activity:1", "activity:2"],
+            vec!["activity:1", &format!("activity:1:{}", "ab".repeat(32))[..]],
+            // Grammar this relay does not emit.
+            vec!["activity:notanumber"],
+            vec!["activity:16"],
+            vec!["activity:1:short"],
+            vec!["read-state:00000000000000000000000000000000"],
+        ] {
+            assert_eq!(
+                super::activity_snapshot_audience(&snapshot_with_d_tags(&d_tags)),
+                super::SnapshotAudience::Nobody,
+                "must fail closed for {d_tags:?}"
+            );
+        }
+    }
 
     #[test]
     fn fanout_event_frame_matches_legacy_format_byte_for_byte() {

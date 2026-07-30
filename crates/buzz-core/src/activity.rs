@@ -111,6 +111,46 @@ impl ActivityShard {
             Self::Member { shard, pubkey_hex } => format!("activity:{shard}:{pubkey_hex}"),
         }
     }
+
+    /// Recover the shard identity from a `d` tag.
+    ///
+    /// The fan-out gate reads this to decide who may receive a snapshot, so it
+    /// is the security-relevant half of the grammar and returns `None` for
+    /// anything it does not fully recognise. Callers must treat `None` as
+    /// "deliver to nobody": a snapshot whose audience cannot be determined is
+    /// exactly the case where guessing leaks activity.
+    pub fn from_d_tag(d_tag: &str) -> Option<Self> {
+        let rest = d_tag.strip_prefix("activity:")?;
+        match rest.split_once(':') {
+            None => Some(Self::Shared {
+                shard: parse_shard(rest)?,
+            }),
+            Some((shard, pubkey_hex)) => {
+                // A pubkey is 32 bytes of lowercase hex. Anything else is not a
+                // reader this relay can address.
+                if pubkey_hex.len() != 64
+                    || !pubkey_hex
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                {
+                    return None;
+                }
+                Some(Self::Member {
+                    shard: parse_shard(shard)?,
+                    pubkey_hex: pubkey_hex.to_string(),
+                })
+            }
+        }
+    }
+}
+
+/// Parse a shard index, rejecting anything outside the configured range.
+///
+/// An out-of-range index cannot have been produced by [`shard_of`], so it is
+/// forged or stale; either way it has no legitimate audience.
+fn parse_shard(raw: &str) -> Option<u32> {
+    let shard: u32 = raw.parse().ok()?;
+    (shard < ACTIVITY_SHARD_COUNT).then_some(shard)
 }
 
 /// The body of a snapshot event.
@@ -221,6 +261,63 @@ mod tests {
             pubkey_hex: "bb".repeat(32),
         };
         assert_ne!(one.d_tag(), two.d_tag());
+    }
+
+    #[test]
+    fn a_d_tag_round_trips_for_both_classes() {
+        for shard in [
+            ActivityShard::Shared { shard: 0 },
+            ActivityShard::Shared {
+                shard: ACTIVITY_SHARD_COUNT - 1,
+            },
+            ActivityShard::Member {
+                shard: 7,
+                pubkey_hex: "ab".repeat(32),
+            },
+        ] {
+            assert_eq!(ActivityShard::from_d_tag(&shard.d_tag()), Some(shard));
+        }
+    }
+
+    #[test]
+    fn an_unrecognisable_d_tag_has_no_audience() {
+        // The fan-out gate reads this to decide who receives a snapshot, so
+        // every one of these must be None — a `Some` here would be a delivery
+        // to an audience nobody chose.
+        for malformed in [
+            "",
+            "activity",
+            "activity:",
+            "activity:notanumber",
+            // Out of range: cannot have come from `shard_of`.
+            "activity:16",
+            "activity:99999",
+            // Truncated, over-long, and non-hex reader ids.
+            "activity:1:abcd",
+            &format!("activity:1:{}", "ab".repeat(33)),
+            &format!("activity:1:{}", "zz".repeat(32)),
+            // Uppercase hex is not the form this relay emits; accepting it would
+            // let one reader be addressed by two distinct d tags.
+            &format!("activity:1:{}", "AB".repeat(32)),
+            // Extra segments beyond the grammar.
+            &format!("activity:1:{}:extra", "ab".repeat(32)),
+            // A different overlay's slot entirely.
+            "read-state:00000000000000000000000000000000",
+        ] {
+            assert_eq!(
+                ActivityShard::from_d_tag(malformed),
+                None,
+                "unrecognised d tag must have no audience: {malformed:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_shared_tag_never_parses_as_a_reader_tag() {
+        // If these ever collapsed, a shared shard would be delivered as though
+        // addressed to one reader, or worse, a reader's shard broadcast.
+        let shared = ActivityShard::from_d_tag("activity:5").unwrap();
+        assert!(matches!(shared, ActivityShard::Shared { .. }));
     }
 
     #[test]
