@@ -324,12 +324,34 @@ export function buildReactionWithdrawalTemplate(reactionEventId: string): {
 }
 
 /**
+ * How far back unread badges look.
+ *
+ * Matches the desktop client's read-state horizon. A channel whose newest
+ * message predates this is not worth badging, and bounding the window is what
+ * keeps the initial activity read from scanning the whole history.
+ */
+export const UNREAD_HORIZON_SECONDS = 7 * 24 * 60 * 60;
+
+/**
  * Recent messages across every channel the reader can see.
  *
  * Unscoped by channel on purpose: unread badges need activity for the channels
  * the reader is *not* looking at. `kinds` is still explicit, since an open-ended
  * filter trips the relay's p-gate.
+ *
+ * Bounded by `since` and a small `limit` because the subscription is a firehose:
+ * every message in the community arrives here to yield one integer per channel.
+ * That is a stopgap — the read is superseded by the bounded probe in
+ * `unread.ts`, which asks the relay per channel instead of listening to
+ * everything.
  */
-export function buildGlobalActivityFilter(limit: number): NostrFilter {
-  return { kinds: CHANNEL_TIMELINE_CONTENT_KINDS, limit };
+export function buildGlobalActivityFilter(
+  limit: number,
+  nowSeconds: number,
+): NostrFilter {
+  return {
+    kinds: CHANNEL_TIMELINE_CONTENT_KINDS,
+    since: nowSeconds - UNREAD_HORIZON_SECONDS,
+    limit,
+  };
 }
