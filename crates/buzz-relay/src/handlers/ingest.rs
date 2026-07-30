@@ -2504,6 +2504,24 @@ async fn ingest_event_inner(
         );
     }
 
+    // Move the channel's activity timestamp, which is what unread badges read.
+    // Only message kinds count: a badge should mean someone said something, not
+    // that a reaction or an edit touched an old message.
+    //
+    // Recording is cheap and unconditional; the expensive half (rebuild, sign,
+    // fan out) is coalesced behind a claim inside, so a burst of messages in one
+    // channel still produces one snapshot per window.
+    if let Some(ch_id) = channel_id {
+        if buzz_core::kind::is_channel_activity_kind(kind_u32) {
+            crate::activity::record_channel_activity(
+                tenant,
+                state,
+                ch_id,
+                event.created_at.as_secs() as i64,
+            );
+        }
+    }
+
     let pubkey_hex = auth.pubkey().to_hex();
     // Spec WriteInsert (line 514) / WriteInsertGlobal (line 559) /
     // WriteDuplicate (line 606): emit the abstract write at the trailing

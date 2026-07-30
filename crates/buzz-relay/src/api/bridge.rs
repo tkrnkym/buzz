@@ -1030,6 +1030,12 @@ async fn query_events_authed(
         return Ok(Json(Value::Array(presence_events)));
     }
 
+    if let Some(snapshots) =
+        synthesize_activity_snapshots(state, tenant, &filters, &pubkey_bytes).await
+    {
+        return Ok(Json(Value::Array(snapshots)));
+    }
+
     let mut events: Vec<Value> = Vec::new();
     let mut handled: std::collections::HashSet<usize> = std::collections::HashSet::new();
 
@@ -1968,6 +1974,110 @@ pub async fn workflow_webhook(
             "status": "pending",
         })),
     ))
+}
+
+/// Serve a reader's whole unread picture from Redis when every filter asks for
+/// activity snapshots.
+///
+/// Snapshots are never stored (see [`crate::activity`]), so a normal query would
+/// find nothing. This is the initial-fetch half of the feature: a client asks
+/// once on connect, then keeps up over the live subscription.
+///
+/// The response is built for the reader rather than filtered from a general
+/// one — shared shards plus that reader's own member shards — so a caller
+/// cannot request another reader's view by naming them.
+///
+/// Cost is one Redis read per shard, independent of how many channels the reader
+/// can see. That is the point: the query this replaces cost one Postgres round
+/// trip per channel.
+async fn synthesize_activity_snapshots(
+    state: &AppState,
+    tenant: &buzz_core::tenant::TenantContext,
+    filters: &[nostr::Filter],
+    pubkey_bytes: &[u8],
+) -> Option<Vec<Value>> {
+    use buzz_core::activity::{ActivityShard, ActivitySnapshot, ACTIVITY_SHARD_COUNT};
+    use buzz_core::kind::KIND_CHANNEL_ACTIVITY_SNAPSHOT;
+
+    // Only intercept when every filter is asking for exactly this kind; anything
+    // mixed falls through so a combined query is not silently truncated.
+    if filters.is_empty() {
+        return None;
+    }
+    for filter in filters {
+        let kinds = filter.kinds.as_ref()?;
+        if kinds.len() != 1 {
+            return None;
+        }
+        let kind = kinds.iter().next()?;
+        if kind.as_u16() as u32 != KIND_CHANNEL_ACTIVITY_SNAPSHOT {
+            return None;
+        }
+    }
+
+    let accessible: std::collections::HashSet<uuid::Uuid> = state
+        .get_accessible_channel_ids_cached(tenant.community(), pubkey_bytes)
+        .await
+        .ok()?
+        .into_iter()
+        .collect();
+    let open: std::collections::HashSet<uuid::Uuid> = state
+        .db
+        .list_channels(tenant.community(), Some("open"))
+        .await
+        .ok()?
+        .into_iter()
+        .map(|channel| channel.id)
+        .collect();
+
+    let reader_hex = hex::encode(pubkey_bytes);
+    let mut events = Vec::new();
+
+    for shard in 0..ACTIVITY_SHARD_COUNT {
+        let entries = buzz_pubsub::activity::read_shard(&state.redis_pool, tenant, shard)
+            .await
+            .unwrap_or_default();
+        if entries.is_empty() {
+            continue;
+        }
+
+        let (shared, mine) = crate::activity::split_for_reader(&entries, &open, &accessible);
+
+        for (shard_id, channels) in [
+            (ActivityShard::Shared { shard }, shared),
+            (
+                ActivityShard::Member {
+                    shard,
+                    pubkey_hex: reader_hex.clone(),
+                },
+                mine,
+            ),
+        ] {
+            if channels.is_empty() {
+                continue;
+            }
+            let snapshot = ActivitySnapshot::new(shard, channels);
+            let Ok(content) = serde_json::to_string(&snapshot) else {
+                continue;
+            };
+            let Ok(tag) = nostr::Tag::parse(["d", &shard_id.d_tag()]) else {
+                continue;
+            };
+            let Ok(event) = nostr::EventBuilder::new(
+                nostr::Kind::Custom(KIND_CHANNEL_ACTIVITY_SNAPSHOT as u16),
+                content,
+            )
+            .tag(tag)
+            .sign_with_keys(&state.relay_keypair) else {
+                continue;
+            };
+            if let Ok(value) = serde_json::to_value(&event) {
+                events.push(value);
+            }
+        }
+    }
+
+    Some(events)
 }
 
 /// If all filters target kind:20001 or kind:40902 with authors, synthesize

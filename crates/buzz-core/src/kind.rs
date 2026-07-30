@@ -378,6 +378,23 @@ pub const KIND_THREAD_SUMMARY: u32 = 39005;
 /// clients must not infer `has_more` from row counts.
 pub const KIND_WINDOW_BOUNDS: u32 = 39006;
 
+/// Kinds whose arrival in a channel counts as activity for unread badges.
+///
+/// Deliberately narrower than "everything with an `h` tag": a badge should mean
+/// someone said something, not that a reaction or an edit touched an old
+/// message. It matches the client's timeline content kinds — if the two drift,
+/// badges appear for rooms whose timeline shows nothing new.
+pub const CHANNEL_ACTIVITY_KINDS: &[u32] = &[
+    KIND_STREAM_MESSAGE,
+    KIND_STREAM_MESSAGE_V2,
+    KIND_SYSTEM_MESSAGE,
+];
+
+/// True when an event of this kind should move a channel's activity timestamp.
+pub fn is_channel_activity_kind(kind: u32) -> bool {
+    CHANNEL_ACTIVITY_KINDS.contains(&kind)
+}
+
 /// Channel activity snapshot (relay-signed, addressable, coalesced).
 ///
 /// One event carries the last-activity timestamp for a whole *shard* of
