@@ -22,6 +22,7 @@
 //! Lagged receivers get `RecvError::Lagged`.
 
 /// Cross-pod cache-key invalidation over Redis pub/sub.
+pub mod activity;
 pub mod cache_invalidation;
 /// Cross-pod connection-control commands over Redis pub/sub.
 pub mod conn_control;

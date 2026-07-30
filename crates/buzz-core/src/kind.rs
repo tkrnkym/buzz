@@ -378,6 +378,16 @@ pub const KIND_THREAD_SUMMARY: u32 = 39005;
 /// clients must not infer `has_more` from row counts.
 pub const KIND_WINDOW_BOUNDS: u32 = 39006;
 
+/// Channel activity snapshot (relay-signed, addressable, coalesced).
+///
+/// One event carries the last-activity timestamp for a whole *shard* of
+/// channels, not for one channel. See [`crate::activity`] for the shard model
+/// and why the per-channel shape was rejected.
+///
+/// `d` tag = the shard key (see [`crate::activity::ActivityShard::d_tag`]),
+/// content = `{"shard": <n>, "channels": {"<uuid>": <unix_seconds>, ...}}`.
+pub const KIND_CHANNEL_ACTIVITY_SNAPSHOT: u32 = 39007;
+
 /// Workflow definition (parameterized replaceable, d=workflow_uuid).
 pub const KIND_WORKFLOW_DEF: u32 = 30620;
 
@@ -788,6 +798,7 @@ const _: () = assert!(is_parameterized_replaceable(KIND_WORKFLOW_DEF)); // 30620
 const _: () = assert!(is_parameterized_replaceable(KIND_EVENT_REMINDER)); // 30300 ∈ 30000–39999
 const _: () = assert!(is_parameterized_replaceable(KIND_DM_VISIBILITY)); // 30622 ∈ 30000–39999
 const _: () = assert!(is_parameterized_replaceable(KIND_THREAD_SUMMARY)); // 39005 ∈ 30000–39999
+const _: () = assert!(is_parameterized_replaceable(KIND_CHANNEL_ACTIVITY_SNAPSHOT)); // 39007 ∈ 30000–39999
 const _: () = assert!(is_parameterized_replaceable(KIND_WINDOW_BOUNDS)); // 39006 ∈ 30000–39999
 
 // Compile-time: NIP-34 parameterized replaceable kinds are in the correct range.
