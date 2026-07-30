@@ -98,22 +98,6 @@ where
     drop_count
 }
 
-/// Drop recipients without access before fan-out on a private channel.
-///
-/// Open and channel-less events skip membership filtering (open channel-scoped
-/// events pay one visibility lookup; see `channel_visibility_cached`). For a
-/// private channel, each recipient is kept only if its connection's
-/// authenticated pubkey is a current member; unknown/unauthenticated recipients
-/// fail closed. This is the cluster-wide backstop: even if a stale subscription
-/// survives on another node after an open->private flip, its events are not
-/// delivered here.
-///
-/// `threaded` is an optional visibility read resolved earlier in the same
-/// request (E1 phase-2, §4.8 phase-2 addendum). It is consulted only when its
-/// `(community_id, channel_id)` exactly match this fan-out's — a mismatched or
-/// absent bundle falls back to the fresh fail-closed lookup below, never to
-/// "assume open". Membership checks stay fresh either way; the threaded value
-/// only replaces the visibility SELECT.
 /// Who may receive an activity snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SnapshotAudience {
@@ -158,6 +142,22 @@ pub(crate) fn activity_snapshot_audience(event: &Event) -> SnapshotAudience {
     }
 }
 
+/// Drop recipients without access before fan-out on a private channel.
+///
+/// Open and channel-less events skip membership filtering (open channel-scoped
+/// events pay one visibility lookup; see `channel_visibility_cached`). For a
+/// private channel, each recipient is kept only if its connection's
+/// authenticated pubkey is a current member; unknown/unauthenticated recipients
+/// fail closed. This is the cluster-wide backstop: even if a stale subscription
+/// survives on another node after an open->private flip, its events are not
+/// delivered here.
+///
+/// `threaded` is an optional visibility read resolved earlier in the same
+/// request (E1 phase-2, §4.8 phase-2 addendum). It is consulted only when its
+/// `(community_id, channel_id)` exactly match this fan-out's — a mismatched or
+/// absent bundle falls back to the fresh fail-closed lookup below, never to
+/// "assume open". Membership checks stay fresh either way; the threaded value
+/// only replaces the visibility SELECT.
 pub async fn filter_fanout_by_access(
     state: &AppState,
     community_id: CommunityId,
