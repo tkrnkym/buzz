@@ -368,6 +368,11 @@ function mockRelay(
     readStateEvents?: unknown[];
     /** Served to the kind:20002 typing subscription. */
     typingEvents?: unknown[];
+    /**
+     * Hold back the OK for a read-state write, so a spec can advance a second
+     * cursor while the first publish is still in flight.
+     */
+    delayReadStateOkMs?: number;
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -420,6 +425,15 @@ function mockRelay(
 
             if (verb === "EVENT") {
               published.push(frame[1]);
+              const delay =
+                frame[1].kind === 30078 ? (options.delayReadStateOkMs ?? 0) : 0;
+              if (delay > 0) {
+                setTimeout(
+                  () => ws.send(JSON.stringify(["OK", frame[1].id, true, ""])),
+                  delay,
+                );
+                return;
+              }
               ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
               // Echo it back on the live subscription, as a relay would.
               ws.send(JSON.stringify(["EVENT", "s1", frame[1]]));
@@ -438,7 +452,19 @@ function mockRelay(
                   ws.send(JSON.stringify(["EVENT", subId, readState]));
                 }
               } else if (filter.kinds.includes(9) && filter["#h"]) {
-                ws.send(JSON.stringify(["EVENT", subId, message]));
+                // Echo the requested channel back on the `h` tag so a spec that
+                // opens two rooms sees each one's own timeline.
+                ws.send(
+                  JSON.stringify([
+                    "EVENT",
+                    subId,
+                    {
+                      ...message,
+                      id: `${filter["#h"][0]}`.padEnd(64, "0").slice(0, 64),
+                      tags: [["h", filter["#h"][0]]],
+                    },
+                  ]),
+                );
                 for (const extra of options.extraMessages ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, extra]));
                 }
@@ -1018,4 +1044,104 @@ test("presence comes from the HTTP snapshot, which is the only path that has it"
 
   await expect.poll(() => presenceQueried).toBe(true);
   await expect(page.getByText("Status: online")).toBeAttached();
+});
+
+test("read cursors advanced during a publish are not lost", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, "ab".repeat(32));
+
+  const otherChannel = "33333333-3333-3333-3333-333333333333";
+  const relay = mockRelay(page, {
+    // Hold the first write open so the second cursor advances mid-publish —
+    // without this the two never overlap and the race is not exercised.
+    delayReadStateOkMs: 1_500,
+    extraChannels: [
+      {
+        id: "77".repeat(32),
+        pubkey: "b".repeat(64),
+        kind: 39000,
+        created_at: 1_700_000_000,
+        tags: [
+          ["d", otherChannel],
+          ["name", "second"],
+          ["public"],
+          ["t", "stream"],
+        ],
+        content: "",
+        sig: "c".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  // Read one room and immediately switch to another, so the second cursor
+  // advances while the first publish is still in flight.
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page
+    .getByRole("navigation", { name: "Channels" })
+    .getByText("second")
+    .click();
+  await expect(page.getByRole("heading", { name: "#second" })).toBeVisible();
+
+  const cursorsOf = (event: unknown) =>
+    (
+      JSON.parse(
+        Buffer.from(
+          (event as { content: string }).content.replace(/^enc:/, ""),
+          "base64",
+        ).toString("utf8"),
+      ) as { contexts: Record<string, number> }
+    ).contexts;
+
+  // The newest write must carry both rooms: dropping the second would leave a
+  // cursor that only ever existed in this tab, and the badge returns on reload.
+  await expect
+    .poll(() => {
+      const writes = relay.published.filter(
+        (event) => (event as { kind: number }).kind === 30078,
+      );
+      if (writes.length === 0) return null;
+      return Object.keys(cursorsOf(writes[writes.length - 1])).sort();
+    })
+    .toEqual([CHANNEL_UUID, otherChannel].sort());
+});
+
+test("a signer without NIP-44 is told unread sync is unavailable", async ({
+  page,
+}) => {
+  // NIP-44 is optional in NIP-07 and some extensions omit it. Marking a channel
+  // read must not look like it worked when nothing can be persisted.
+  await page.addInitScript((extensionPubkey) => {
+    (window as Window & { nostr?: Record<string, unknown> }).nostr = {
+      async getPublicKey() {
+        return extensionPubkey;
+      },
+      async signEvent(event: Record<string, unknown>) {
+        return {
+          ...event,
+          id: "ab".repeat(32),
+          pubkey: extensionPubkey,
+          sig: "ef".repeat(64),
+        };
+      },
+      // No nip44 member at all.
+    };
+  }, "ab".repeat(32));
+
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  await expect(page.getByText("unread sync off")).toBeVisible();
+  // And nothing is written, rather than a write that silently fails.
+  await expect
+    .poll(
+      () =>
+        relay.published.filter(
+          (event) => (event as { kind: number }).kind === 30078,
+        ).length,
+    )
+    .toBe(0);
 });

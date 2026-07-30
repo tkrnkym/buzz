@@ -7,6 +7,7 @@ import {
   type ReplyTarget,
 } from "@/features/chat/ui/MessageComposer";
 import { MessageTimeline } from "@/features/chat/ui/MessageTimeline";
+import { ReadStateNotice } from "@/features/chat/ui/ReadStateNotice";
 import { RelayStatus } from "@/features/chat/ui/RelayStatus";
 import { TypingIndicator } from "@/features/chat/ui/TypingIndicator";
 import {
@@ -130,7 +131,13 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
               </p>
             )}
           </div>
-          <RelayStatus />
+          <div className="flex shrink-0 items-center gap-2">
+            <ReadStateNotice
+              canSync={readState.canSync}
+              error={readState.error}
+            />
+            <RelayStatus />
+          </div>
         </header>
 
         {channelId ? (

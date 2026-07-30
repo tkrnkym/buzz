@@ -65,13 +65,16 @@ export function useReadState(): ReadStateApi {
   const [snapshot, setSnapshot] = useState<ReadStateSnapshot>(EMPTY_READ_STATE);
   const [error, setError] = useState<string | null>(null);
 
-  // Held in a ref as well as state: the publish path needs the newest values
-  // without re-creating `markRead` on every cursor change.
+  // Refs, not state, are what the publisher reads. `setState` is asynchronous,
+  // so a second mark-as-read arriving in the same tick would otherwise build its
+  // blob from cursors that do not yet include the first one.
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
   const clientIdRef = useRef<string>(randomSlotId());
   const publishingRef = useRef(false);
+  /** A cursor advanced while a publish was in flight, still to be written. */
+  const pendingRef = useRef(false);
 
   useEffect(() => {
     if (!myPubkey || !canSync) return;
@@ -98,10 +101,14 @@ export function useReadState(): ReadStateApi {
         // Merge rather than replace: a cursor this session already advanced
         // must not be pulled back to whatever the relay last stored, or the
         // badge reappears and the client republishes in a loop.
-        setSnapshot((previous) => ({
-          ...folded,
-          contexts: mergeContexts(previous.contexts, folded.contexts),
-        }));
+        setSnapshot((previous) => {
+          const merged = {
+            ...folded,
+            contexts: mergeContexts(previous.contexts, folded.contexts),
+          };
+          snapshotRef.current = merged;
+          return merged;
+        });
       } catch (loadError) {
         if (active) {
           setError(
@@ -119,6 +126,62 @@ export function useReadState(): ReadStateApi {
     };
   }, [session, signer, myPubkey, canSync]);
 
+  /**
+   * Write the current cursors to the relay, coalescing concurrent requests.
+   *
+   * A publish that arrives while one is in flight is not dropped — it sets a
+   * pending flag, and the loop runs again with whatever the cursors are by then.
+   * Dropping it would leave a cursor that only ever existed in this tab, so the
+   * badge would come back on reload.
+   */
+  const publishReadState = useCallback(async () => {
+    if (publishingRef.current) {
+      pendingRef.current = true;
+      return;
+    }
+    publishingRef.current = true;
+    try {
+      do {
+        pendingRef.current = false;
+        const current = snapshotRef.current;
+        const slotId = current.slotId ?? clientIdRef.current;
+        const blob = buildReadStateBlob(clientIdRef.current, current.contexts);
+        if (!fitsSlotBudget(blob)) {
+          // Slot splitting is desktop behaviour not ported yet. Refusing the
+          // write keeps the stored blob valid instead of publishing something
+          // the relay or another client would reject.
+          throw new Error(
+            "Read state is too large to publish from this client",
+          );
+        }
+        const createdAt = nextCreatedAt(
+          Math.floor(Date.now() / 1000),
+          current.newestCreatedAt,
+        );
+        const ciphertext = await signer.encryptToSelf(JSON.stringify(blob));
+        await session.publish(
+          buildReadStateTemplate(slotId, ciphertext, createdAt),
+        );
+        const written = {
+          ...snapshotRef.current,
+          newestCreatedAt: createdAt,
+          slotId,
+        };
+        snapshotRef.current = written;
+        setSnapshot(written);
+        setError(null);
+      } while (pendingRef.current);
+    } catch (publishError) {
+      setError(
+        publishError instanceof Error
+          ? publishError.message
+          : "Could not save read state",
+      );
+    } finally {
+      publishingRef.current = false;
+    }
+  }, [session, signer]);
+
   const markRead = useCallback(
     (channelId: string, readAt: number) => {
       if (!canSync || !myPubkey) return;
@@ -128,53 +191,19 @@ export function useReadState(): ReadStateApi {
       // Cursors only move forward, so re-reading older history is not a write.
       if (existing !== undefined && existing >= readAt) return;
 
-      const contexts = mergeContexts(current.contexts, {
-        [channelId]: readAt,
-      });
-      // Reflect it immediately: the badge should clear on read, not on round trip.
-      setSnapshot({ ...current, contexts });
+      const advanced = {
+        ...current,
+        contexts: mergeContexts(current.contexts, { [channelId]: readAt }),
+      };
+      // Ref first: the publisher must see this cursor even if it runs before
+      // React has re-rendered. State follows so the badge clears on read rather
+      // than on round trip.
+      snapshotRef.current = advanced;
+      setSnapshot(advanced);
 
-      if (publishingRef.current) return;
-      publishingRef.current = true;
-
-      void (async () => {
-        try {
-          const slotId = current.slotId ?? clientIdRef.current;
-          const blob = buildReadStateBlob(clientIdRef.current, contexts);
-          if (!fitsSlotBudget(blob)) {
-            // Slot splitting is desktop behaviour not ported yet. Refusing the
-            // write keeps the stored blob valid instead of publishing something
-            // the relay or another client would reject.
-            throw new Error(
-              "Read state is too large to publish from this client",
-            );
-          }
-          const createdAt = nextCreatedAt(
-            Math.floor(Date.now() / 1000),
-            snapshotRef.current.newestCreatedAt,
-          );
-          const ciphertext = await signer.encryptToSelf(JSON.stringify(blob));
-          await session.publish(
-            buildReadStateTemplate(slotId, ciphertext, createdAt),
-          );
-          setSnapshot((previous) => ({
-            contexts: previous.contexts,
-            newestCreatedAt: createdAt,
-            slotId,
-          }));
-          setError(null);
-        } catch (publishError) {
-          setError(
-            publishError instanceof Error
-              ? publishError.message
-              : "Could not save read state",
-          );
-        } finally {
-          publishingRef.current = false;
-        }
-      })();
+      void publishReadState();
     },
-    [session, signer, myPubkey, canSync],
+    [canSync, myPubkey, publishReadState],
   );
 
   const isChannelUnread = useCallback(
