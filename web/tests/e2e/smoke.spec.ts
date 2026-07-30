@@ -347,3 +347,142 @@ test("invite download falls back for mobile and non-desktop devices", async ({
     await context.close();
   }
 });
+
+/**
+ * Chat surface, driven against a mocked relay WebSocket.
+ *
+ * `page.routeWebSocket` handles the connection entirely in-process, so the spec
+ * exercises the real NIP-42 handshake, REQ/EVENT/EOSE dispatch, and publish path
+ * without a Postgres/Redis-backed relay.
+ */
+function mockRelay(page: import("@playwright/test").Page) {
+  const published: unknown[][] = [];
+
+  const channelMetadata = {
+    id: "a".repeat(64),
+    pubkey: "b".repeat(64),
+    kind: 39000,
+    created_at: 1_700_000_000,
+    tags: [
+      ["d", "11111111-1111-1111-1111-111111111111"],
+      ["name", "general"],
+      ["about", "Everything else"],
+      ["public"],
+      ["closed"],
+      ["t", "stream"],
+      ["topic", "ship it"],
+    ],
+    content: "",
+    sig: "c".repeat(128),
+  };
+
+  const message = {
+    id: "d".repeat(64),
+    pubkey: "e".repeat(64),
+    kind: 9,
+    created_at: 1_700_000_100,
+    tags: [["h", "11111111-1111-1111-1111-111111111111"]],
+    content: "hello from the mocked relay",
+    sig: "f".repeat(128),
+  };
+
+  return {
+    published,
+    install: () =>
+      page.routeWebSocket(
+        (url) => url.protocol === "ws:" || url.protocol === "wss:",
+        (ws) => {
+          // Buzz relays always challenge before serving anything.
+          ws.send(JSON.stringify(["AUTH", "challenge-from-mock"]));
+
+          ws.onMessage((raw) => {
+            const frame = JSON.parse(String(raw));
+            const [verb] = frame;
+
+            if (verb === "AUTH") {
+              ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
+              return;
+            }
+
+            if (verb === "EVENT") {
+              published.push(frame[1]);
+              ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
+              // Echo it back on the live subscription, as a relay would.
+              ws.send(JSON.stringify(["EVENT", "s1", frame[1]]));
+              return;
+            }
+
+            if (verb === "REQ") {
+              const [, subId, filter] = frame;
+              if (filter.kinds.includes(39000)) {
+                ws.send(JSON.stringify(["EVENT", subId, channelMetadata]));
+              } else if (filter.kinds.includes(9)) {
+                ws.send(JSON.stringify(["EVENT", subId, message]));
+              }
+              ws.send(JSON.stringify(["EOSE", subId]));
+            }
+          });
+        },
+      ),
+  };
+}
+
+test("chat lists channels from kind:39000 metadata", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/c");
+
+  await expect(
+    page.getByRole("navigation", { name: "Channels" }).getByText("general"),
+  ).toBeVisible();
+  // No NIP-07 extension in a plain browser, so custody must be shown as
+  // disposable rather than silently assumed durable.
+  await expect(page.getByText("temporary identity")).toBeVisible();
+  await expect(page.getByText("Connected")).toBeVisible();
+});
+
+test("opening a channel renders its timeline", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/c");
+  await page
+    .getByRole("navigation", { name: "Channels" })
+    .getByText("general")
+    .click();
+
+  await expect(page.getByRole("heading", { name: "#general" })).toBeVisible();
+  await expect(page.getByText("ship it")).toBeVisible();
+  await expect(page.getByText("hello from the mocked relay")).toBeVisible();
+});
+
+test("sending a message publishes kind:9 with the channel h tag", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/c/11111111-1111-1111-1111-111111111111");
+
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("sent from the browser");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  // The composer clears only after the relay OKs the event.
+  await expect(composer).toHaveValue("");
+  await expect(page.getByText("sent from the browser")).toBeVisible();
+
+  expect(relay.published).toHaveLength(1);
+  const event = relay.published[0] as {
+    kind: number;
+    tags: string[][];
+    content: string;
+  };
+  expect(event.kind).toBe(9);
+  expect(event.tags).toContainEqual([
+    "h",
+    "11111111-1111-1111-1111-111111111111",
+  ]);
+  expect(event.content).toBe("sent from the browser");
+});

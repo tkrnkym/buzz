@@ -6,9 +6,12 @@
 
 import { Route as rootRouteImport } from "./routes/root";
 import { Route as reposRouteImport } from "./routes/repos";
+import { Route as chatRouteImport } from "./routes/chat";
 import { Route as indexRouteImport } from "./routes/index";
+import { Route as chatDotindexRouteImport } from "./routes/chat.index";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
 import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
+import { Route as chatDotchannelIdRouteImport } from "./routes/chat.$channelId";
 import { Route as reposDotrepoIdDotblobDotsplatRouteImport } from "./routes/repos.$repoId.blob.$";
 
 const reposRoute = reposRouteImport.update({
@@ -16,10 +19,20 @@ const reposRoute = reposRouteImport.update({
   path: "/repos",
   getParentRoute: () => rootRouteImport,
 } as any);
+const chatRoute = chatRouteImport.update({
+  id: "/c",
+  path: "/c",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const indexRoute = indexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => rootRouteImport,
+} as any);
+const chatDotindexRoute = chatDotindexRouteImport.update({
+  id: "/",
+  path: "/",
+  getParentRoute: () => chatRoute,
 } as any);
 const reposDotrepoIdRoute = reposDotrepoIdRouteImport.update({
   id: "/repos/$repoId",
@@ -31,6 +44,11 @@ const inviteDotcodeRoute = inviteDotcodeRouteImport.update({
   path: "/invite/$code",
   getParentRoute: () => rootRouteImport,
 } as any);
+const chatDotchannelIdRoute = chatDotchannelIdRouteImport.update({
+  id: "/$channelId",
+  path: "/$channelId",
+  getParentRoute: () => chatRoute,
+} as any);
 const reposDotrepoIdDotblobDotsplatRoute =
   reposDotrepoIdDotblobDotsplatRouteImport.update({
     id: "/repos/$repoId/blob/$",
@@ -40,52 +58,69 @@ const reposDotrepoIdDotblobDotsplatRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
+  "/c": typeof chatRouteWithChildren;
   "/repos": typeof reposRoute;
+  "/c/$channelId": typeof chatDotchannelIdRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
+  "/c/": typeof chatDotindexRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof indexRoute;
   "/repos": typeof reposRoute;
+  "/c/$channelId": typeof chatDotchannelIdRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
+  "/c": typeof chatDotindexRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof indexRoute;
+  "/c": typeof chatRouteWithChildren;
   "/repos": typeof reposRoute;
+  "/c/$channelId": typeof chatDotchannelIdRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
+  "/c/": typeof chatDotindexRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
+    | "/c"
     | "/repos"
+    | "/c/$channelId"
     | "/invite/$code"
     | "/repos/$repoId"
+    | "/c/"
     | "/repos/$repoId/blob/$";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
     | "/repos"
+    | "/c/$channelId"
     | "/invite/$code"
     | "/repos/$repoId"
+    | "/c"
     | "/repos/$repoId/blob/$";
   id:
     | "__root__"
     | "/"
+    | "/c"
     | "/repos"
+    | "/c/$channelId"
     | "/invite/$code"
     | "/repos/$repoId"
+    | "/c/"
     | "/repos/$repoId/blob/$";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   indexRoute: typeof indexRoute;
+  chatRoute: typeof chatRouteWithChildren;
   reposRoute: typeof reposRoute;
   inviteDotcodeRoute: typeof inviteDotcodeRoute;
   reposDotrepoIdRoute: typeof reposDotrepoIdRoute;
@@ -101,12 +136,26 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof reposRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/c": {
+      id: "/c";
+      path: "/c";
+      fullPath: "/c";
+      preLoaderRoute: typeof chatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/": {
       id: "/";
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof indexRouteImport;
       parentRoute: typeof rootRouteImport;
+    };
+    "/c/": {
+      id: "/c/";
+      path: "/";
+      fullPath: "/c/";
+      preLoaderRoute: typeof chatDotindexRouteImport;
+      parentRoute: typeof chatRoute;
     };
     "/repos/$repoId": {
       id: "/repos/$repoId";
@@ -122,6 +171,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof inviteDotcodeRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/c/$channelId": {
+      id: "/c/$channelId";
+      path: "/$channelId";
+      fullPath: "/c/$channelId";
+      preLoaderRoute: typeof chatDotchannelIdRouteImport;
+      parentRoute: typeof chatRoute;
+    };
     "/repos/$repoId/blob/$": {
       id: "/repos/$repoId/blob/$";
       path: "/repos/$repoId/blob/$";
@@ -132,8 +188,21 @@ declare module "@tanstack/react-router" {
   }
 }
 
+interface chatRouteChildren {
+  chatDotchannelIdRoute: typeof chatDotchannelIdRoute;
+  chatDotindexRoute: typeof chatDotindexRoute;
+}
+
+const chatRouteChildren: chatRouteChildren = {
+  chatDotchannelIdRoute: chatDotchannelIdRoute,
+  chatDotindexRoute: chatDotindexRoute,
+};
+
+const chatRouteWithChildren = chatRoute._addFileChildren(chatRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
   indexRoute: indexRoute,
+  chatRoute: chatRouteWithChildren,
   reposRoute: reposRoute,
   inviteDotcodeRoute: inviteDotcodeRoute,
   reposDotrepoIdRoute: reposDotrepoIdRoute,
