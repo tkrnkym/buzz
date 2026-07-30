@@ -5,12 +5,16 @@ import {
   buildChannelListFilter,
   buildChannelTimelineFilter,
   buildMessageTemplate,
+  buildReactionFilter,
+  buildReactionTemplate,
+  buildReactionWithdrawalFilter,
+  buildReactionWithdrawalTemplate,
+  buildReplyTemplate,
+  chunkIds,
   dedupeAddressable,
   eventToChannel,
   eventToMessage,
-  mergeTimeline,
   parseThreadRefs,
-  sortTimeline,
   toChannelList,
 } from "@/features/chat/chat-model";
 
@@ -206,38 +210,6 @@ test("eventToMessage accepts both stream message kinds", () => {
   assert.equal(eventToMessage(event({ id: "c", kind: 7 })), null);
 });
 
-test("mergeTimeline dedupes replayed events and keeps identity when unchanged", () => {
-  const first = mergeTimeline(new Map(), [
-    event({ id: "a", kind: 9, created_at: 10 }),
-    event({ id: "b", kind: 9, created_at: 20 }),
-  ]);
-  assert.equal(first.size, 2);
-
-  // A reconnect re-sends the same filter, so the same ids arrive again.
-  const again = mergeTimeline(first, [
-    event({ id: "a", kind: 9, created_at: 10 }),
-  ]);
-  assert.equal(again, first, "no new events must not produce a new Map");
-
-  const grown = mergeTimeline(first, [
-    event({ id: "c", kind: 9, created_at: 30 }),
-  ]);
-  assert.equal(grown.size, 3);
-  assert.notEqual(grown, first);
-});
-
-test("sortTimeline orders oldest first and breaks ties deterministically", () => {
-  const merged = mergeTimeline(new Map(), [
-    event({ id: "bbb", kind: 9, created_at: 100 }),
-    event({ id: "aaa", kind: 9, created_at: 100 }),
-    event({ id: "ccc", kind: 9, created_at: 50 }),
-  ]);
-  assert.deepEqual(
-    sortTimeline(merged).map((message) => message.id),
-    ["ccc", "aaa", "bbb"],
-  );
-});
-
 test("filters always carry explicit kinds", () => {
   // An open-ended filter trips the relay's p-gate and comes back 403.
   const timeline = buildChannelTimelineFilter("chan-1", 50);
@@ -256,4 +228,78 @@ test("buildMessageTemplate matches buzz-sdk build_message", () => {
     tags: [["h", "chan-1"]],
     content: "hi",
   });
+});
+
+test("buildReplyTemplate emits one marked reply tag for a direct reply", () => {
+  // buzz-sdk collapses root === parent into a single `reply` tag.
+  assert.deepEqual(
+    buildReplyTemplate("chan-1", "ack", {
+      rootId: "root-1",
+      parentId: "root-1",
+    }),
+    {
+      kind: 9,
+      tags: [
+        ["h", "chan-1"],
+        ["e", "root-1", "", "reply"],
+      ],
+      content: "ack",
+    },
+  );
+});
+
+test("buildReplyTemplate emits root plus reply for a nested reply", () => {
+  assert.deepEqual(
+    buildReplyTemplate("chan-1", "ack", {
+      rootId: "root-1",
+      parentId: "parent-2",
+    }).tags,
+    [
+      ["h", "chan-1"],
+      ["e", "root-1", "", "root"],
+      ["e", "parent-2", "", "reply"],
+    ],
+  );
+});
+
+test("buildReactionTemplate matches buzz-sdk build_reaction", () => {
+  // kind 7, one `e` tag, emoji as content — and deliberately no `h` tag, which
+  // is why reactions are unreachable from an `#h` subscription.
+  assert.deepEqual(buildReactionTemplate("msg-1", "👍"), {
+    kind: 7,
+    tags: [["e", "msg-1"]],
+    content: "👍",
+  });
+});
+
+test("buildReactionTemplate enforces the SDK's emoji length cap", () => {
+  assert.throws(() => buildReactionTemplate("msg-1", "a".repeat(65)));
+  assert.ok(buildReactionTemplate("msg-1", "a".repeat(64)));
+});
+
+test("withdrawing a reaction deletes the reaction event, not the message", () => {
+  // Targeting the message id would ask the relay to delete the message.
+  assert.deepEqual(buildReactionWithdrawalTemplate("reaction-1"), {
+    kind: 5,
+    tags: [["e", "reaction-1"]],
+    content: "",
+  });
+});
+
+test("aux filters are keyed by #e and carry explicit kinds", () => {
+  const reactions = buildReactionFilter(["msg-1", "msg-2"]);
+  assert.deepEqual(reactions["#e"], ["msg-1", "msg-2"]);
+  // kind 5 rides along because the NIP-09 delete form has no `h` tag either.
+  assert.deepEqual(reactions.kinds, [7, 5]);
+  assert.equal(reactions["#h"], undefined);
+
+  const withdrawals = buildReactionWithdrawalFilter(["reaction-1"]);
+  assert.deepEqual(withdrawals.kinds, [5]);
+  assert.deepEqual(withdrawals["#e"], ["reaction-1"]);
+});
+
+test("chunkIds keeps each filter inside the relay's limits", () => {
+  assert.deepEqual(chunkIds(["a", "b", "c"], 2), [["a", "b"], ["c"]]);
+  assert.deepEqual(chunkIds([], 2), []);
+  assert.equal(chunkIds(new Array(250).fill("x")).length, 3);
 });

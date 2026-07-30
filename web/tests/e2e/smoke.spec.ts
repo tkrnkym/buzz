@@ -357,7 +357,7 @@ test("invite download falls back for mobile and non-desktop devices", async ({
  */
 function mockRelay(
   page: import("@playwright/test").Page,
-  options: { extraMessages?: unknown[] } = {},
+  options: { extraMessages?: unknown[]; auxEvents?: unknown[] } = {},
 ) {
   const published: unknown[][] = [];
 
@@ -423,6 +423,12 @@ function mockRelay(
                 ws.send(JSON.stringify(["EVENT", subId, message]));
                 for (const extra of options.extraMessages ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
+              } else if (filter.kinds.includes(7)) {
+                // The #e-keyed auxiliary read: reactions and NIP-09 deletes,
+                // neither of which carries an `h` tag.
+                for (const aux of options.auxEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, aux]));
                 }
               }
               ws.send(JSON.stringify(["EOSE", subId]));
@@ -601,4 +607,123 @@ test("an image is sized from its NIP-92 imeta dim before it loads", async ({
   const image = page.locator('img[alt="shot"]');
   await expect(image).toHaveAttribute("width", "800");
   await expect(image).toHaveAttribute("height", "600");
+});
+
+test("reactions render from #e-keyed events and toggle", async ({ page }) => {
+  const target = markdownMessage("7", "react to me");
+  const relay = mockRelay(page, {
+    extraMessages: [target],
+    auxEvents: [
+      {
+        id: "aa".repeat(32),
+        pubkey: "cc".repeat(32),
+        kind: 7,
+        created_at: 1_700_000_300,
+        // A reaction carries only an `e` tag — no `h` — so it is only reachable
+        // through the #e subscription.
+        tags: [["e", target.id]],
+        content: "🎉",
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  const pill = page.getByRole("button", { name: "🎉 1" });
+  await expect(pill).toBeVisible();
+  // Not the reader's own reaction, so it is not shown as pressed.
+  await expect(pill).toHaveAttribute("aria-pressed", "false");
+
+  await pill.click();
+  await expect(page.getByRole("button", { name: "🎉 2" })).toBeVisible();
+
+  const reaction = relay.published.find(
+    (event) => (event as { kind: number }).kind === 7,
+  ) as { kind: number; tags: string[][]; content: string };
+  expect(reaction.content).toBe("🎉");
+  expect(reaction.tags).toEqual([["e", target.id]]);
+});
+
+test("a quick reaction publishes kind:7 against the message", async ({
+  page,
+}) => {
+  const target = markdownMessage("8", "quick react");
+  const relay = mockRelay(page, { extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  await page.getByRole("button", { name: "React with 👍" }).first().click();
+  await expect(page.getByRole("button", { name: "👍 1" })).toBeVisible();
+  // The reader's own reaction reads as pressed, so a second click withdraws it.
+  await expect(page.getByRole("button", { name: "👍 1" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("replying publishes thread tags and shows the reply count", async ({
+  page,
+}) => {
+  const root = markdownMessage("9", "the original");
+  const relay = mockRelay(page, { extraMessages: [root] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  // Scope to the intended row: the mock also serves a baseline message, and a
+  // bare `.first()` would reply to that instead.
+  const rootRow = page
+    .getByRole("listitem")
+    .filter({ hasText: "the original" });
+  await rootRow.getByRole("button", { name: "Reply" }).click();
+  await expect(page.getByText(/Replying to/)).toBeVisible();
+
+  const composer = page.getByRole("textbox", { name: /^Reply to/ });
+  await composer.fill("a threaded answer");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(rootRow.getByText("1 reply")).toBeVisible();
+
+  const reply = relay.published.find((event) =>
+    (event as { tags: string[][] }).tags.some((tag) => tag[3] === "reply"),
+  ) as { kind: number; tags: string[][] };
+  expect(reply.kind).toBe(9);
+  // Root === parent for a direct reply, which buzz-sdk collapses to one tag.
+  expect(reply.tags).toContainEqual(["e", root.id, "", "reply"]);
+  expect(reply.tags).toContainEqual(["h", CHANNEL_UUID]);
+});
+
+test("a deleted message renders as a tombstone", async ({ page }) => {
+  const target = markdownMessage("a", "will be removed");
+  const relay = mockRelay(page, {
+    extraMessages: [
+      target,
+      {
+        id: "bb".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 9005,
+        created_at: 1_700_000_400,
+        tags: [
+          ["h", CHANNEL_UUID],
+          ["e", target.id],
+          ["public_reason", "Removed as spam"],
+        ],
+        content: "",
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  // The row survives as a tombstone so a reader following a reply can see the
+  // parent existed and was removed.
+  await expect(
+    page.getByText("Message deleted — Removed as spam"),
+  ).toBeVisible();
+  await expect(page.getByText("will be removed")).toHaveCount(0);
 });

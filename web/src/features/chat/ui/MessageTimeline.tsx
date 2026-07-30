@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 
-import type { Message } from "@/features/chat/chat-model";
+import type { TimelineRow } from "@/features/chat/timeline";
 import { MessageContent } from "@/features/chat/ui/MessageContent";
+import { ReactionBar } from "@/features/chat/ui/ReactionBar";
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { relativeTime } from "@/shared/lib/relative-time";
 
@@ -27,17 +28,46 @@ function systemMessageLabel(content: string): string {
   return content;
 }
 
-function MessageRow({ message }: { message: Message }) {
+export interface TimelineActions {
+  onToggleReaction: (input: {
+    messageId: string;
+    emoji: string;
+    myReactionId?: string;
+  }) => void;
+  onReply: (row: TimelineRow) => void;
+  pending?: boolean;
+}
+
+function MessageRow({
+  row,
+  actions,
+}: {
+  row: TimelineRow;
+  actions: TimelineActions;
+}) {
+  const { message } = row;
+
   if (message.system) {
     return (
       <li className="px-4 py-1 text-2xs italic text-muted-foreground">
-        {systemMessageLabel(message.content)}
+        {systemMessageLabel(row.content)}
+      </li>
+    );
+  }
+
+  if (row.deleted) {
+    // A tombstone is shown rather than the row vanishing: a reader following a
+    // reply needs to see that the parent existed and was removed.
+    return (
+      <li className="px-4 py-1.5 text-sm italic text-muted-foreground">
+        Message deleted
+        {row.deletedReason ? ` — ${row.deletedReason}` : ""}
       </li>
     );
   }
 
   return (
-    <li className="px-4 py-1.5">
+    <li className="group px-4 py-1.5">
       <div className="flex items-baseline gap-2">
         <span className="font-semibold text-base">
           {truncatePubkey(message.pubkey)}
@@ -48,36 +78,64 @@ function MessageRow({ message }: { message: Message }) {
         >
           {relativeTime(message.createdAt)}
         </time>
-        {message.parentId && (
-          <span className="text-2xs text-muted-foreground">reply</span>
+        {row.edited && (
+          <span className="text-2xs text-muted-foreground">(edited)</span>
         )}
+        <button
+          type="button"
+          onClick={() => actions.onReply(row)}
+          className="text-2xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          Reply
+        </button>
       </div>
+
       <div className="break-words">
-        <MessageContent content={message.content} imeta={message.imeta} />
+        <MessageContent content={row.content} imeta={message.imeta} />
       </div>
+
+      {row.replyCount > 0 && (
+        <p className="text-2xs text-primary">
+          {row.replyCount === 1 ? "1 reply" : `${row.replyCount} replies`}
+        </p>
+      )}
+
+      <ReactionBar
+        reactions={row.reactions}
+        disabled={actions.pending}
+        onToggle={({ emoji, myReactionId }) =>
+          actions.onToggleReaction({
+            messageId: message.id,
+            emoji,
+            myReactionId,
+          })
+        }
+      />
     </li>
   );
 }
 
 export function MessageTimeline({
-  messages,
+  rows,
   loaded,
   error,
+  actions,
 }: {
-  messages: Message[];
+  rows: TimelineRow[];
   loaded: boolean;
   error: string | null;
+  actions: TimelineActions;
 }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // Follow the tail. Virtualization and read-position restore are later work;
   // this keeps the newest message visible in the meantime. Keyed on the count so
-  // an edit to an existing message does not yank the viewport.
-  const messageCount = messages.length;
+  // a reaction or edit does not yank the viewport.
+  const rowCount = rows.length;
   useEffect(() => {
-    if (messageCount === 0) return;
+    if (rowCount === 0) return;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messageCount]);
+  }, [rowCount]);
 
   if (error) {
     return (
@@ -95,7 +153,7 @@ export function MessageTimeline({
     );
   }
 
-  if (messages.length === 0) {
+  if (rowCount === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <p className="text-sm text-muted-foreground">
@@ -108,8 +166,8 @@ export function MessageTimeline({
   return (
     <div className="flex-1 overflow-y-auto">
       <ul className="flex flex-col py-2">
-        {messages.map((message) => (
-          <MessageRow key={message.id} message={message} />
+        {rows.map((row) => (
+          <MessageRow key={row.message.id} row={row} actions={actions} />
         ))}
       </ul>
       <div ref={bottomRef} />
