@@ -11,11 +11,11 @@ import { ReadStateNotice } from "@/features/chat/ui/ReadStateNotice";
 import { RelayStatus } from "@/features/chat/ui/RelayStatus";
 import { TypingIndicator } from "@/features/chat/ui/TypingIndicator";
 import {
-  useChannelActivity,
   useChannelMessages,
   useChannels,
   useToggleReaction,
 } from "@/features/chat/use-chat";
+import { useUnreadChannels } from "@/features/chat/use-unread";
 import { useReadState } from "@/features/chat/use-read-state";
 import { usePresence, useTyping } from "@/features/chat/use-presence";
 
@@ -29,7 +29,6 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
   const channels = useChannels();
   const timeline = useChannelMessages(channelId);
   const toggleReaction = useToggleReaction();
-  const activity = useChannelActivity();
   const readState = useReadState();
   const typing = useTyping(channelId);
   // Only the authors on screen: presence is read per-author, so asking about
@@ -79,10 +78,13 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
     // Keyed on the id so this fires once per message, not on every re-render.
   }, [newestRowId, newestRow, completeTyping]);
 
-  const isChannelUnread = useCallback(
-    (id: string) => readState.isChannelUnread(id, activity.get(id) ?? null),
-    [readState.isChannelUnread, activity],
+  // Unread is asked for per channel rather than derived from a stream of every
+  // message in the community. See `unread.ts`.
+  const channelIds = useMemo(
+    () => (channels.data ?? []).map((channel) => channel.id),
+    [channels.data],
   );
+  const unread = useUnreadChannels(channelIds, readState.contexts);
 
   const onReply = useCallback(
     (row: TimelineRow) => {
@@ -116,7 +118,7 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
         activeChannelId={channelId}
         isLoading={channels.isLoading}
         error={channels.error instanceof Error ? channels.error : null}
-        isUnread={isChannelUnread}
+        isUnread={unread.isUnread}
       />
 
       <section className="flex min-w-0 flex-1 flex-col">

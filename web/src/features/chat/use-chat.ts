@@ -16,7 +16,6 @@ import {
   type Channel,
   buildChannelListFilter,
   buildChannelTimelineFilter,
-  buildGlobalActivityFilter,
   buildMessageTemplate,
   buildReactionFilter,
   buildReactionTemplate,
@@ -36,13 +35,6 @@ import {
 
 const CHANNEL_LIST_LIMIT = 500;
 const TIMELINE_LIMIT = 100;
-/**
- * Recent messages scanned across all channels to seed unread badges.
- *
- * Matches the desktop client's 50. The earlier 500 pulled ten times the history
- * for the same one-integer-per-channel result.
- */
-const ACTIVITY_LIMIT = 50;
 
 /**
  * The channel list.
@@ -239,48 +231,4 @@ export function useToggleReaction() {
           : buildReactionTemplate(input.messageId, input.emoji),
       ),
   });
-}
-
-/**
- * Newest message timestamp per channel, for unread badges.
- *
- * A channel-scoped subscription only covers the room in view, so unread state for
- * every *other* channel needs a global read. Messages carry an `h` tag, so one
- * subscription over the message kinds yields activity for every channel the
- * reader can see; the relay's own visibility rules decide what that is.
- */
-export function useChannelActivity(): Map<string, number> {
-  const session = useRelaySession();
-  const [activity, setActivity] = useState<Map<string, number>>(
-    () => new Map(),
-  );
-
-  useEffect(
-    () =>
-      session.subscribe(
-        buildGlobalActivityFilter(
-          ACTIVITY_LIMIT,
-          Math.floor(Date.now() / 1000),
-        ),
-        {
-          onEvent: (event) => {
-            const channelId = event.tags.find((tag) => tag[0] === "h")?.[1];
-            if (!channelId) return;
-            setActivity((previous) => {
-              const current = previous.get(channelId);
-              if (current !== undefined && current >= event.created_at) {
-                // Older than what we already know — no new Map, so React can skip.
-                return previous;
-              }
-              const next = new Map(previous);
-              next.set(channelId, event.created_at);
-              return next;
-            });
-          },
-        },
-      ),
-    [session],
-  );
-
-  return activity;
 }

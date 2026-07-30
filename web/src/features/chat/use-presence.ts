@@ -7,9 +7,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRelaySession } from "@/shared/api/relay-provider";
-import { makeNip98AuthHeader } from "@/shared/lib/nip98";
+import { postRelayQuery } from "@/shared/api/relay-http";
 import type { NostrEvent } from "@/shared/lib/nostr-client";
-import { relayHttpBaseUrl } from "@/shared/lib/relay-url";
 import {
   PRESENCE_HEARTBEAT_MS,
   type PresenceStatus,
@@ -39,24 +38,9 @@ const TYPING_PRUNE_MS = 1_000;
  * that reads current status out of Redis, and only for filters that name the
  * presence kind together with explicit authors.
  */
-async function fetchPresenceSnapshot(pubkeys: string[]): Promise<NostrEvent[]> {
-  if (pubkeys.length === 0) return [];
-
-  const url = `${relayHttpBaseUrl()}/query`;
-  const body = JSON.stringify({ filters: [buildPresenceFilter(pubkeys)] });
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: await makeNip98AuthHeader(url, "POST", { body }),
-    },
-    body,
-  });
-  if (!response.ok) {
-    throw new Error(`Presence query failed: ${response.status}`);
-  }
-  const events: unknown = await response.json();
-  return Array.isArray(events) ? (events as NostrEvent[]) : [];
+function fetchPresenceSnapshot(pubkeys: string[]): Promise<NostrEvent[]> {
+  if (pubkeys.length === 0) return Promise.resolve([]);
+  return postRelayQuery([buildPresenceFilter(pubkeys)]);
 }
 
 export interface PresenceApi {

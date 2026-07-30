@@ -354,14 +354,33 @@ test("invite download falls back for mobile and non-desktop devices", async ({
  * `page.routeWebSocket` handles the connection entirely in-process, so the spec
  * exercises the real NIP-42 handshake, REQ/EVENT/EOSE dispatch, and publish path
  * without a Postgres/Redis-backed relay.
+ *
+ * `POST /query` is mocked alongside it, because two reads deliberately do not go
+ * over the socket: presence (never stored, only synthesized for a query) and the
+ * unread probe (a bounded question per channel rather than a stream).
  */
+interface QueryFilter {
+  kinds?: number[];
+  authors?: string[];
+  since?: number;
+  limit?: number;
+  "#h"?: string[];
+}
+
+interface MockEvent {
+  created_at: number;
+  tags: string[][];
+}
+
 function mockRelay(
   page: import("@playwright/test").Page,
   options: {
     extraMessages?: unknown[];
     auxEvents?: unknown[];
-    /** Served to the unscoped activity read that drives unread badges. */
-    activityEvents?: unknown[];
+    /** Served to the per-channel unread probes over `POST /query`. */
+    unreadActivity?: MockEvent[];
+    /** Served to the kind:20001 presence read over `POST /query`. */
+    presenceEvents?: unknown[];
     /** Extra kind:39000 metadata, for rooms beyond the default one. */
     extraChannels?: unknown[];
     /** Served to the kind:30078 read-state read. */
@@ -376,6 +395,10 @@ function mockRelay(
   } = {},
 ) {
   const published: unknown[][] = [];
+  /** Every REQ filter the client opened, so a spec can assert what it did not. */
+  const subscriptions: QueryFilter[] = [];
+  /** Every `POST /query` body, as an array of filters per request. */
+  const queries: QueryFilter[][] = [];
 
   const channelMetadata = {
     id: "a".repeat(64),
@@ -407,8 +430,44 @@ function mockRelay(
 
   return {
     published,
-    install: () =>
-      page.routeWebSocket(
+    subscriptions,
+    queries,
+    install: async () => {
+      await page.route("**/query", async (route) => {
+        const body = JSON.parse(route.request().postData() ?? "{}") as {
+          filters?: QueryFilter[];
+        };
+        const filters = body.filters ?? [];
+        queries.push(filters);
+
+        const events: unknown[] = [];
+        for (const filter of filters) {
+          if (filter.kinds?.includes(20001)) {
+            events.push(...(options.presenceEvents ?? []));
+            continue;
+          }
+          // An unread probe: one channel, and `since` is the read cursor. The
+          // mock honours it, so a spec can seed a cursor past the activity and
+          // assert the badge stays off.
+          const channelId = filter["#h"]?.[0];
+          if (!channelId) continue;
+          const hit = (options.unreadActivity ?? []).find(
+            (event) =>
+              event.tags.some(
+                (tag) => tag[0] === "h" && tag[1] === channelId,
+              ) && event.created_at >= (filter.since ?? 0),
+          );
+          if (hit) events.push(hit);
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(events),
+        });
+      });
+
+      await page.routeWebSocket(
         (url) => url.protocol === "ws:" || url.protocol === "wss:",
         (ws) => {
           // Buzz relays always challenge before serving anything.
@@ -442,6 +501,7 @@ function mockRelay(
 
             if (verb === "REQ") {
               const [, subId, filter] = frame;
+              subscriptions.push(filter);
               if (filter.kinds.includes(39000)) {
                 ws.send(JSON.stringify(["EVENT", subId, channelMetadata]));
                 for (const extra of options.extraChannels ?? []) {
@@ -468,11 +528,6 @@ function mockRelay(
                 for (const extra of options.extraMessages ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, extra]));
                 }
-              } else if (filter.kinds.includes(9)) {
-                // Unscoped by channel: the activity read behind unread badges.
-                for (const activity of options.activityEvents ?? []) {
-                  ws.send(JSON.stringify(["EVENT", subId, activity]));
-                }
               } else if (filter.kinds.includes(20002)) {
                 for (const typing of options.typingEvents ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, typing]));
@@ -488,7 +543,8 @@ function mockRelay(
             }
           });
         },
-      ),
+      );
+    },
   };
 }
 
@@ -905,8 +961,7 @@ test("a channel with activity past its cursor shows as unread", async ({
         sig: "c".repeat(128),
       },
     ],
-    // Channel metadata for a second room the reader is not looking at.
-    activityEvents: [
+    unreadActivity: [
       {
         id: "cc".repeat(32),
         pubkey: "e".repeat(64),
@@ -946,6 +1001,105 @@ test("a channel with activity past its cursor shows as unread", async ({
   // The badge is on the other room; the open one is being read right now.
   const nav = page.getByRole("navigation", { name: "Channels" });
   await expect(nav.getByText("Unread messages")).toHaveCount(1);
+
+  // Badges are asked for, not listened to: no subscription may carry message
+  // bodies for a channel the reader is not looking at. A channel-less content
+  // filter is exactly that firehose, so its absence is the guarantee.
+  const firehose = relay.subscriptions.filter(
+    (filter) => filter.kinds?.includes(9) && !filter["#h"],
+  );
+  expect(firehose).toEqual([]);
+
+  // And the probe that replaced it is bounded: one filter per channel, each
+  // asking only whether a single event exists past that channel's cursor.
+  const probe = relay.queries.find((filters) =>
+    filters.some((filter) => filter["#h"]),
+  );
+  expect(probe).toBeDefined();
+  for (const filter of probe ?? []) {
+    expect(filter["#h"]).toHaveLength(1);
+    expect(filter.limit).toBe(1);
+  }
+  const otherProbe = probe?.find(
+    (filter) => filter["#h"]?.[0] === otherChannel,
+  );
+  // `since` is inclusive in Nostr and the cursor itself has been read, so the
+  // probe must start one second past it or every read channel reports unread.
+  expect(otherProbe?.since).toBe(1_800_000_001);
+});
+
+test("a channel read past its newest message shows no badge", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, "ab".repeat(32));
+
+  const otherChannel = "22222222-2222-2222-2222-222222222222";
+  const relay = mockRelay(page, {
+    extraChannels: [
+      {
+        id: "ee".repeat(32),
+        pubkey: "b".repeat(64),
+        kind: 39000,
+        created_at: 1_700_000_000,
+        tags: [
+          ["d", otherChannel],
+          ["name", "elsewhere"],
+          ["public"],
+          ["t", "stream"],
+        ],
+        content: "",
+        sig: "c".repeat(128),
+      },
+    ],
+    unreadActivity: [
+      {
+        id: "cc".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 9,
+        created_at: 1_800_000_000,
+        tags: [["h", otherChannel]],
+        content: "already read",
+        sig: "f".repeat(128),
+      },
+    ],
+    readStateEvents: [
+      {
+        id: "dd".repeat(32),
+        pubkey: "ab".repeat(32),
+        kind: 30078,
+        created_at: 1_700_000_000,
+        tags: [
+          ["d", `read-state:${"0".repeat(32)}`],
+          ["t", "read-state"],
+        ],
+        // Cursor sits on the activity above — it has been read.
+        content: `enc:${Buffer.from(
+          JSON.stringify({
+            v: 1,
+            client_id: "desktop",
+            contexts: { [otherChannel]: 1_800_000_000 },
+          }),
+        ).toString("base64")}`,
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  // Wait for a probe carrying this room before asserting on its absence of a
+  // badge, so the assertion cannot pass merely because nothing has run yet.
+  await expect
+    .poll(() =>
+      relay.queries.some((filters) =>
+        filters.some((filter) => filter["#h"]?.[0] === otherChannel),
+      ),
+    )
+    .toBe(true);
+
+  const nav = page.getByRole("navigation", { name: "Channels" });
+  await expect(nav.getByText("Unread messages")).toHaveCount(0);
 });
 
 test("a typing indicator appears and clears when the message lands", async ({
@@ -1009,41 +1163,38 @@ test("presence comes from the HTTP snapshot, which is the only path that has it"
 }) => {
   // Ephemeral events are never stored, so a WebSocket REQ has nothing to
   // return; `POST /query` is where the relay synthesizes status out of Redis.
-  let presenceQueried = false;
-  await page.route("**/query", async (route) => {
-    presenceQueried = true;
-    const body = JSON.parse(route.request().postData() ?? "{}") as {
-      filters: Array<{ kinds: number[]; authors?: string[] }>;
-    };
-    expect(body.filters[0].kinds).toEqual([20001]);
-    // The relay only synthesizes for filters that name authors explicitly.
-    expect(body.filters[0].authors?.length).toBeGreaterThan(0);
-
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([
-        {
-          id: "22".repeat(32),
-          pubkey: "e".repeat(64),
-          kind: 20001,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [],
-          content: "online",
-          sig: "f".repeat(128),
-        },
-      ]),
-    });
+  const relay = mockRelay(page, {
+    presenceEvents: [
+      {
+        id: "22".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 20001,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: "online",
+        sig: "f".repeat(128),
+      },
+    ],
   });
-
-  const relay = mockRelay(page);
   await relay.install();
 
   await page.goto(`/c/${CHANNEL_UUID}`);
   await expect(page.getByText("hello from the mocked relay")).toBeVisible();
 
-  await expect.poll(() => presenceQueried).toBe(true);
   await expect(page.getByText("Status: online")).toBeAttached();
+
+  const presence = relay.queries
+    .flat()
+    .find((filter) => filter.kinds?.includes(20001));
+  expect(presence?.kinds).toEqual([20001]);
+  // The relay only synthesizes for filters that name authors explicitly.
+  expect(presence?.authors?.length).toBeGreaterThan(0);
+  // Presence and unread share the endpoint but never the request: mixing them
+  // would tie a status refresh to the badge poll's cadence and vice versa.
+  for (const filters of relay.queries) {
+    const kinds = new Set(filters.flatMap((filter) => filter.kinds ?? []));
+    expect(kinds.has(20001) && kinds.has(9)).toBe(false);
+  }
 });
 
 test("read cursors advanced during a publish are not lost", async ({
