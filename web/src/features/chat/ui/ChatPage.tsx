@@ -78,13 +78,9 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
     // Keyed on the id so this fires once per message, not on every re-render.
   }, [newestRowId, newestRow, completeTyping]);
 
-  // Unread is asked for per channel rather than derived from a stream of every
-  // message in the community. See `unread.ts`.
-  const channelIds = useMemo(
-    () => (channels.data ?? []).map((channel) => channel.id),
-    [channels.data],
-  );
-  const unread = useUnreadChannels(channelIds, readState.contexts);
+  // Unread comes from relay-published activity snapshots, not from a stream of
+  // every message in the community. See `unread.ts`.
+  const unread = useUnreadChannels(readState.contexts);
 
   const onReply = useCallback(
     (row: TimelineRow) => {

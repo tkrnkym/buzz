@@ -356,8 +356,9 @@ test("invite download falls back for mobile and non-desktop devices", async ({
  * without a Postgres/Redis-backed relay.
  *
  * `POST /query` is mocked alongside it, because two reads deliberately do not go
- * over the socket: presence (never stored, only synthesized for a query) and the
- * unread probe (a bounded question per channel rather than a stream).
+ * over the socket. Neither kind is ever stored, so a subscription alone would
+ * deliver nothing until the next write: presence is synthesized from Redis on
+ * demand, and activity snapshots are synthesized for the initial badge picture.
  */
 interface QueryFilter {
   kinds?: number[];
@@ -367,18 +368,17 @@ interface QueryFilter {
   "#h"?: string[];
 }
 
-interface MockEvent {
-  created_at: number;
-  tags: string[][];
-}
-
 function mockRelay(
   page: import("@playwright/test").Page,
   options: {
     extraMessages?: unknown[];
     auxEvents?: unknown[];
-    /** Served to the per-channel unread probes over `POST /query`. */
-    unreadActivity?: MockEvent[];
+    /**
+     * Channel id -> last-activity unix seconds, served as kind:39007 activity
+     * snapshots. Delivered both to the initial `POST /query` and live over the
+     * subscription, which is how the relay serves them.
+     */
+    channelActivity?: Record<string, number>;
     /** Served to the kind:20001 presence read over `POST /query`. */
     presenceEvents?: unknown[];
     /** Extra kind:39000 metadata, for rooms beyond the default one. */
@@ -428,6 +428,35 @@ function mockRelay(
     sig: "f".repeat(128),
   };
 
+  /**
+   * Build the kind:39007 snapshots for the seeded activity.
+   *
+   * Sharded the way the relay shards, so a spec that seeds two channels
+   * exercises the merge across shards rather than a single event — replacing
+   * instead of merging would pass a one-shard test and lose badges in real use.
+   */
+  const activitySnapshots = () => {
+    const byShard = new Map<number, Record<string, number>>();
+    for (const [channelId, at] of Object.entries(
+      options.channelActivity ?? {},
+    )) {
+      // Same rule as `shard_of` in buzz-core: the UUID's last bytes, mod the
+      // shard count.
+      const shard =
+        Number.parseInt(channelId.replace(/-/g, "").slice(-8), 16) % 16;
+      byShard.set(shard, { ...(byShard.get(shard) ?? {}), [channelId]: at });
+    }
+    return [...byShard].map(([shard, channels]) => ({
+      id: `39007${shard}`.padEnd(64, "0"),
+      pubkey: "b".repeat(64),
+      kind: 39007,
+      created_at: 1_900_000_000,
+      tags: [["d", `activity:${shard}`]],
+      content: JSON.stringify({ shard, channels }),
+      sig: "f".repeat(128),
+    }));
+  };
+
   return {
     published,
     subscriptions,
@@ -444,20 +473,9 @@ function mockRelay(
         for (const filter of filters) {
           if (filter.kinds?.includes(20001)) {
             events.push(...(options.presenceEvents ?? []));
-            continue;
+          } else if (filter.kinds?.includes(39007)) {
+            events.push(...activitySnapshots());
           }
-          // An unread probe: one channel, and `since` is the read cursor. The
-          // mock honours it, so a spec can seed a cursor past the activity and
-          // assert the badge stays off.
-          const channelId = filter["#h"]?.[0];
-          if (!channelId) continue;
-          const hit = (options.unreadActivity ?? []).find(
-            (event) =>
-              event.tags.some(
-                (tag) => tag[0] === "h" && tag[1] === channelId,
-              ) && event.created_at >= (filter.since ?? 0),
-          );
-          if (hit) events.push(hit);
         }
 
         await route.fulfill({
@@ -527,6 +545,16 @@ function mockRelay(
                 );
                 for (const extra of options.extraMessages ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
+              } else if (filter.kinds.includes(39007)) {
+                // Live badge updates. The relay never stores these, so a real
+                // subscription only carries what happens after it opens — the
+                // initial picture comes from `POST /query`. The mock replays the
+                // seeded state here anyway, so a spec that breaks the query path
+                // cannot be rescued by the socket without the query assertions
+                // noticing.
+                for (const snapshot of activitySnapshots()) {
+                  ws.send(JSON.stringify(["EVENT", subId, snapshot]));
                 }
               } else if (filter.kinds.includes(20002)) {
                 for (const typing of options.typingEvents ?? []) {
@@ -961,17 +989,8 @@ test("a channel with activity past its cursor shows as unread", async ({
         sig: "c".repeat(128),
       },
     ],
-    unreadActivity: [
-      {
-        id: "cc".repeat(32),
-        pubkey: "e".repeat(64),
-        kind: 9,
-        created_at: 1_900_000_000,
-        tags: [["h", otherChannel]],
-        content: "newer than the cursor",
-        sig: "f".repeat(128),
-      },
-    ],
+    // Newer than the cursor seeded below, so that room is unread.
+    channelActivity: { [otherChannel]: 1_900_000_000 },
     readStateEvents: [
       {
         id: "dd".repeat(32),
@@ -1002,30 +1021,32 @@ test("a channel with activity past its cursor shows as unread", async ({
   const nav = page.getByRole("navigation", { name: "Channels" });
   await expect(nav.getByText("Unread messages")).toHaveCount(1);
 
-  // Badges are asked for, not listened to: no subscription may carry message
-  // bodies for a channel the reader is not looking at. A channel-less content
-  // filter is exactly that firehose, so its absence is the guarantee.
+  // No subscription may carry message bodies for a channel the reader is not
+  // looking at. A channel-less content filter is exactly that firehose, so its
+  // absence is the guarantee.
   const firehose = relay.subscriptions.filter(
     (filter) => filter.kinds?.includes(9) && !filter["#h"],
   );
   expect(firehose).toEqual([]);
 
-  // And the probe that replaced it is bounded: one filter per channel, each
-  // asking only whether a single event exists past that channel's cursor.
-  const probe = relay.queries.find((filters) =>
-    filters.some((filter) => filter["#h"]),
+  // Nor may badges cost one request per channel. Every read that mentions a
+  // specific channel is the content subscription for the room on screen; the
+  // badge path must never name a channel at all.
+  const perChannelBadgeWork = relay.queries
+    .flat()
+    .filter((filter) => filter["#h"]);
+  expect(perChannelBadgeWork).toEqual([]);
+
+  // What replaced both: one unscoped subscription for the snapshot kind. The
+  // relay decides which shards this reader may see and addresses them, so the
+  // client neither names channels nor names itself.
+  const badgeSubs = relay.subscriptions.filter((filter) =>
+    filter.kinds?.includes(39007),
   );
-  expect(probe).toBeDefined();
-  for (const filter of probe ?? []) {
-    expect(filter["#h"]).toHaveLength(1);
-    expect(filter.limit).toBe(1);
-  }
-  const otherProbe = probe?.find(
-    (filter) => filter["#h"]?.[0] === otherChannel,
-  );
-  // `since` is inclusive in Nostr and the cursor itself has been read, so the
-  // probe must start one second past it or every read channel reports unread.
-  expect(otherProbe?.since).toBe(1_800_000_001);
+  expect(badgeSubs).toHaveLength(1);
+  expect(badgeSubs[0].kinds).toEqual([39007]);
+  expect(badgeSubs[0]["#h"]).toBeUndefined();
+  expect(badgeSubs[0].authors).toBeUndefined();
 });
 
 test("a channel read past its newest message shows no badge", async ({
@@ -1051,17 +1072,8 @@ test("a channel read past its newest message shows no badge", async ({
         sig: "c".repeat(128),
       },
     ],
-    unreadActivity: [
-      {
-        id: "cc".repeat(32),
-        pubkey: "e".repeat(64),
-        kind: 9,
-        created_at: 1_800_000_000,
-        tags: [["h", otherChannel]],
-        content: "already read",
-        sig: "f".repeat(128),
-      },
-    ],
+    // Exactly the cursor seeded below: that message has been read.
+    channelActivity: { [otherChannel]: 1_800_000_000 },
     readStateEvents: [
       {
         id: "dd".repeat(32),
@@ -1088,12 +1100,13 @@ test("a channel read past its newest message shows no badge", async ({
 
   await page.goto(`/c/${CHANNEL_UUID}`);
 
-  // Wait for a probe carrying this room before asserting on its absence of a
-  // badge, so the assertion cannot pass merely because nothing has run yet.
+  // Wait for the badge data to have actually arrived before asserting on the
+  // absence of a badge, so the assertion cannot pass merely because nothing has
+  // run yet.
   await expect
     .poll(() =>
       relay.queries.some((filters) =>
-        filters.some((filter) => filter["#h"]?.[0] === otherChannel),
+        filters.some((filter) => filter.kinds?.includes(39007)),
       ),
     )
     .toBe(true);

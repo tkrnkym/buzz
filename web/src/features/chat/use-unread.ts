@@ -1,74 +1,77 @@
 /**
- * Unread badge state, polled rather than streamed. See `unread.ts` for why.
+ * Unread badge state, subscribed rather than polled. See `unread.ts` for why.
  */
 
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 
 import { postRelayQuery } from "@/shared/api/relay-http";
+import { useRelaySession } from "@/shared/api/relay-provider";
 import {
-  buildUnreadProbeFilters,
-  channelsWithActivity,
+  type ActivityMap,
+  buildActivityFilter,
+  isChannelUnread,
+  mergeActivity,
+  parseActivitySnapshot,
 } from "@/features/chat/unread";
-
-/**
- * How often the probe re-asks.
- *
- * A pull cannot be instant, and this is the visible cost of not streaming every
- * message. Short enough that a badge is not stale for long, long enough that an
- * idle tab is not making a request a second.
- */
-const UNREAD_POLL_MS = 30_000;
 
 export interface UnreadApi {
   isUnread: (channelId: string) => boolean;
-  /** True until the first probe answers, so the sidebar can stay quiet. */
+  /** True until the first snapshot arrives, so the sidebar can stay quiet. */
   isLoading: boolean;
 }
 
-export function useUnreadChannels(
-  channelIds: string[],
-  contexts: Record<string, number>,
-): UnreadApi {
-  // Cursors are part of the key: reading a channel moves its cursor, and the
-  // badge should clear on the next probe rather than persisting until the timer.
-  const probeKey = useMemo(
-    () =>
-      channelIds
-        .map((channelId) => `${channelId}:${contexts[channelId] ?? 0}`)
-        .sort()
-        .join(","),
-    [channelIds, contexts],
-  );
+export function useUnreadChannels(contexts: Record<string, number>): UnreadApi {
+  const session = useRelaySession();
+  const [activity, setActivity] = useState<ActivityMap>({});
+  const [loaded, setLoaded] = useState(false);
 
-  const query = useQuery<Set<string>>({
-    queryKey: ["chat", "unread", probeKey],
-    enabled: channelIds.length > 0,
-    refetchInterval: UNREAD_POLL_MS,
-    // The app disables focus refetching globally; a returning reader is exactly
-    // when a stale badge is most visible, so this query opts back in.
-    refetchOnWindowFocus: true,
-    // Keep the previous answer on screen while re-probing, so badges do not
-    // blink off and back on every poll.
-    placeholderData: (previous) => previous,
-    queryFn: async () => {
-      const chunks = buildUnreadProbeFilters(
-        channelIds,
-        contexts,
-        Math.floor(Date.now() / 1000),
-      );
-      const responses = await Promise.all(
-        chunks.map((filters) => postRelayQuery(filters)),
-      );
-      return channelsWithActivity(responses.flat());
-    },
-  });
+  useEffect(() => {
+    let cancelled = false;
 
-  return useMemo(
-    () => ({
-      isUnread: (channelId: string) => query.data?.has(channelId) ?? false,
-      isLoading: query.isPending,
-    }),
-    [query.data, query.isPending],
-  );
+    // Snapshots are never stored, so a subscription on its own delivers nothing
+    // until the next write — a reader opening a quiet community would see no
+    // badges at all. `POST /query` synthesizes the current picture on demand,
+    // which is what makes the first render correct.
+    postRelayQuery([buildActivityFilter()])
+      .then((events) => {
+        if (cancelled) return;
+        setActivity((current) =>
+          events.reduce(
+            (map, event) => mergeActivity(map, parseActivitySnapshot(event)),
+            current,
+          ),
+        );
+      })
+      .catch(() => {
+        // A failed initial fetch is not fatal: the subscription still carries
+        // everything from the next coalescing window onward.
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+
+    const unsubscribe = session.subscribe(buildActivityFilter(), {
+      onEvent(event) {
+        setActivity((current) =>
+          mergeActivity(current, parseActivitySnapshot(event)),
+        );
+      },
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [session]);
+
+  return useMemo(() => {
+    // Read the clock once per render rather than once per channel, so every
+    // badge in a single paint is judged against the same instant.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    return {
+      isUnread: (channelId: string) =>
+        isChannelUnread(channelId, activity, contexts, nowSeconds),
+      isLoading: !loaded,
+    };
+  }, [activity, contexts, loaded]);
 }

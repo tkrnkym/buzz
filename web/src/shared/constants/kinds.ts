@@ -37,6 +37,16 @@ export const KIND_SYSTEM_MESSAGE = 40099;
 export const KIND_READ_STATE = 30078;
 
 /**
+ * Relay-signed channel activity snapshot.
+ *
+ * One event carries the last-activity timestamp for a whole shard of channels,
+ * which is what unread badges read. Sharding is why this is a subscription
+ * rather than a poll: the relay pushes at most a bounded number of these per
+ * community per coalescing window, no matter how many messages arrive.
+ */
+export const KIND_CHANNEL_ACTIVITY_SNAPSHOT = 39007;
+
+/**
  * Kinds that render as a row in a channel timeline.
  *
  * Both message kinds are included: `build_message` in `buzz-sdk` writes kind 9,
