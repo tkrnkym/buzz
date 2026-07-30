@@ -48,6 +48,21 @@ export function hasNip07Provider(): boolean {
   return typeof window !== "undefined" && window.nostr != null;
 }
 
+/**
+ * Public key {@link signNostrEvent} will sign with right now.
+ *
+ * Resolves the NIP-07 provider when one is installed, otherwise the
+ * page-lifetime ephemeral key. Callers that need a durable identity must gate on
+ * {@link hasNip07Provider} rather than treating this as stable across reloads.
+ */
+export async function getSigningPublicKey(): Promise<string> {
+  const provider = typeof window === "undefined" ? undefined : window.nostr;
+  if (provider) {
+    return provider.getPublicKey();
+  }
+  return getPublicKey(getEphemeralSecretKey());
+}
+
 function sameUnsignedEvent(
   expected: UnsignedNostrEvent,
   actual: SignedNostrEvent,
