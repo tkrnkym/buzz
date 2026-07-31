@@ -13,8 +13,10 @@ const rules = [
 ];
 
 const overrides = new Set([
-  // Avatar fallback initials — two glyphs inside an avatar disc.
-  "src/features/repos/ui/PubkeyAvatar.tsx:31",
+  // Avatar fallback initials — two glyphs inside an avatar disc, not an
+  // identity string. The one place allowed to do it; every avatar goes through
+  // this component.
+  "src/shared/ui/PubkeyAvatar.tsx:57",
   // Array window (first N pubkeys), not string truncation.
   "src/features/repos/ui/OrgSidebar.tsx:22",
 ]);

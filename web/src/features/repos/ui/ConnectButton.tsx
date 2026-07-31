@@ -17,7 +17,7 @@ export function ConnectButton({ className }: { className?: string }) {
       asChild
       className={`bg-black text-white hover:bg-black/90 focus-visible:ring-black dark:bg-white dark:text-black dark:hover:bg-white/90 dark:focus-visible:ring-white ${className ?? ""}`}
     >
-      <Link to="/c">
+      <Link to="/">
         <MessageSquare className="h-4 w-4" />
         Open chat
       </Link>

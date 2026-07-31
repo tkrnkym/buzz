@@ -1,25 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { TimelineRow } from "@/features/chat/timeline";
-import { ChannelSidebar } from "@/features/chat/ui/ChannelSidebar";
 import {
   MessageComposer,
   type ReplyTarget,
 } from "@/features/chat/ui/MessageComposer";
 import { MessageTimeline } from "@/features/chat/ui/MessageTimeline";
 import { ReadStateNotice } from "@/features/chat/ui/ReadStateNotice";
-import { SearchBox } from "@/features/search/ui/SearchBox";
-import { SearchResults } from "@/features/search/ui/SearchResults";
 import { RelayStatus } from "@/features/chat/ui/RelayStatus";
 import { TypingIndicator } from "@/features/chat/ui/TypingIndicator";
 import {
   useChannelMessages,
-  useChannels,
   useToggleReaction,
 } from "@/features/chat/use-chat";
-import { useUnreadChannels } from "@/features/chat/use-unread";
-import { useReadState } from "@/features/chat/use-read-state";
 import { usePresence, useTyping } from "@/features/chat/use-presence";
+import { SearchResults } from "@/features/search/ui/SearchResults";
+import { useShell } from "@/features/shell/shell-context";
+import { ChannelWelcome } from "@/features/shell/ui/ChannelWelcome";
+import { SidebarTrigger } from "@/shared/ui/sidebar";
 
 /** First line of a message, for the reply banner. */
 function previewOf(content: string): string {
@@ -35,10 +33,11 @@ export function ChatPage({
   /** Active search, from the URL. Empty means the timeline is showing. */
   query?: string;
 }) {
-  const channels = useChannels();
+  // Channels, read cursors, and unread state come from the shell so the sidebar
+  // and this pane cannot disagree — see `shell-context.tsx`.
+  const { channels, readState } = useShell();
   const timeline = useChannelMessages(channelId);
   const toggleReaction = useToggleReaction();
-  const readState = useReadState();
   const typing = useTyping(channelId);
   // Only the authors on screen: presence is read per-author, so asking about
   // everyone would grow the query with the community rather than the viewport.
@@ -57,7 +56,7 @@ export function ChatPage({
   const replyTo = reply?.channelId === channelId ? reply.target : null;
 
   const activeChannel =
-    channels.data?.find((channel) => channel.id === channelId) ?? null;
+    channels.find((channel) => channel.id === channelId) ?? null;
 
   // Reading the room marks it read up to its newest message. Driven by the
   // loaded timeline rather than the global activity feed, so the cursor never
@@ -87,10 +86,6 @@ export function ChatPage({
     // Keyed on the id so this fires once per message, not on every re-render.
   }, [newestRowId, newestRow, completeTyping]);
 
-  // Unread comes from relay-published activity snapshots, not from a stream of
-  // every message in the community. See `unread.ts`.
-  const unread = useUnreadChannels(readState.contexts);
-
   const onReply = useCallback(
     (row: TimelineRow) => {
       if (!channelId) return;
@@ -117,24 +112,17 @@ export function ChatPage({
   );
 
   return (
-    <div className="flex h-dvh min-h-0">
-      <ChannelSidebar
-        channels={channels.data ?? []}
-        activeChannelId={channelId}
-        isLoading={channels.isLoading}
-        error={channels.error instanceof Error ? channels.error : null}
-        isUnread={unread.isUnread}
-      />
-
-      <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <SidebarTrigger className="md:-ml-1" />
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold">
               {query
                 ? `Search${activeChannel ? ` in #${activeChannel.name}` : ""}`
                 : activeChannel
                   ? `#${activeChannel.name}`
-                  : "Select a channel"}
+                  : "Channels"}
             </h1>
             {activeChannel?.topic && (
               <p className="truncate text-2xs text-muted-foreground">
@@ -142,56 +130,51 @@ export function ChatPage({
               </p>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <SearchBox channelId={channelId} query={query} />
-            <ReadStateNotice
-              canSync={readState.canSync}
-              error={readState.error}
-            />
-            <RelayStatus />
-          </div>
-        </header>
-
-        {query ? (
-          <SearchResults
-            query={query}
-            channels={channels.data ?? []}
-            scopeChannelId={channelId}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ReadStateNotice
+            canSync={readState.canSync}
+            error={readState.error}
           />
-        ) : channelId ? (
-          <>
-            <MessageTimeline
-              rows={timeline.rows}
-              loaded={timeline.loaded}
-              error={timeline.error}
-              hasMore={timeline.hasMore}
-              isLoadingMore={timeline.isLoadingMore}
-              onLoadOlder={timeline.loadOlder}
-              actions={{
-                statusOf: presence.statusOf,
-                onToggleReaction,
-                onReply,
-                pending: toggleReaction.isPending,
-              }}
-            />
-            <TypingIndicator typists={typing.typists} />
-            <MessageComposer
-              channelId={channelId}
-              channelName={activeChannel?.name ?? channelId}
-              replyTo={replyTo}
-              onCancelReply={() => setReply(null)}
-              onComposing={typing.announce}
-              onSent={typing.complete}
-            />
-          </>
-        ) : (
-          <div className="flex flex-1 items-center justify-center p-8">
-            <p className="text-sm text-muted-foreground">
-              Pick a channel to start reading.
-            </p>
-          </div>
-        )}
-      </section>
-    </div>
+          <RelayStatus />
+        </div>
+      </header>
+
+      {query ? (
+        <SearchResults
+          channels={channels}
+          query={query}
+          scopeChannelId={channelId}
+        />
+      ) : channelId ? (
+        <>
+          <MessageTimeline
+            actions={{
+              statusOf: presence.statusOf,
+              onToggleReaction,
+              onReply,
+              pending: toggleReaction.isPending,
+            }}
+            error={timeline.error}
+            hasMore={timeline.hasMore}
+            isLoadingMore={timeline.isLoadingMore}
+            loaded={timeline.loaded}
+            onLoadOlder={timeline.loadOlder}
+            rows={timeline.rows}
+          />
+          <TypingIndicator typists={typing.typists} />
+          <MessageComposer
+            channelId={channelId}
+            channelName={activeChannel?.name ?? channelId}
+            onCancelReply={() => setReply(null)}
+            onComposing={typing.announce}
+            onSent={typing.complete}
+            replyTo={replyTo}
+          />
+        </>
+      ) : (
+        <ChannelWelcome />
+      )}
+    </section>
   );
 }

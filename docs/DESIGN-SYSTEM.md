@@ -81,6 +81,12 @@ CI ガード `pnpm -C web check:px-text`（`web/scripts/check-px-text.mjs`）が
 
 - React 19 + Vite + Tailwind。lint/format は **Biome**（ESLint/Prettier は不使用）
 - 機能は `web/src/features/<name>/`、共有は `web/src/shared/`
+- アプリシェルは `features/shell/`。サイドバーの下地は
+  `shared/ui/sidebar.tsx`（幅は CSS 変数 `--sidebar-width`、既定 300px は
+  ドラッグのディテント。算術は `shared/ui/sidebar-width.ts` に純関数として分離）
+- シェルが持つ状態（チャンネル一覧・既読カーソル・未読・スター）は
+  `features/shell/shell-context.tsx` に集約する。`useReadState` は
+  マウントごとに固有のスロット ID を持つため、**2 回インスタンス化してはならない**
 - `React.memo` は all-or-nothing — 1 つでも参照不安定な prop（インライン関数、
   React Query の結果オブジェクト等）があると無効。安定メソッド
   （`mutation.mutateAsync`）に依存し、導出 Map/配列は

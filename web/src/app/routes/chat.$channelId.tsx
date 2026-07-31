@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { ChatPage } from "@/features/chat/ui/ChatPage";
 
-export const Route = createFileRoute("/c/$channelId")({
+export const Route = createFileRoute("/_shell/c/$channelId")({
   // `m` anchors the view on one message, so a `nuxx://message` deep link can
   // point at it. `q` puts a search in the URL, so a result set is linkable and
   // survives a reload.

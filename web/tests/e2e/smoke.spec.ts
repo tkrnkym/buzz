@@ -1,16 +1,17 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
-test("home page loads with Nuxx branding", async ({ page }) => {
-  await page.goto("/");
+test("the repo browser loads with Nuxx branding", async ({ page }) => {
+  // Was the top page until chat took `/`; it lives at `/repos` now.
+  await page.goto("/repos");
   await expect(
     page.getByRole("main").getByRole("img", { name: "Nuxx" }),
   ).toBeVisible();
 });
 
-test("home page shows repositories section", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByText("Repositories")).toBeVisible();
+test("the repo browser shows its repositories section", async ({ page }) => {
+  await page.goto("/repos");
+  await expect(page.getByRole("main").getByText("Repositories")).toBeVisible();
 });
 
 test("invite requires age and legal consent before opening Nuxx", async ({
@@ -209,6 +210,17 @@ function mockRelay(
   const historyRequests: { until: number; beforeId: string }[] = [];
   /** Search filters the client sent, in order. */
   const searchRequests: QueryFilter[] = [];
+  /** How many WebSockets the page opened, so a spec can assert reuse. */
+  let socketsOpened = 0;
+  /**
+   * Open message subscriptions, by id and channel.
+   *
+   * A publish is echoed to whichever subscription actually asked for that
+   * channel's messages, the way a relay fans out. This used to be a hardcoded
+   * `s1`, which quietly depended on the timeline being the first subscription
+   * the client opened — so it broke the moment the app shell opened one first.
+   */
+  const messageSubs: { subId: string; channelId: string }[] = [];
 
   const channelMetadata = {
     id: "a".repeat(64),
@@ -273,6 +285,7 @@ function mockRelay(
     queries,
     historyRequests,
     searchRequests,
+    socketCount: () => socketsOpened,
     install: async () => {
       await page.route("**/query", async (route) => {
         const body = JSON.parse(route.request().postData() ?? "{}") as {
@@ -329,6 +342,7 @@ function mockRelay(
       await page.routeWebSocket(
         (url) => url.protocol === "ws:" || url.protocol === "wss:",
         (ws) => {
+          socketsOpened += 1;
           // Nuxx relays always challenge before serving anything.
           ws.send(JSON.stringify(["AUTH", "challenge-from-mock"]));
 
@@ -353,8 +367,17 @@ function mockRelay(
                 return;
               }
               ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
-              // Echo it back on the live subscription, as a relay would.
-              ws.send(JSON.stringify(["EVENT", "s1", frame[1]]));
+              // Echo it back to every subscription that covers it, as a relay
+              // would. Reactions and deletions carry an `e` tag rather than an
+              // `h` tag, so they go to all open message subscriptions.
+              const hTag = (frame[1].tags as string[][]).find(
+                (tag) => tag[0] === "h",
+              )?.[1];
+              for (const sub of messageSubs) {
+                if (hTag === undefined || sub.channelId === hTag) {
+                  ws.send(JSON.stringify(["EVENT", sub.subId, frame[1]]));
+                }
+              }
               return;
             }
 
@@ -371,6 +394,7 @@ function mockRelay(
                   ws.send(JSON.stringify(["EVENT", subId, readState]));
                 }
               } else if (filter.kinds.includes(9) && filter["#h"]) {
+                messageSubs.push({ subId, channelId: filter["#h"][0] });
                 // Echo the requested channel back on the `h` tag so a spec that
                 // opens two rooms sees each one's own timeline.
                 ws.send(
@@ -409,6 +433,9 @@ function mockRelay(
                   ws.send(JSON.stringify(["EVENT", subId, typing]));
                 }
               } else if (filter.kinds.includes(7)) {
+                // The reaction subscription is keyed on `e`, not `h`, so it has
+                // no channel of its own — it takes every echo.
+                messageSubs.push({ subId, channelId: "" });
                 // The #e-keyed auxiliary read: reactions and NIP-09 deletes,
                 // neither of which carries an `h` tag.
                 for (const aux of options.auxEvents ?? []) {
@@ -423,6 +450,115 @@ function mockRelay(
     },
   };
 }
+
+test("the top page is chat, with the app shell around it", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+
+  // The shell: community rail, channel list, and the identity card at its foot.
+  await expect(
+    page.getByRole("navigation", { name: "Communities" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Channels" }).getByText("general"),
+  ).toBeVisible();
+  await expect(page.getByTestId("sidebar-profile-card")).toBeVisible();
+  // No channel chosen yet, so the content pane offers the rooms instead of
+  // pointing at a sidebar that may be collapsed.
+  await expect(
+    page.getByRole("heading", { name: "Welcome to nuxx" }),
+  ).toBeVisible();
+});
+
+test("the legacy /c link still lands on chat", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  // Shared links and bookmarks from before chat moved to `/` must not 404.
+  await page.goto("/c?q=ship");
+  await expect(page).toHaveURL(/\/\?q=ship$/);
+});
+
+test("the sidebar survives channel navigation without reconnecting", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await expect(page.getByText("Connected")).toBeVisible();
+  const socketsAfterLoad = relay.socketCount();
+
+  await page
+    .getByRole("navigation", { name: "Channels" })
+    .getByText("general")
+    .click();
+  await expect(page.getByRole("heading", { name: "#general" })).toBeVisible();
+
+  // The shell is a layout route, so the authenticated socket is reused. A
+  // per-page provider would have opened a second one here.
+  expect(relay.socketCount()).toBe(socketsAfterLoad);
+});
+
+test("starring a channel moves it under Starred", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  // The heading does not exist until something is starred, so an empty Starred
+  // section never takes up room.
+  await expect(page.getByTestId("sidebar-group-starred")).toBeHidden();
+
+  await page.getByTestId("star-channel-general").click();
+  const starred = page.getByTestId("sidebar-group-starred");
+  await expect(starred.getByText("general")).toBeVisible();
+  // Only under Starred: listing it twice would double the unread badge and make
+  // the room count look wrong.
+  await expect(
+    page.getByTestId("sidebar-group-channels").getByText("general"),
+  ).toHaveCount(0);
+});
+
+test("a star survives a reload for a durable identity", async ({ page }) => {
+  // Stars are stored locally, keyed by pubkey — a private view preference should
+  // not be published to the community. That key is what makes this test need a
+  // NIP-07 identity: without an extension the signer mints a fresh key per page
+  // load, so there is no identity for a preference to belong to.
+  await page.addInitScript(() => {
+    (
+      window as Window & {
+        nostr?: {
+          getPublicKey(): Promise<string>;
+          signEvent(
+            event: Record<string, unknown>,
+          ): Promise<Record<string, unknown>>;
+        };
+      }
+    ).nostr = {
+      async getPublicKey() {
+        return "ab".repeat(32);
+      },
+      async signEvent(event) {
+        return { ...event, id: "cd".repeat(32), sig: "ef".repeat(64) };
+      },
+    };
+  });
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("star-channel-general").click();
+  await expect(
+    page.getByTestId("sidebar-group-starred").getByText("general"),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page.getByTestId("sidebar-group-starred").getByText("general"),
+  ).toBeVisible();
+});
 
 test("chat lists channels from kind:39000 metadata", async ({ page }) => {
   const relay = mockRelay(page);
@@ -867,7 +1003,7 @@ test("a channel with activity past its cursor shows as unread", async ({
 
   // The badge is on the other room; the open one is being read right now.
   const nav = page.getByRole("navigation", { name: "Channels" });
-  await expect(nav.getByText("Unread messages")).toHaveCount(1);
+  await expect(nav.getByText("unread", { exact: true })).toHaveCount(1);
 
   // No subscription may carry message bodies for a channel the reader is not
   // looking at. A channel-less content filter is exactly that firehose, so its
@@ -960,7 +1096,7 @@ test("a channel read past its newest message shows no badge", async ({
     .toBe(true);
 
   const nav = page.getByRole("navigation", { name: "Channels" });
-  await expect(nav.getByText("Unread messages")).toHaveCount(0);
+  await expect(nav.getByText("unread", { exact: true })).toHaveCount(0);
 });
 
 test("searching puts the query in the URL and lists ranked hits", async ({
