@@ -17,7 +17,7 @@ set -euo pipefail
 
 # ── config ──────────────────────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-NS="${NS:-buzz-mesh}"
+NS="${NS:-nuxx-mesh}"
 RELEASE="${RELEASE:-buzz}"
 IMAGE_REPO="${IMAGE_REPO:-buzz-relay}"
 IMAGE_TAG="${IMAGE_TAG:-mesh-local}"

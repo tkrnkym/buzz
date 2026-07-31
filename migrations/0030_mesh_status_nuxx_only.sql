@@ -13,10 +13,14 @@
 --   with no error and no log line — the same silent failure 0028 was written to
 --   prevent, now accepted for the pre-rename corpus only.
 --
---   Mitigation below: every legacy row that is ALREADY soft-deleted is purged
---   once here, so the residual exposure is limited to pre-rename events that
---   get soft-deleted after this migration runs. Mesh status is a 45-second
---   heartbeat, so that set drains as members re-publish under the new spelling.
+--   Scope of that cost: there is no legacy backlog to strand. 0019 deleted the
+--   pre-existing legacy rows once and its trigger matched the legacy spelling,
+--   so every legacy row soft-deleted from 0019 onward was purged as it went.
+--   0028 then swept the nuxx-prefixed rows that had accumulated while 0019's
+--   predicate could not see them. The residual is therefore only pre-rename
+--   events soft-deleted from HERE on, which no one-time purge can cover.
+--   Mesh status is a 45-second heartbeat, so that set drains as members
+--   re-publish under the new spelling.
 --
 -- The function rename needs DROP TRIGGER + DROP FUNCTION + recreate, since a
 -- trigger holds a dependency on its function. That takes a brief ACCESS
@@ -26,22 +30,24 @@
 -- prune to the single partition holding the row, and keeps 0019's delete order
 -- (mentions after events) and its AFTER UPDATE OF deleted_at timing.
 
--- One-time purge of legacy rows already soft-deleted, before the predicate stops
--- matching them.
+-- Belt-and-braces sweep on the current spelling, matching the narrowed trigger.
+-- Expected to delete nothing: 0028's trigger already purges these on soft-delete.
+-- Kept so the migration is self-sufficient if it is ever applied to a database
+-- that skipped 0028's sweep.
 DELETE FROM event_mentions mention
 USING events status
 WHERE mention.community_id = status.community_id
   AND mention.event_id = status.id
   AND status.kind = 30003
-  AND status.d_tag LIKE 'buzz-mesh-member-status:%'
+  AND status.d_tag LIKE 'nuxx-mesh-member-status:%'
   AND status.deleted_at IS NOT NULL
-  AND status.tags @> '[["k", "buzz-mesh-status"]]'::jsonb;
+  AND status.tags @> '[["k", "nuxx-mesh-status"]]'::jsonb;
 
 DELETE FROM events
 WHERE kind = 30003
-  AND d_tag LIKE 'buzz-mesh-member-status:%'
+  AND d_tag LIKE 'nuxx-mesh-member-status:%'
   AND deleted_at IS NOT NULL
-  AND tags @> '[["k", "buzz-mesh-status"]]'::jsonb;
+  AND tags @> '[["k", "nuxx-mesh-status"]]'::jsonb;
 
 DROP TRIGGER IF EXISTS trg_events_purge_soft_deleted_buzz_mesh_status ON events;
 DROP FUNCTION IF EXISTS purge_soft_deleted_buzz_mesh_status();

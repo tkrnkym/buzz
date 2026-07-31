@@ -957,11 +957,9 @@ mod tests {
             .contains("for update"));
 
         // 0030 narrows the mesh-status retention trigger to the new spelling and
-        // renames the function/trigger off `buzz`. The narrowing is the point, so
-        // assert the legacy predicate is gone from the executable body while the
-        // one-time purge of already-soft-deleted legacy rows is still there —
-        // dropping that purge would strand exactly the rows the trigger stops
-        // recognizing.
+        // renames the function/trigger off `buzz`. The whole executable body must
+        // be free of the legacy spelling EXCEPT the two DROP statements, which
+        // name the objects 0019 actually created and would not resolve otherwise.
         assert_eq!(migrations[29].version, 30);
         let mesh_only = migrations[29].sql.as_str();
         let mesh_body = strip_sql_comments(mesh_only);
@@ -970,11 +968,16 @@ mod tests {
         assert!(mesh_body
             .contains("DROP TRIGGER IF EXISTS trg_events_purge_soft_deleted_buzz_mesh_status"));
         assert!(mesh_body.contains("nuxx-mesh-member-status:%"));
-        // The purge (a DELETE) may still name the legacy prefix; the trigger
-        // predicate may not.
-        let predicate = &mesh_body[mesh_body.find("CREATE FUNCTION").unwrap()..];
-        assert!(!predicate.contains("buzz-mesh-member-status"));
-        assert!(!predicate.contains("buzz-mesh-status"));
+        // No legacy tag spelling anywhere in the executable body — the sweep and
+        // the trigger predicate both moved to the new one. The DROPs are exempt:
+        // they name catalog objects, not tag values.
+        let without_drops: String = mesh_body
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("DROP "))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!without_drops.contains("buzz-mesh-member-status"));
+        assert!(!without_drops.contains("buzz-mesh-status"));
         assert!(mesh_body.contains("AFTER UPDATE OF deleted_at ON events"));
         // 0019's partition-pruning clause and delete order must survive the
         // recreate.
