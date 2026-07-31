@@ -288,7 +288,7 @@ test("external links open safely and unsafe schemes are not clickable", async ({
   await expect(page.getByRole("link", { name: "do not click" })).toHaveCount(0);
 });
 
-test("a buzz://message autolink becomes in-app navigation", async ({
+test("a nuxx://message autolink becomes in-app navigation", async ({
   page,
 }) => {
   const target = "a".repeat(64);
@@ -296,7 +296,7 @@ test("a buzz://message autolink becomes in-app navigation", async ({
     extraMessages: [
       markdownMessage(
         "3",
-        `see <buzz://message?channel=${CHANNEL_UUID}&id=${target}>`,
+        `see <nuxx://message?channel=${CHANNEL_UUID}&id=${target}>`,
       ),
     ],
   });

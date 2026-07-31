@@ -626,7 +626,7 @@ class PairingNotifier extends Notifier<PairingState> {
     var payload = raw.trim();
 
     // Both schemes: a pairing payload may have been produced before the rename.
-    for (final scheme in const ['nuxx://', 'buzz://']) {
+    for (final scheme in const ['nuxx://']) {
       if (payload.startsWith(scheme)) {
         payload = payload.substring(scheme.length);
         break;

@@ -45,7 +45,7 @@ export interface MarkdownProps {
    * Schemes react-markdown would otherwise strip that this caller handles.
    *
    * `defaultUrlTransform` blanks any unknown scheme *before* a link renderer can
-   * see it, so an app-specific scheme (`buzz://message?…`) has to be allowed
+   * see it, so an app-specific scheme (`nuxx://message?…`) has to be allowed
    * through here or copy → paste → click breaks end to end.
    */
   preserveUrl?: (url: string) => boolean;

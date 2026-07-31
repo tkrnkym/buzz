@@ -1,8 +1,5 @@
 /// Parsing for `nuxx://` deep links.
 ///
-/// The pre-rename `buzz://` scheme is accepted permanently. Those strings live
-/// inside the `content` of signed message events and in links colleagues already
-/// pasted to each other, so they cannot be rewritten and must keep resolving.
 /// Links are always *written* with [linkScheme].
 ///
 /// `nuxx://message?channel=<uuid>&id=<hex>[&thread=<hex>]` references a
@@ -57,12 +54,8 @@ class InviteDeepLink extends NuxxDeepLink {
 /// Scheme new links are written with.
 const String linkScheme = 'nuxx';
 
-/// Pre-rename scheme, still parsed. See the library docs.
-const String legacyLinkScheme = 'buzz';
-
 /// True when [scheme] is either accepted deep-link scheme.
-bool isAcceptedLinkScheme(String scheme) =>
-    scheme == linkScheme || scheme == legacyLinkScheme;
+bool isAcceptedLinkScheme(String scheme) => scheme == linkScheme;
 
 /// A parsed `nuxx://message` deep link.
 class MessageDeepLink extends NuxxDeepLink {

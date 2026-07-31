@@ -56,7 +56,7 @@ test("parseMessageLink reports why a link is unusable", () => {
     reason: "invalid-url",
   });
   assert.equal(parseMessageLink("https://example.com").reason, "wrong-scheme");
-  assert.equal(parseMessageLink("buzz://channel?x=1").reason, "wrong-host");
+  assert.equal(parseMessageLink("nuxx://channel?x=1").reason, "wrong-host");
   assert.equal(
     parseMessageLink(`nuxx://message?id=${MESSAGE}`).reason,
     "missing-channel",
@@ -70,7 +70,7 @@ test("parseMessageLink reports why a link is unusable", () => {
 test("isMessageLink is a cheap pre-check", () => {
   assert.equal(isMessageLink(`nuxx://message?channel=${CHANNEL}`), true);
   assert.equal(isMessageLink("nuxx://message"), true);
-  assert.equal(isMessageLink("buzz://other?channel=x"), false);
+  assert.equal(isMessageLink("nuxx://other?channel=x"), false);
   assert.equal(isMessageLink("https://example.com"), false);
   assert.equal(isMessageLink(undefined), false);
   assert.equal(isMessageLink(null), false);
@@ -107,16 +107,16 @@ test("a malformed message link falls back to default link handling", () => {
   );
 });
 
-test("a link shared before the rename still resolves", () => {
-  // These strings are inside the content of signed message events. They cannot
-  // be rewritten without invalidating the signature, so dropping the old scheme
-  // would turn every previously-shared link into inert text.
+test("the pre-rename scheme is not accepted", () => {
+  // Pins the decision to drop it: nothing shipped under the old scheme, so there
+  // are no links to keep resolving. If acceptance ever comes back, that is a
+  // deliberate change and this test should be the thing that notices.
   const legacy = `buzz://message?channel=${"1".repeat(8)}&id=${"ab".repeat(32)}`;
 
-  assert.equal(isMessageLink(legacy), true);
+  assert.equal(isMessageLink(legacy), false);
   const parsed = parseMessageLink(legacy);
-  assert.equal(parsed.ok, true);
-  assert.equal(parsed.value.messageId, "ab".repeat(32));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.reason, "wrong-scheme");
 });
 
 test("new links are written with the current scheme only", () => {

@@ -9,7 +9,7 @@ void main() {
   group('parseMessageDeepLink', () {
     test('parses channel and id', () {
       final link = parseMessageDeepLink(
-        Uri.parse('buzz://message?channel=d14cd131&id=abc123'),
+        Uri.parse('nuxx://message?channel=d14cd131&id=abc123'),
       );
       expect(
         link,
@@ -19,33 +19,33 @@ void main() {
 
     test('parses optional thread param', () {
       final link = parseMessageDeepLink(
-        Uri.parse('buzz://message?channel=d14cd131&id=abc123&thread=root99'),
+        Uri.parse('nuxx://message?channel=d14cd131&id=abc123&thread=root99'),
       );
       expect(link?.threadRootId, 'root99');
     });
 
     test('treats empty thread as absent', () {
       final link = parseMessageDeepLink(
-        Uri.parse('buzz://message?channel=d14cd131&id=abc123&thread='),
+        Uri.parse('nuxx://message?channel=d14cd131&id=abc123&thread='),
       );
       expect(link, isNotNull);
       expect(link?.threadRootId, isNull);
     });
 
     test('rejects missing channel', () {
-      expect(parseMessageDeepLink(Uri.parse('buzz://message?id=abc')), isNull);
+      expect(parseMessageDeepLink(Uri.parse('nuxx://message?id=abc')), isNull);
     });
 
     test('rejects empty channel', () {
       expect(
-        parseMessageDeepLink(Uri.parse('buzz://message?channel=&id=abc')),
+        parseMessageDeepLink(Uri.parse('nuxx://message?channel=&id=abc')),
         isNull,
       );
     });
 
     test('rejects missing id', () {
       expect(
-        parseMessageDeepLink(Uri.parse('buzz://message?channel=d14cd131')),
+        parseMessageDeepLink(Uri.parse('nuxx://message?channel=d14cd131')),
         isNull,
       );
     });
@@ -59,7 +59,7 @@ void main() {
 
     test('rejects non-message host (connect is desktop-only)', () {
       expect(
-        parseMessageDeepLink(Uri.parse('buzz://connect?relay=wss://x')),
+        parseMessageDeepLink(Uri.parse('nuxx://connect?relay=wss://x')),
         isNull,
       );
     });
@@ -94,7 +94,7 @@ void _inviteTests() {
     test('parses nuxx join handoff link', () {
       final link = parseInviteDeepLink(
         Uri.parse(
-          'buzz://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123',
+          'nuxx://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123',
         ),
       );
       expect(
@@ -109,7 +109,7 @@ void _inviteTests() {
     test('normalizes trailing slash in nuxx join handoff', () {
       final link = parseInviteDeepLink(
         Uri.parse(
-          'buzz://join?relay=wss%3A%2F%2Frelay.example.com%2F&code=abc123',
+          'nuxx://join?relay=wss%3A%2F%2Frelay.example.com%2F&code=abc123',
         ),
       );
       expect(link?.relayUrl, 'wss://relay.example.com');
@@ -118,7 +118,7 @@ void _inviteTests() {
     test('rejects plaintext public nuxx join handoff', () {
       final relay = Uri.encodeQueryComponent('ws://relay.example.com');
       expect(
-        parseInviteDeepLink(Uri.parse('buzz://join?relay=$relay&code=abc')),
+        parseInviteDeepLink(Uri.parse('nuxx://join?relay=$relay&code=abc')),
         isNull,
       );
     });
@@ -126,7 +126,7 @@ void _inviteTests() {
     test('preserves policy receipt in nuxx join handoff', () {
       final link = parseInviteDeepLink(
         Uri.parse(
-          'buzz://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123&policy_receipt=receipt.value',
+          'nuxx://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123&policy_receipt=receipt.value',
         ),
       );
       expect(
@@ -170,7 +170,7 @@ void _inviteTests() {
       expect(
         parseInviteDeepLink(
           Uri.parse(
-            'buzz://join?relay=wss%3A%2F%2Fuser%3Apass%40relay.example.com&code=abc',
+            'nuxx://join?relay=wss%3A%2F%2Fuser%3Apass%40relay.example.com&code=abc',
           ),
         ),
         isNull,
@@ -180,18 +180,18 @@ void _inviteTests() {
     test('rejects nuxx join without websocket relay or code', () {
       expect(
         parseInviteDeepLink(
-          Uri.parse('buzz://join?relay=https://relay.example.com&code=abc'),
+          Uri.parse('nuxx://join?relay=https://relay.example.com&code=abc'),
         ),
         isNull,
       );
       expect(
         parseInviteDeepLink(
-          Uri.parse('buzz://join?relay=wss://relay.example.com'),
+          Uri.parse('nuxx://join?relay=wss://relay.example.com'),
         ),
         isNull,
       );
       expect(
-        parseInviteDeepLink(Uri.parse('buzz://connect?relay=wss://x')),
+        parseInviteDeepLink(Uri.parse('nuxx://connect?relay=wss://x')),
         isNull,
       );
     });
@@ -225,7 +225,7 @@ void _inviteTests() {
       ]) {
         final encoded = Uri.encodeQueryComponent(hostile);
         expect(
-          parseInviteDeepLink(Uri.parse('buzz://join?relay=$encoded&code=abc')),
+          parseInviteDeepLink(Uri.parse('nuxx://join?relay=$encoded&code=abc')),
           isNull,
           reason: 'must reject relay scheme in $hostile',
         );
@@ -234,18 +234,27 @@ void _inviteTests() {
   });
 }
 
-/// Deep-link parsing tests below deliberately keep using the pre-rename
-/// `buzz://` scheme in places: those strings live inside already-signed message
-/// events and in links people pasted before the rename, so continuing to parse
-/// them is a requirement rather than a leftover.
+/// The pre-rename `buzz://` scheme is no longer accepted. Nothing shipped under
+/// it, so there are no previously-shared links to keep resolving; these tests pin
+/// that decision so re-adding acceptance is a visible change.
 void _legacySchemeTests() {
-  group('legacy buzz:// scheme', () {
-    test('a link shared before the rename still parses', () {
-      final parsed = parseMessageDeepLink(
-        Uri.parse('buzz://message?channel=d14cd131&id=abc123'),
+  group('pre-rename buzz:// scheme', () {
+    test('a pre-rename link is refused', () {
+      expect(
+        parseMessageDeepLink(
+          Uri.parse('buzz://message?channel=d14cd131&id=abc123'),
+        ),
+        isNull,
       );
-      expect(parsed, isNotNull);
-      expect(parsed!.messageId, 'abc123');
+    });
+
+    test('a pre-rename invite link is refused', () {
+      expect(
+        parseInviteDeepLink(
+          Uri.parse('buzz://join?relay=wss%3A%2F%2Fr.example.com&code=abc'),
+        ),
+        isNull,
+      );
     });
 
     test('new links are written with the current scheme only', () {

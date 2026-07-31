@@ -60,7 +60,7 @@ export function SearchResults({
                   to="/c/$channelId"
                   params={{ channelId: hit.channelId }}
                   // Anchors the timeline on this message, the same parameter a
-                  // `buzz://message` deep link uses.
+                  // `nuxx://message` deep link uses.
                   search={{ m: hit.id }}
                   className="block px-4 py-2 hover:bg-secondary"
                 >

@@ -34,5 +34,5 @@ test("relative URLs are not clickable", () => {
 test("app schemes are not clickable by default", () => {
   // A caller that handles its own scheme injects a link renderer; the default
   // path must not activate one it does not understand.
-  assert.equal(isClickableHref("buzz://message?channel=x&id=y"), false);
+  assert.equal(isClickableHref("nuxx://message?channel=x&id=y"), false);
 });

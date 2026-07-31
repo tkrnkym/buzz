@@ -11,7 +11,7 @@ import type { ImetaEntry } from "@/shared/ui/markdown/parse-imeta";
 /**
  * Chat-side composition of the markdown primitive.
  *
- * This is where app knowledge lives: `buzz://message` links become in-app
+ * This is where app knowledge lives: `nuxx://message` links become in-app
  * navigation, and everything else falls through to the primitive's default
  * handling. The renderer itself stays feature-agnostic.
  */

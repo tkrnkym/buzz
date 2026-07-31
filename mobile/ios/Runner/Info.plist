@@ -30,13 +30,8 @@
 			<key>CFBundleURLName</key>
 			<string>com.nuxx.deeplink</string>
 			<key>CFBundleURLSchemes</key>
-			<!-- Both schemes are registered. `buzz` is the pre-rename scheme:
-			     links carrying it are inside already-signed message events and
-			     in links people pasted before the rename, so an installed build
-			     must keep answering them. New links are written as `nuxx`. -->
 			<array>
 				<string>nuxx</string>
-				<string>buzz</string>
 			</array>
 		</dict>
 	</array>

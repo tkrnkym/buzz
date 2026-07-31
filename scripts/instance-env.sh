@@ -15,7 +15,7 @@ export NUXX_HMR_PORT=$((BASE_PORT + 1))
 export NUXX_RELAY_PORT=3000
 export VITE_PORT="$NUXX_VITE_PORT"
 export VITE_HMR_PORT="$NUXX_HMR_PORT"
-export NUXX_RELAY_URL="${NUXX_RELAY_URL:-${NUXX_RELAY_URL:-ws://localhost:3000}}"
+export NUXX_RELAY_URL="${NUXX_RELAY_URL:-ws://localhost:3000}"
 
 unset VITE_DEV_BRANCH
 

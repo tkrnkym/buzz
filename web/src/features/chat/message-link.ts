@@ -7,25 +7,15 @@
  * not know what a message link is — it takes link handling as an injected
  * extension point, which is what keeps the renderer a reusable primitive.
  *
- * # Both schemes are read, one is written
- *
- * The pre-rename `buzz://` scheme is accepted permanently. Those strings sit
- * inside the `content` of *signed* message events: they cannot be rewritten
- * without invalidating the signature, and they are what colleagues pasted to
- * each other. Dropping the old scheme would turn every link shared before the
- * rename into inert text. This is not a deprecation window.
- *
- * New links are always written with {@link MESSAGE_LINK_SCHEME}.
+ * Links are written and read with this one scheme.
  */
 
 /** Scheme new links are written with. */
 const MESSAGE_LINK_SCHEME = "nuxx:";
-/** Pre-rename scheme, still parsed. See the module docs. */
-const LEGACY_MESSAGE_LINK_SCHEME = "buzz:";
 const MESSAGE_LINK_HOST = "message";
 
 /** Every scheme a message link may legitimately carry. */
-const ACCEPTED_SCHEMES = [MESSAGE_LINK_SCHEME, LEGACY_MESSAGE_LINK_SCHEME];
+const ACCEPTED_SCHEMES = [MESSAGE_LINK_SCHEME];
 
 export interface ParsedMessageLink {
   channelId: string;
@@ -65,7 +55,7 @@ export function buildMessageLink(input: {
 }
 
 /**
- * Parse a message link in either accepted scheme.
+ * Parse a message link.
  *
  * Returns a result rather than throwing so a malformed link can render as plain
  * text instead of breaking the whole message.

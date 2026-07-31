@@ -6,7 +6,7 @@ import 'package:nuxx/features/pairing/pairing_provider.dart';
 import 'package:nuxx/features/pairing/pairing_socket.dart';
 import 'package:nuxx/shared/auth/auth.dart';
 
-/// Tests for [PairingNotifier]'s legacy `buzz://` payload parsing and
+/// Tests for [PairingNotifier]'s `nuxx://` payload parsing and
 /// SSRF-prevention validation.
 ///
 /// The pairing flow used to validate by calling `GET /api/users/me/profile`
@@ -17,7 +17,7 @@ import 'package:nuxx/shared/auth/auth.dart';
 ///
 /// What we still cover here:
 ///   - Initial state.
-///   - Parsing every documented payload format (raw base64, `buzz://`
+///   - Parsing every documented payload format (raw base64, `nuxx://`
 ///     prefix, whitespace).
 ///   - Failure modes that return BEFORE any network call: invalid base64,
 ///     wrong shape (non-object, missing fields, missing nsec), and SSRF
@@ -91,7 +91,7 @@ void main() {
     test('accepts nuxx scheme prefix', () async {
       container = createContainer();
 
-      final code = 'buzz://${_encodePairingCode()}';
+      final code = 'nuxx://${_encodePairingCode()}';
       await container.read(pairingProvider.notifier).pair(code);
 
       final state = container.read(pairingProvider);
