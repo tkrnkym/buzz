@@ -2855,7 +2855,7 @@ mod tests {
         let tags = vec![
             Tag::parse(["d", "wrong-repo"]).unwrap(),
             Tag::parse(["name", "Protected Repo"]).unwrap(),
-            Tag::parse(["buzz-channel", "channel-id"]).unwrap(),
+            Tag::parse(["nuxx-channel", "channel-id"]).unwrap(),
             Tag::parse(["future-metadata", "preserve-me"]).unwrap(),
         ];
 
@@ -2874,7 +2874,7 @@ mod tests {
             1
         );
         assert!(has_tag(&ev, "d", "protected-repo"));
-        assert!(has_tag(&ev, "buzz-channel", "channel-id"));
+        assert!(has_tag(&ev, "nuxx-channel", "channel-id"));
         assert!(has_tag(&ev, "future-metadata", "preserve-me"));
     }
 

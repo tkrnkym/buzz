@@ -565,7 +565,7 @@ mod tests {
         }
     }
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx"; // sadscan:disable np.postgres.1
 
     fn claim_cache(
         capacity: u64,

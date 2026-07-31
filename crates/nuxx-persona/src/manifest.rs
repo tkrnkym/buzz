@@ -35,9 +35,14 @@ pub enum ManifestError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Engines {
-    /// Semver range the Buzz runtime must satisfy (e.g. `">=0.9.0"`).
+    /// Semver range the Nuxx runtime must satisfy (e.g. `">=0.9.0"`).
+    ///
+    /// Serialized as `nuxx`, with `buzz` accepted on read. This is a key in
+    /// author-written persona pack manifests, so packs published before the
+    /// rename still declare `engines.buzz`; dropping the alias would make them
+    /// fail to load. The alias predates the rename and only now does work.
     #[serde(skip_serializing_if = "Option::is_none", alias = "buzz")]
-    pub buzz: Option<String>,
+    pub nuxx: Option<String>,
 }
 
 /// Pack-wide behavioral defaults.
@@ -211,6 +216,22 @@ mod tests {
     }
 
     #[test]
+    fn either_engine_key_parses_to_the_same_field() {
+        let legacy =
+            parse_manifest(r#"{"id":"p","name":"P","version":"1.0.0","engines":{"buzz":">=1"}}"#)
+                .expect("legacy engines key parses");
+        let current =
+            parse_manifest(r#"{"id":"p","name":"P","version":"1.0.0","engines":{"nuxx":">=1"}}"#)
+                .expect("current engines key parses");
+
+        assert_eq!(legacy.engines.unwrap().nuxx.as_deref(), Some(">=1"));
+        assert_eq!(current.engines.unwrap().nuxx.as_deref(), Some(">=1"));
+    }
+
+    #[test]
+    /// Uses the legacy `engines.buzz` key on purpose: packs published before the
+    /// rename still declare it, and the alias on `Engines::nuxx` is what keeps
+    /// them loading.
     fn parse_full_manifest() {
         let json = r#"{
             "id": "full-pack",

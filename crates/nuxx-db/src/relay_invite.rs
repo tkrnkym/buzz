@@ -377,7 +377,7 @@ mod tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx"; // sadscan:disable np.postgres.1
 
     async fn setup_pool() -> PgPool {
         let database_url = std::env::var("NUXX_TEST_DATABASE_URL")

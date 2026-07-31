@@ -1506,7 +1506,7 @@ mod tests {
     use super::*;
     use nostr::{EventBuilder, Keys, Kind, Tag};
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx";
 
     async fn setup_pool() -> PgPool {
         let database_url = std::env::var("NUXX_TEST_DATABASE_URL")

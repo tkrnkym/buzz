@@ -535,7 +535,7 @@ impl Default for DbConfig {
     /// At 20 main + 5 audit = 25/pod, four relay pods fit within the PG limit.
     fn default() -> Self {
         Self {
-            database_url: "postgres://buzz:nuxx_dev@localhost:5432/buzz".to_string(), // sadscan:disable np.postgres.1
+            database_url: "postgres://nuxx:nuxx_dev@localhost:5432/nuxx".to_string(), // sadscan:disable np.postgres.1
             read_database_url: None,
             max_connections: 20,
             read_max_connections: None,
@@ -671,10 +671,18 @@ impl Db {
 
     /// Connect one pool with the sizing knobs from `config`.
     ///
-    /// `arm_floor_guard` sets the `buzz.created_at_floor` session GUC on
-    /// every connection, arming the deferred commit-time trigger from
-    /// migration 0021. Writer pools must arm it; replica pools are read-only
-    /// so the trigger never fires there.
+    /// `arm_floor_guard` sets the `created_at_floor` session GUC on every
+    /// connection, arming the deferred commit-time trigger from migration 0021.
+    /// Writer pools must arm it; replica pools are read-only so the trigger
+    /// never fires there.
+    ///
+    /// Both the `nuxx.` and the pre-rename `buzz.` spelling are set. A relay
+    /// that set only the new name against a database still running the 0021
+    /// function would have the guard silently degrade to a no-op — no error, no
+    /// log, just below-fence rows becoming possible again. Setting both keeps
+    /// every old/new combination enforcing during the rollout; migration 0027
+    /// has the full table. Dropping the legacy set_config is a follow-up for
+    /// after every relay is on the new build.
     async fn connect_pool(config: &DbConfig, url: &str, arm_floor_guard: bool) -> Result<PgPool> {
         let mut options = PgPoolOptions::new()
             .max_connections(config.max_connections)
@@ -686,8 +694,15 @@ impl Db {
             options = options.after_connect(|conn, _meta| {
                 Box::pin(async move {
                     // `SET` cannot take bind parameters; `set_config` can.
+                    let floor = replica_fence::CREATED_AT_FLOOR_SECS.to_string();
+                    sqlx::query("SELECT set_config('nuxx.created_at_floor', $1, false)")
+                        .bind(&floor)
+                        .execute(&mut *conn)
+                        .await?;
+                    // Transition-only, and load-bearing until every relay is on
+                    // the new build: see the doc comment above.
                     sqlx::query("SELECT set_config('buzz.created_at_floor', $1, false)")
-                        .bind(replica_fence::CREATED_AT_FLOOR_SECS.to_string())
+                        .bind(&floor)
                         .execute(conn)
                         .await?;
                     Ok(())
@@ -4808,13 +4823,21 @@ impl Db {
                         .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
             })
             && read_state_t_tag_count == 1;
-        let is_nuxx_mesh_status = kind_i32 == nuxx_core::kind::KIND_BOOKMARK_SET as i32
-            && d_tag.starts_with("nuxx-mesh-member-status:")
+        // Both spellings. The `d` tag and the `k` tag value live inside *signed*
+        // kind:30003 events, so every mesh-status record written before the
+        // rename carries the old prefix permanently — it cannot be rewritten
+        // without invalidating the signature. Matching only the new spelling
+        // would leave those rows out of the supersede path silently.
+        let is_mesh_status = kind_i32 == nuxx_core::kind::KIND_BOOKMARK_SET as i32
+            && (d_tag.starts_with("nuxx-mesh-member-status:")
+                || d_tag.starts_with("buzz-mesh-member-status:"))
             && event.tags.iter().any(|tag| {
                 let parts = tag.as_slice();
-                parts.len() == 2 && parts[0] == "k" && parts[1] == "nuxx-mesh-status"
+                parts.len() == 2
+                    && parts[0] == "k"
+                    && (parts[1] == "nuxx-mesh-status" || parts[1] == "buzz-mesh-status")
             });
-        let hard_delete_superseded = is_nip_rs || is_nuxx_mesh_status;
+        let hard_delete_superseded = is_nip_rs || is_mesh_status;
 
         // Check the live head and, for NIP-RS, the compact historical ordering
         // watermark. The watermark remains after a NIP-09 coordinate deletion,
@@ -5058,7 +5081,7 @@ mod tests {
     use sqlx::{Acquire, PgPool};
     use uuid::Uuid;
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx";
 
     async fn setup_db() -> Db {
         let database_url =

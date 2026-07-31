@@ -1,7 +1,7 @@
 //! Git permission types — ref patterns, protection rules, and policy evaluation inputs.
 //!
 //! This module defines the core data types for the Buzz git permission system.
-//! The permission model: channel role = repo role; `buzz-protect` tags on
+//! The permission model: channel role = repo role; `nuxx-protect` tags on
 //! kind:30617 add constraints that apply to everyone (including the owner).
 //!
 //! # Architecture
@@ -16,7 +16,7 @@ use crate::channel::MemberRole;
 use std::fmt;
 
 /// Machine-readable token prefixing the push-policy denial for a kind:30617
-/// announcement with no `buzz-channel` binding.
+/// announcement with no `nuxx-channel` binding.
 ///
 /// This is a **declared cross-component contract**, not a log string. Known
 /// consumers switch on it:
@@ -39,7 +39,39 @@ pub const GIT_NO_CHANNEL_BINDING_TOKEN: &str = "no_channel_binding";
 pub const GIT_NO_CHANNEL_BINDING_BODY: &str =
     "no_channel_binding: repository has no channel binding";
 
-/// Maximum number of `buzz-protect` tags per repo.
+/// Tag name a repo announcement uses to bind itself to a channel.
+///
+/// Emitted on new events. [`LEGACY_CHANNEL_TAG`] is still accepted on read.
+pub const CHANNEL_TAG: &str = "nuxx-channel";
+
+/// Tag name carrying one ref-protection rule.
+///
+/// Emitted on new events. [`LEGACY_PROTECT_TAG`] is still accepted on read.
+pub const PROTECT_TAG: &str = "nuxx-protect";
+
+/// Pre-rename spelling of [`CHANNEL_TAG`].
+///
+/// These tag names live inside *signed* kind:30617 events, so they cannot be
+/// rewritten: re-signing is impossible without the author's key, and editing
+/// would invalidate the signature. Every repo announced before the rename
+/// carries the old spelling forever, so readers accept both permanently. This is
+/// not a deprecation window — dropping it would orphan those repositories.
+pub const LEGACY_CHANNEL_TAG: &str = "buzz-channel";
+
+/// Pre-rename spelling of [`PROTECT_TAG`]. See [`LEGACY_CHANNEL_TAG`].
+pub const LEGACY_PROTECT_TAG: &str = "buzz-protect";
+
+/// True when `name` is either spelling of the channel-binding tag.
+pub fn is_channel_tag(name: &str) -> bool {
+    name == CHANNEL_TAG || name == LEGACY_CHANNEL_TAG
+}
+
+/// True when `name` is either spelling of the protection-rule tag.
+pub fn is_protect_tag(name: &str) -> bool {
+    name == PROTECT_TAG || name == LEGACY_PROTECT_TAG
+}
+
+/// Maximum number of `nuxx-protect` tags per repo.
 pub const MAX_PROTECTION_RULES: usize = 50;
 /// Maximum character length of a ref pattern.
 pub const MAX_PATTERN_LENGTH: usize = 256;
@@ -260,9 +292,9 @@ pub struct RefUpdate {
     pub new_oid: String,
 }
 
-/// A single protection rule parsed from a `buzz-protect` tag on kind:30617.
+/// A single protection rule parsed from a `nuxx-protect` tag on kind:30617.
 ///
-/// Format: `["buzz-protect", "<ref-pattern>", "<rule>", ...]`
+/// Format: `["nuxx-protect", "<ref-pattern>", "<rule>", ...]`
 /// Multiple rules per tag are allowed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtectionRule {
@@ -283,7 +315,7 @@ pub struct ProtectionRule {
     pub require_patch: bool,
 }
 
-/// Errors from parsing a `buzz-protect` tag.
+/// Errors from parsing a `nuxx-protect` tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleParseError {
     /// Tag has fewer than 2 values (need at least pattern + one rule).
@@ -301,7 +333,7 @@ pub enum RuleParseError {
 impl fmt::Display for RuleParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TooFewValues => write!(f, "buzz-protect tag needs pattern + at least one rule"),
+            Self::TooFewValues => write!(f, "nuxx-protect tag needs pattern + at least one rule"),
             Self::TooManyRules => write!(f, "exceeds max {MAX_PROTECTION_RULES} rules per repo"),
             Self::InvalidPattern(e) => write!(f, "invalid pattern: {e}"),
             Self::UnknownRule(r) => write!(f, "unknown rule: {r:?}"),
@@ -312,18 +344,18 @@ impl fmt::Display for RuleParseError {
 
 impl std::error::Error for RuleParseError {}
 
-/// Parse a single `buzz-protect` tag into a `ProtectionRule`.
+/// Parse a single `nuxx-protect` tag into a `ProtectionRule`.
 ///
-/// Tag format: `["buzz-protect", "<pattern>", "<rule1>", "<rule2>", ...]`
-/// The first element ("buzz-protect") should already be stripped — pass
+/// Tag format: `["nuxx-protect", "<pattern>", "<rule1>", "<rule2>", ...]`
+/// The first element ("nuxx-protect") should already be stripped — pass
 /// the remaining values starting with the pattern.
-/// Parse a single `buzz-protect` tag (simple API, discards unknown rules).
+/// Parse a single `nuxx-protect` tag (simple API, discards unknown rules).
 pub fn parse_protection_tag(values: &[&str]) -> Result<ProtectionRule, RuleParseError> {
     let (rule, _unknowns) = parse_protection_tag_with_warnings(values)?;
     Ok(rule)
 }
 
-/// Parse a single `buzz-protect` tag, returning unknown rules for logging.
+/// Parse a single `nuxx-protect` tag, returning unknown rules for logging.
 pub fn parse_protection_tag_with_warnings(
     values: &[&str],
 ) -> Result<(ProtectionRule, Vec<String>), RuleParseError> {
@@ -394,9 +426,9 @@ pub struct ParsedProtection {
     pub unknown_rules: Vec<String>,
 }
 
-/// Parse all `buzz-protect` tags from a kind:30617 event's tag list.
+/// Parse all `nuxx-protect` tags from a kind:30617 event's tag list.
 ///
-/// Returns an error if any `buzz-protect` tag is structurally malformed.
+/// Returns an error if any `nuxx-protect` tag is structurally malformed.
 /// Unknown rule strings are skipped but reported in `ParsedProtection::unknown_rules`
 /// so callers can log warnings (helps catch typos while maintaining forward-compat).
 /// Enforces the per-repo rule count limit.
@@ -405,7 +437,7 @@ pub fn parse_protection_tags(tags: &[Vec<String>]) -> Result<ParsedProtection, R
     let mut unknown_rules = Vec::new();
 
     for tag in tags {
-        if tag.first().map(|s| s.as_str()) != Some("buzz-protect") {
+        if !tag.first().is_some_and(|s| is_protect_tag(s)) {
             continue;
         }
         if rules.len() >= MAX_PROTECTION_RULES {
@@ -423,7 +455,7 @@ pub fn parse_protection_tags(tags: &[Vec<String>]) -> Result<ParsedProtection, R
     })
 }
 
-/// Built-in default minimum role for an operation when no `buzz-protect` tag matches.
+/// Built-in default minimum role for an operation when no `nuxx-protect` tag matches.
 pub fn default_min_role(ref_name: &str, kind: UpdateKind) -> MemberRole {
     let is_branch = ref_name.starts_with("refs/heads/");
     let is_tag = ref_name.starts_with("refs/tags/");
@@ -624,6 +656,58 @@ pub fn evaluate_push(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_repo_announced_before_the_rename_still_parses() {
+        // These tag names live inside signed kind:30617 events. Re-signing is
+        // impossible without the author's key and editing would invalidate the
+        // signature, so every repo announced before the rename carries the old
+        // spelling forever. Dropping acceptance would orphan those repositories.
+        let legacy = vec![vec![
+            LEGACY_PROTECT_TAG.to_string(),
+            "refs/heads/main".to_string(),
+            "no-force-push".to_string(),
+        ]];
+        let parsed = parse_protection_tags(&legacy).expect("legacy tag parses");
+        assert_eq!(parsed.rules.len(), 1, "legacy protection rule must survive");
+    }
+
+    #[test]
+    fn both_spellings_yield_the_same_rules() {
+        let mk = |name: &str| {
+            vec![vec![
+                name.to_string(),
+                "refs/heads/main".to_string(),
+                "no-force-push".to_string(),
+            ]]
+        };
+        let current = parse_protection_tags(&mk(PROTECT_TAG)).unwrap();
+        let legacy = parse_protection_tags(&mk(LEGACY_PROTECT_TAG)).unwrap();
+        assert_eq!(current.rules, legacy.rules);
+    }
+
+    #[test]
+    fn an_unrelated_tag_is_not_mistaken_for_either() {
+        for name in [
+            "protect",
+            "nuxx",
+            "buzz",
+            "x-nuxx-protect",
+            "nuxx-protected",
+        ] {
+            assert!(!is_protect_tag(name), "{name:?} must not parse as protect");
+            assert!(!is_channel_tag(name), "{name:?} must not parse as channel");
+        }
+    }
+
+    #[test]
+    fn each_tag_name_recognises_exactly_its_two_spellings() {
+        assert!(is_protect_tag(PROTECT_TAG) && is_protect_tag(LEGACY_PROTECT_TAG));
+        assert!(is_channel_tag(CHANNEL_TAG) && is_channel_tag(LEGACY_CHANNEL_TAG));
+        // Cross-contamination would bind a repo to a protection rule or vice versa.
+        assert!(!is_protect_tag(CHANNEL_TAG) && !is_protect_tag(LEGACY_CHANNEL_TAG));
+        assert!(!is_channel_tag(PROTECT_TAG) && !is_channel_tag(LEGACY_PROTECT_TAG));
+    }
     use super::*;
 
     #[test]

@@ -100,7 +100,7 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx";
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum ConstraintKind {
@@ -561,7 +561,9 @@ mod tests {
         let mut migrations: Vec<_> = MIGRATOR.iter().collect();
         migrations.sort_by_key(|migration| migration.version);
 
-        assert_eq!(migrations.len(), 26);
+        // Bumped with every added migration on purpose: the count is a guard
+        // that a migration file was not added without being noticed here.
+        assert_eq!(migrations.len(), 28);
         assert_eq!(migrations[0].version, 1);
         assert_eq!(&*migrations[0].description, "initial schema");
         assert!(migrations[0]
@@ -816,14 +818,14 @@ mod tests {
         // writers during rolling deploys without changing kind:30003 broadly.
         assert_eq!(migrations[18].version, 19);
         let mesh_retention = migrations[18].sql.as_str();
-        assert!(mesh_retention.contains("nuxx-mesh-member-status:%"));
-        assert!(mesh_retention.contains("nuxx-mesh-status"));
+        assert!(mesh_retention.contains("buzz-mesh-member-status:%"));
+        assert!(mesh_retention.contains("buzz-mesh-status"));
         assert!(mesh_retention
-            .contains("CREATE TRIGGER trg_events_purge_soft_deleted_nuxx_mesh_status"));
+            .contains("CREATE TRIGGER trg_events_purge_soft_deleted_buzz_mesh_status"));
         assert!(!migrations[0]
             .sql
             .as_str()
-            .contains("purge_soft_deleted_nuxx_mesh_status"));
+            .contains("purge_soft_deleted_buzz_mesh_status"));
 
         // Join policy acceptances landed concurrently with mesh status retention;
         // keep both additive migrations in a single, unambiguous sequence.
@@ -861,7 +863,7 @@ mod tests {
         let push_gate = migrations[22].sql.as_str();
         assert!(push_gate.contains("CREATE OR REPLACE FUNCTION enqueue_push_match_job"));
         assert!(push_gate.contains("pg_advisory_xact_lock_shared"));
-        assert!(push_gate.contains("'nuxx_push_gate:' || NEW.community_id::text"));
+        assert!(push_gate.contains("'buzz_push_gate:' || NEW.community_id::text"));
         assert!(push_gate.contains("endpoint_enabled"));
 
         // T1a repair: the TTL refresh trigger synchronizes on a shared
@@ -872,7 +874,7 @@ mod tests {
         assert!(ttl_shared
             .contains("CREATE OR REPLACE FUNCTION refresh_channel_ttl_after_event_insert"));
         assert!(ttl_shared.contains("pg_advisory_xact_lock_shared"));
-        assert!(ttl_shared.contains("'nuxx_channel_ttl:' || NEW.community_id::text"));
+        assert!(ttl_shared.contains("'buzz_channel_ttl:' || NEW.community_id::text"));
         // The row read must be a bare SELECT (comments describe the removed
         // FOR UPDATE; the executable body must not reintroduce it).
         assert!(ttl_shared.contains("SELECT ttl_seconds INTO channel_ttl"));

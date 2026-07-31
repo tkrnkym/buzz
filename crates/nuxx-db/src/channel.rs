@@ -1527,7 +1527,7 @@ mod tests {
     use crate::user::{ensure_user, set_agent_owner};
     use nostr::Keys;
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx";
 
     async fn setup_pool() -> PgPool {
         PgPool::connect(TEST_DB_URL)

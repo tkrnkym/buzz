@@ -369,12 +369,12 @@ fn hydrate_error_to_response(owner: &str, repo: &str, err: HydrateError) -> Resp
 /// 1. current live kind:30617 by `(community, owner pubkey from the URL,
 ///    d = canonical repo name)` — soft-deleted/replaced announcements do not
 ///    resolve;
-/// 2. its `buzz-channel` tag → channel UUID;
+/// 2. its `nuxx-channel` tag → channel UUID;
 /// 3. [`nuxx_db::Db::get_member_role`] for the caller — a read is allowed
 ///    only on `Ok(Some(role))` with a role the relay recognizes.
 ///
 /// Fail-closed: missing/deleted announcement, invalid owner, missing or
-/// malformed `buzz-channel` binding, non-member, unknown role, and every DB
+/// malformed `nuxx-channel` binding, non-member, unknown role, and every DB
 /// error all deny. There is deliberately **no repo-owner bypass**: an owner
 /// removed from the bound channel loses read access, which is the exact
 /// exploit shape this gate closes. Every denial is the same generic 404 as a
@@ -382,7 +382,7 @@ fn hydrate_error_to_response(owner: &str, repo: &str, err: HydrateError) -> Resp
 /// — with exactly one carve-out: a **never-bound** repo read by its own
 /// **announcement author** returns a 404 whose body tells the author how to
 /// bind it (issue #3527: a vanilla NIP-34 client can announce without a
-/// `buzz-channel` tag, and the repo then 404s forever with no explanation
+/// `nuxx-channel` tag, and the repo then 404s forever with no explanation
 /// for anyone). The author already knows the repo exists — they announced it
 /// — so the remediation body leaks nothing, and only the author can rebind
 /// (kind:30617 is keyed by `(author, d)`). A *broken* binding stays generic
@@ -443,11 +443,11 @@ async fn authorize_git_read(
                 )
                     .into_response());
             }
-            warn!(repo = %repo_name, "git read gate: missing buzz-channel binding (deny)");
+            warn!(repo = %repo_name, "git read gate: missing nuxx-channel binding (deny)");
             return Err(denied());
         }
         RepoBinding::Broken => {
-            warn!(repo = %repo_name, "git read gate: malformed buzz-channel binding (deny)");
+            warn!(repo = %repo_name, "git read gate: malformed nuxx-channel binding (deny)");
             return Err(denied());
         }
     };
@@ -2495,7 +2495,7 @@ mod sec005_read_gate_tests {
 
     // ── authorize_git_read matrix (requires Postgres) ────────────────────
 
-    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
+    const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx"; // sadscan:disable np.postgres.1
 
     async fn setup_db() -> nuxx_db::Db {
         let url = std::env::var("NUXX_TEST_DATABASE_URL")
@@ -2507,13 +2507,13 @@ mod sec005_read_gate_tests {
 
     /// How the fixture's kind:30617 binds (or fails to bind) a channel.
     enum Binding {
-        /// `buzz-channel` tag carrying the fixture channel's UUID.
+        /// `nuxx-channel` tag carrying the fixture channel's UUID.
         Channel,
-        /// No `buzz-channel` tag at all.
+        /// No `nuxx-channel` tag at all.
         Missing,
-        /// `buzz-channel` tag whose value is not a UUID.
+        /// `nuxx-channel` tag whose value is not a UUID.
         Malformed,
-        /// `buzz-channel` tag carrying a well-formed UUID that names no
+        /// `nuxx-channel` tag carrying a well-formed UUID that names no
         /// channel. The resolver reports `Bound`; the membership lookup
         /// (whose SQL joins `channels … deleted_at IS NULL`) then returns
         /// no role — the deliberate phase-1 posture for dead bindings.
@@ -2577,14 +2577,14 @@ mod sec005_read_gate_tests {
         let mut tags = vec![Tag::parse(["d", &repo]).unwrap()];
         match binding {
             Binding::Channel => {
-                tags.push(Tag::parse(["buzz-channel", &channel.to_string()]).unwrap());
+                tags.push(Tag::parse(["nuxx-channel", &channel.to_string()]).unwrap());
             }
             Binding::Missing => {}
             Binding::Malformed => {
-                tags.push(Tag::parse(["buzz-channel", "not-a-uuid"]).unwrap());
+                tags.push(Tag::parse(["nuxx-channel", "not-a-uuid"]).unwrap());
             }
             Binding::UnknownChannel => {
-                tags.push(Tag::parse(["buzz-channel", &uuid::Uuid::new_v4().to_string()]).unwrap());
+                tags.push(Tag::parse(["nuxx-channel", &uuid::Uuid::new_v4().to_string()]).unwrap());
             }
         }
         let event = announcement(&owner_keys, tags);
@@ -2653,7 +2653,7 @@ mod sec005_read_gate_tests {
     #[tokio::test]
     #[ignore = "requires Postgres"]
     async fn read_gate_denies_missing_or_malformed_binding_and_absent_repo() {
-        // Missing buzz-channel tag → deny even for a channel member, with
+        // Missing nuxx-channel tag → deny even for a channel member, with
         // the generic body: the remediation carve-out is author-only.
         let f = setup_repo(Binding::Missing).await;
         let member = f.member_keys.public_key();
@@ -2668,7 +2668,7 @@ mod sec005_read_gate_tests {
              remediation for anyone but the announcement author leaks repo existence"
         );
 
-        // Malformed buzz-channel tag → deny with the generic body EVEN FOR
+        // Malformed nuxx-channel tag → deny with the generic body EVEN FOR
         // THE AUTHOR. This is the assertion that pins the carve-out to
         // NotBound: if it ever fires on Broken, this fails on bytes, not
         // on Ok/Err (which cannot see the difference).

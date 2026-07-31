@@ -58,18 +58,18 @@ test("parseMessageLink reports why a link is unusable", () => {
   assert.equal(parseMessageLink("https://example.com").reason, "wrong-scheme");
   assert.equal(parseMessageLink("buzz://channel?x=1").reason, "wrong-host");
   assert.equal(
-    parseMessageLink(`buzz://message?id=${MESSAGE}`).reason,
+    parseMessageLink(`nuxx://message?id=${MESSAGE}`).reason,
     "missing-channel",
   );
   assert.equal(
-    parseMessageLink(`buzz://message?channel=${CHANNEL}`).reason,
+    parseMessageLink(`nuxx://message?channel=${CHANNEL}`).reason,
     "missing-id",
   );
 });
 
 test("isMessageLink is a cheap pre-check", () => {
-  assert.equal(isMessageLink(`buzz://message?channel=${CHANNEL}`), true);
-  assert.equal(isMessageLink("buzz://message"), true);
+  assert.equal(isMessageLink(`nuxx://message?channel=${CHANNEL}`), true);
+  assert.equal(isMessageLink("nuxx://message"), true);
   assert.equal(isMessageLink("buzz://other?channel=x"), false);
   assert.equal(isMessageLink("https://example.com"), false);
   assert.equal(isMessageLink(undefined), false);
@@ -93,7 +93,7 @@ test("an autolink renders as a pill and a labelled link keeps its label", () => 
 test("a malformed message link falls back to default link handling", () => {
   assert.equal(
     resolveMessageLinkRenderTarget({
-      href: "buzz://message?channel=",
+      href: "nuxx://message?channel=",
       label: "x",
     }).kind,
     "none",
@@ -105,4 +105,36 @@ test("a malformed message link falls back to default link handling", () => {
     }).kind,
     "none",
   );
+});
+
+test("a link shared before the rename still resolves", () => {
+  // These strings are inside the content of signed message events. They cannot
+  // be rewritten without invalidating the signature, so dropping the old scheme
+  // would turn every previously-shared link into inert text.
+  const legacy = `buzz://message?channel=${"1".repeat(8)}&id=${"ab".repeat(32)}`;
+
+  assert.equal(isMessageLink(legacy), true);
+  const parsed = parseMessageLink(legacy);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.value.messageId, "ab".repeat(32));
+});
+
+test("new links are written with the current scheme only", () => {
+  const built = buildMessageLink({
+    channelId: "chan",
+    messageId: "ab".repeat(32),
+  });
+  assert.ok(built.startsWith("nuxx://message?"), built);
+  assert.ok(!built.includes("buzz://"));
+});
+
+test("an unrelated scheme is still refused", () => {
+  // Accepting two schemes must not become accepting any scheme.
+  for (const href of [
+    "https://message?channel=c&id=i",
+    "nuxxx://message?channel=c&id=i",
+    "javascript://message?channel=c&id=i",
+  ]) {
+    assert.equal(isMessageLink(href), false, href);
+  }
 });

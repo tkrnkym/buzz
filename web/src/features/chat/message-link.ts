@@ -1,16 +1,31 @@
 /**
- * `buzz://message` deep links.
+ * `nuxx://message` deep links.
  *
- * Format: `buzz://message?channel=<uuid>&id=<eventId>[&thread=<rootId>]`
+ * Format: `nuxx://message?channel=<uuid>&id=<eventId>[&thread=<rootId>]`
  *
- * Ported from `desktop/src/features/messages/lib/messageLink.ts`. It lives in the
- * chat feature, not in `shared/ui`: the markdown renderer must not know what a
- * Buzz message link is — it takes link handling as an injected extension point,
- * which is what keeps the renderer a reusable primitive.
+ * It lives in the chat feature, not in `shared/ui`: the markdown renderer must
+ * not know what a message link is — it takes link handling as an injected
+ * extension point, which is what keeps the renderer a reusable primitive.
+ *
+ * # Both schemes are read, one is written
+ *
+ * The pre-rename `buzz://` scheme is accepted permanently. Those strings sit
+ * inside the `content` of *signed* message events: they cannot be rewritten
+ * without invalidating the signature, and they are what colleagues pasted to
+ * each other. Dropping the old scheme would turn every link shared before the
+ * rename into inert text. This is not a deprecation window.
+ *
+ * New links are always written with {@link MESSAGE_LINK_SCHEME}.
  */
 
-const MESSAGE_LINK_SCHEME = "buzz:";
+/** Scheme new links are written with. */
+const MESSAGE_LINK_SCHEME = "nuxx:";
+/** Pre-rename scheme, still parsed. See the module docs. */
+const LEGACY_MESSAGE_LINK_SCHEME = "buzz:";
 const MESSAGE_LINK_HOST = "message";
+
+/** Every scheme a message link may legitimately carry. */
+const ACCEPTED_SCHEMES = [MESSAGE_LINK_SCHEME, LEGACY_MESSAGE_LINK_SCHEME];
 
 export interface ParsedMessageLink {
   channelId: string;
@@ -23,7 +38,7 @@ export type MessageLinkParseResult =
   | { ok: false; reason: string };
 
 /**
- * Build a `buzz://message` URL.
+ * Build a `nuxx://message` URL.
  *
  * An empty `threadRootId` counts as "no thread", so callers can pass a resolved
  * thread root straight through without a null check.
@@ -50,7 +65,7 @@ export function buildMessageLink(input: {
 }
 
 /**
- * Parse a `buzz://message?…` URL.
+ * Parse a message link in either accepted scheme.
  *
  * Returns a result rather than throwing so a malformed link can render as plain
  * text instead of breaking the whole message.
@@ -63,10 +78,10 @@ export function parseMessageLink(url: string): MessageLinkParseResult {
     return { ok: false, reason: "invalid-url" };
   }
 
-  if (parsed.protocol !== MESSAGE_LINK_SCHEME) {
+  if (!ACCEPTED_SCHEMES.includes(parsed.protocol)) {
     return { ok: false, reason: "wrong-scheme" };
   }
-  // `new URL("buzz://message?…")` puts "message" in `hostname`.
+  // `new URL("nuxx://message?…")` puts "message" in `hostname`.
   if (parsed.hostname !== MESSAGE_LINK_HOST) {
     return { ok: false, reason: "wrong-host" };
   }
@@ -92,9 +107,11 @@ export function parseMessageLink(url: string): MessageLinkParseResult {
 
 /** Cheap pre-check used before parsing. */
 export function isMessageLink(href: string | undefined | null): boolean {
-  return Boolean(
-    href && (href.startsWith("buzz://message?") || href === "buzz://message"),
-  );
+  if (!href) return false;
+  return ACCEPTED_SCHEMES.some((scheme) => {
+    const prefix = `${scheme}//${MESSAGE_LINK_HOST}`;
+    return href === prefix || href.startsWith(`${prefix}?`);
+  });
 }
 
 export type MessageLinkRenderTarget =
@@ -105,7 +122,7 @@ export type MessageLinkRenderTarget =
 /**
  * How a markdown anchor should render as message-link UI.
  *
- * Both CommonMark autolinks (`<buzz://message?…>`) and explicitly labelled links
+ * Both CommonMark autolinks (`<nuxx://message?…>`) and explicitly labelled links
  * arrive as anchors. An autolink has label === href and becomes a pill; a link
  * the author labelled keeps that label.
  */

@@ -425,7 +425,7 @@ impl Config {
         let bind_addr = parse_bind_addr(&bind_addr_raw)?;
 
         let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://buzz:nuxx_dev@localhost:5432/buzz".to_string()); // sadscan:disable np.postgres.1
+            .unwrap_or_else(|_| "postgres://nuxx:nuxx_dev@localhost:5432/nuxx".to_string()); // sadscan:disable np.postgres.1
 
         let read_database_url = std::env::var("READ_DATABASE_URL")
             .ok()
@@ -1198,7 +1198,7 @@ mod tests {
         std::env::set_var("READ_DATABASE_URL", "   ");
         let blank = Config::from_env().expect("config").read_database_url;
 
-        std::env::set_var("READ_DATABASE_URL", "postgres://buzz:pw@replica:5432/buzz"); // sadscan:disable np.postgres.1
+        std::env::set_var("READ_DATABASE_URL", "postgres://nuxx:pw@replica:5432/nuxx"); // sadscan:disable np.postgres.1
         let set = Config::from_env().expect("config").read_database_url;
 
         if let Some(value) = previous {
@@ -1211,7 +1211,7 @@ mod tests {
         assert_eq!(blank, None, "blank READ_DATABASE_URL must disable routing");
         assert_eq!(
             set.as_deref(),
-            Some("postgres://buzz:pw@replica:5432/buzz") // sadscan:disable np.postgres.1
+            Some("postgres://nuxx:pw@replica:5432/nuxx") // sadscan:disable np.postgres.1
         );
     }
 

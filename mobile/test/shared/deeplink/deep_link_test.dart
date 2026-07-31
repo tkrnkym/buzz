@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   _inviteTests();
   _buildMessageLinkTests();
+  _legacySchemeTests();
 
   group('parseMessageDeepLink', () {
     test('parses channel and id', () {
@@ -233,12 +234,41 @@ void _inviteTests() {
   });
 }
 
+/// Deep-link parsing tests below deliberately keep using the pre-rename
+/// `buzz://` scheme in places: those strings live inside already-signed message
+/// events and in links people pasted before the rename, so continuing to parse
+/// them is a requirement rather than a leftover.
+void _legacySchemeTests() {
+  group('legacy buzz:// scheme', () {
+    test('a link shared before the rename still parses', () {
+      final parsed = parseMessageDeepLink(
+        Uri.parse('buzz://message?channel=d14cd131&id=abc123'),
+      );
+      expect(parsed, isNotNull);
+      expect(parsed!.messageId, 'abc123');
+    });
+
+    test('new links are written with the current scheme only', () {
+      final built = buildMessageLink(channelId: 'c', messageId: 'm');
+      expect(built.startsWith('nuxx://message?'), isTrue);
+      expect(built.contains('buzz://'), isFalse);
+    });
+
+    test('an unrelated scheme is still refused', () {
+      expect(
+        parseMessageDeepLink(Uri.parse('nuxxx://message?channel=c&id=m')),
+        isNull,
+      );
+    });
+  });
+}
+
 void _buildMessageLinkTests() {
   group('buildMessageLink', () {
     test('builds channel + id link', () {
       expect(
         buildMessageLink(channelId: 'd14cd131', messageId: 'abc123'),
-        'buzz://message?channel=d14cd131&id=abc123',
+        'nuxx://message?channel=d14cd131&id=abc123',
       );
     });
 
@@ -249,7 +279,7 @@ void _buildMessageLinkTests() {
           messageId: 'abc123',
           threadRootId: 'root99',
         ),
-        'buzz://message?channel=d14cd131&id=abc123&thread=root99',
+        'nuxx://message?channel=d14cd131&id=abc123&thread=root99',
       );
     });
 
@@ -260,7 +290,7 @@ void _buildMessageLinkTests() {
           messageId: 'abc123',
           threadRootId: '',
         ),
-        'buzz://message?channel=d14cd131&id=abc123',
+        'nuxx://message?channel=d14cd131&id=abc123',
       );
     });
 

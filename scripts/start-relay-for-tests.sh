@@ -152,7 +152,7 @@ fi
 
 log "Starting relay..."
 nohup env \
-  DATABASE_URL=postgres://buzz:buzz_dev@localhost:5432/buzz \
+  DATABASE_URL=postgres://nuxx:nuxx_dev@localhost:5432/nuxx \
   REDIS_URL=redis://localhost:6379 \
   RELAY_URL=ws://localhost:3000 \
   BUZZ_BIND_ADDR=0.0.0.0:3000 \
