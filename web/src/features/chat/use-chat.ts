@@ -28,6 +28,7 @@ import {
   buildReplyTemplate,
   chunkIds,
   toChannelList,
+  toDmList,
 } from "@/features/chat/chat-model";
 import {
   type TimelineRow,
@@ -58,6 +59,23 @@ export function useChannels() {
       toChannelList(
         await session.query(buildChannelListFilter(CHANNEL_LIST_LIMIT)),
       ),
+  });
+}
+
+/**
+ * Direct messages.
+ *
+ * A separate query from `useChannels` rather than one list split two ways: the
+ * two are ordered differently (rooms by name, conversations by recency) and read
+ * in different places, so keeping them apart means neither has to re-sort the
+ * other's data.
+ */
+export function useDms() {
+  const session = useRelaySession();
+  return useQuery<Channel[]>({
+    queryKey: ["chat", "dms"],
+    queryFn: async () =>
+      toDmList(await session.query(buildChannelListFilter(CHANNEL_LIST_LIMIT))),
   });
 }
 

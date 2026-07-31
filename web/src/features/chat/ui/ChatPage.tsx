@@ -17,6 +17,7 @@ import {
   useToggleReaction,
 } from "@/features/chat/use-chat";
 import { usePresence, useTyping } from "@/features/chat/use-presence";
+import { resolveChannelLabel } from "@/features/channels/dm-label";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
 import { useProfiles } from "@/features/profile/profile-store";
 import type { MessageRowActions } from "@/features/messages/ui/MessageRow";
@@ -44,7 +45,7 @@ export function ChatPage({
 }) {
   // Channels, read cursors, and unread state come from the shell so the sidebar
   // and this pane cannot disagree — see `shell-context.tsx`.
-  const { channels, readState } = useShell();
+  const { channels, dms, readState } = useShell();
   const timeline = useChannelMessages(channelId);
   const toggleReaction = useToggleReaction();
   const editMessage = useEditMessage(channelId);
@@ -61,6 +62,13 @@ export function ChatPage({
   // Same author set as presence: names and avatars are needed for exactly the
   // people on screen, and the store keeps whatever it has already resolved.
   const profiles = useProfiles(visibleAuthors);
+  // A DM is titled by who is in it, which needs their profiles too — the authors
+  // on screen are not necessarily all its participants.
+  const dmParticipants = useMemo(
+    () => dms.flatMap((dm) => dm.participantPubkeys),
+    [dms],
+  );
+  const dmProfiles = useProfiles(dmParticipants);
   // Read the rows from a ref inside callbacks: depending on the array directly
   // would give every action a new identity on each delivered event, which is
   // exactly what defeats `React.memo` further down the tree.
@@ -83,8 +91,18 @@ export function ChatPage({
   const openThreadRootId =
     thread?.channelId === channelId ? thread.rootId : null;
 
+  // Searched across both lists: a DM is not in `channels` (the relay marks it
+  // hidden), and a header that could not find it would title the room "Channels".
   const activeChannel =
-    channels.find((channel) => channel.id === channelId) ?? null;
+    [...channels, ...dms].find((channel) => channel.id === channelId) ?? null;
+  const isDm = activeChannel?.type === "dm";
+  const activeLabel = activeChannel
+    ? resolveChannelLabel({
+        channel: activeChannel,
+        currentPubkey: myPubkey,
+        profiles: dmProfiles,
+      })
+    : null;
 
   // The frontier as it stood at open, which is what the "New" divider is
   // measured against — see `use-unread-frontier.ts`.
@@ -259,9 +277,9 @@ export function ChatPage({
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold">
                 {query
-                  ? `Search${activeChannel ? ` in #${activeChannel.name}` : ""}`
-                  : activeChannel
-                    ? `#${activeChannel.name}`
+                  ? `Search${activeLabel ? ` in ${isDm ? "" : "#"}${activeLabel}` : ""}`
+                  : activeLabel
+                    ? `${isDm ? "" : "#"}${activeLabel}`
                     : "Channels"}
               </h1>
               {activeChannel?.topic && (
@@ -302,7 +320,8 @@ export function ChatPage({
             <TypingIndicator typists={typing.typists} />
             <MessageComposer
               channelId={channelId}
-              channelName={activeChannel?.name ?? channelId}
+              channelName={activeLabel ?? channelId}
+              isDm={isDm}
               onCancelReply={onCloseThread}
               onComposing={typing.announce}
               onSent={typing.complete}

@@ -35,6 +35,13 @@ export interface Channel {
   /** NIP-29 `hidden`: DMs, which should stay out of the channel list. */
   hidden: boolean;
   archived: boolean;
+  /**
+   * Participants, from the `p` tags the relay puts on a DM's metadata.
+   *
+   * Only DMs carry these. It is what lets a DM be labelled by who is in it
+   * without a second fetch — a DM's own `name` is a generic placeholder.
+   */
+  participantPubkeys: string[];
   updatedAt: number;
 }
 
@@ -106,6 +113,9 @@ export function eventToChannel(event: NostrEvent): Channel | null {
     isPrivate: hasTag(event, "private"),
     hidden: hasTag(event, "hidden"),
     archived: firstTag(event, "archived") === "true",
+    participantPubkeys: event.tags
+      .filter((tag) => tag[0] === "p" && typeof tag[1] === "string")
+      .map((tag) => (tag[1] as string).toLowerCase()),
     updatedAt: event.created_at,
   };
 }
@@ -120,6 +130,22 @@ export function toChannelList(events: NostrEvent[]): Channel[] {
     .filter((channel): channel is Channel => channel !== null)
     .filter((channel) => !channel.hidden && !channel.archived)
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * Direct messages: the rooms `toChannelList` deliberately leaves out.
+ *
+ * Selected on the channel type rather than on `hidden`, which is a display hint
+ * the relay may set on other kinds of room later. Newest first, because a DM list
+ * is read as a conversation list — the room that just moved belongs at the top,
+ * not under whichever name sorts first.
+ */
+export function toDmList(events: NostrEvent[]): Channel[] {
+  return dedupeAddressable(events)
+    .map(eventToChannel)
+    .filter((channel): channel is Channel => channel !== null)
+    .filter((channel) => channel.type === "dm" && !channel.archived)
+    .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 /**

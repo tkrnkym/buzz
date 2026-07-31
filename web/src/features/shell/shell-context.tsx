@@ -13,7 +13,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 import type { Channel } from "@/features/chat/chat-model";
-import { useChannels } from "@/features/chat/use-chat";
+import { useChannels, useDms } from "@/features/chat/use-chat";
 import {
   useReadState,
   type ReadStateApi,
@@ -24,9 +24,9 @@ import {
   type SelfPresenceApi,
 } from "@/features/profile/use-self-presence";
 import {
-  useChannelStars,
-  type ChannelStarsApi,
-} from "@/features/shell/use-channel-stars";
+  useChannelFlag,
+  type ChannelFlagApi,
+} from "@/features/shell/use-channel-flags";
 
 export interface ShellValue {
   channels: Channel[];
@@ -34,19 +34,24 @@ export interface ShellValue {
   channelsError: Error | null;
   readState: ReadStateApi;
   unread: UnreadApi;
-  stars: ChannelStarsApi;
+  stars: ChannelFlagApi;
+  mutes: ChannelFlagApi;
   presence: SelfPresenceApi;
+  /** Direct messages, which `channels` deliberately leaves out. */
+  dms: Channel[];
 }
 
 const ShellContext = createContext<ShellValue | null>(null);
 
 export function ShellProvider({ children }: { children: ReactNode }) {
   const channels = useChannels();
+  const dms = useDms();
   const readState = useReadState();
   // Unread comes from relay-published activity snapshots, not from a stream of
   // every message in the community. See `chat/unread.ts`.
   const unread = useUnreadChannels(readState.contexts);
-  const stars = useChannelStars();
+  const stars = useChannelFlag("stars");
+  const mutes = useChannelFlag("mutes");
   // Here rather than in the profile card: the heartbeat has to keep running
   // while the reader is looking at any page in the shell, not only while the
   // card that shows it happens to be mounted.
@@ -59,7 +64,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     readState,
     unread,
     stars,
+    mutes,
     presence,
+    dms: dms.data ?? [],
   };
 
   return (

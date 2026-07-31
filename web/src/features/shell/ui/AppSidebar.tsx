@@ -1,19 +1,35 @@
-import { Link } from "@tanstack/react-router";
-import { FolderGit2, Inbox, MessageSquare } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { FolderGit2, Inbox, MessageSquare, Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
+import type { Channel } from "@/features/chat/chat-model";
+import { useMyPubkey } from "@/features/chat/use-chat";
+import { resolveChannelLabel } from "@/features/channels/dm-label";
+import { CreateChannelDialog } from "@/features/channels/ui/CreateChannelDialog";
+import { NewDmDialog } from "@/features/channels/ui/NewDmDialog";
+import {
+  useCreateChannel,
+  useLeaveChannel,
+  useOpenDm,
+} from "@/features/channels/use-channel-ops";
+import { useProfiles } from "@/features/profile/profile-store";
 import { SearchBox } from "@/features/search/ui/SearchBox";
-import { useShell } from "@/features/shell/shell-context";
 import {
   groupChannels,
   type ChannelGroup,
 } from "@/features/shell/lib/channel-groups";
-import { SidebarChannelSection } from "@/features/shell/ui/SidebarChannelSection";
+import { useShell } from "@/features/shell/shell-context";
+import {
+  SidebarChannelSection,
+  type ChannelRowActions,
+} from "@/features/shell/ui/SidebarChannelSection";
 import { SidebarProfileCard } from "@/features/shell/ui/SidebarProfileCard";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroupAction,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -42,13 +58,27 @@ export function AppSidebar({
   query: string;
   view: "chat" | "inbox" | "settings";
 }) {
-  const { channels, channelsError, channelsLoading, stars, unread } =
-    useShell();
+  const {
+    channels,
+    channelsError,
+    channelsLoading,
+    dms,
+    mutes,
+    stars,
+    unread,
+  } = useShell();
+  const navigate = useNavigate();
+  const myPubkey = useMyPubkey();
+  const createChannel = useCreateChannel();
+  const leaveChannel = useLeaveChannel();
+  const openDm = useOpenDm();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newDmOpen, setNewDmOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<
-    Record<ChannelGroup["key"], boolean>
-  >({ starred: false, channels: false, forums: false });
+    Record<ChannelGroup["key"] | "dms", boolean>
+  >({ starred: false, channels: false, forums: false, dms: false });
 
-  const toggleCollapsed = useCallback((key: ChannelGroup["key"]) => {
+  const toggleCollapsed = useCallback((key: ChannelGroup["key"] | "dms") => {
     setCollapsedGroups((current) => ({ ...current, [key]: !current[key] }));
   }, []);
 
@@ -56,23 +86,124 @@ export function AppSidebar({
     () =>
       groupChannels({
         channels,
-        starredChannelIds: stars.starredChannelIds,
+        starredChannelIds: stars.channelIds,
       }),
-    [channels, stars.starredChannelIds],
+    [channels, stars.channelIds],
+  );
+
+  // Only DM participants need resolving here: a channel's own name is on its
+  // metadata, and the profile card asks for the reader separately.
+  const dmParticipants = useMemo(
+    () => dms.flatMap((dm) => dm.participantPubkeys),
+    [dms],
+  );
+  const profiles = useProfiles(dmParticipants);
+
+  const labelFor = useCallback(
+    (channel: Channel) =>
+      resolveChannelLabel({ channel, currentPubkey: myPubkey, profiles }),
+    [myPubkey, profiles],
   );
 
   const unreadChannelIds = useMemo(
     () =>
       new Set(
-        channels
+        [...channels, ...dms]
           .filter((channel) => unread.isUnread(channel.id))
           .map((channel) => channel.id),
       ),
-    [channels, unread],
+    [channels, dms, unread],
+  );
+
+  const rowActions = useMemo<ChannelRowActions>(
+    () => ({
+      isMuted: mutes.has,
+      isStarred: stars.has,
+      labelFor,
+      profiles,
+      onCopyLink: (channel) => {
+        const url = new URL(
+          `/c/${channel.id}`,
+          window.location.origin,
+        ).toString();
+        void navigator.clipboard
+          .writeText(url)
+          .then(() => toast.success("Link copied"))
+          .catch(() => toast.error("Could not copy the link"));
+      },
+      onLeave: (channel) =>
+        leaveChannel.mutate(channel.id, {
+          onSuccess: () => {
+            toast.success(`Left ${labelFor(channel)}`);
+            // Leaving the room being read would leave the reader looking at a
+            // timeline they can no longer load.
+            if (channel.id === activeChannelId) void navigate({ to: "/" });
+          },
+          onError: (error) =>
+            toast.error(
+              error instanceof Error ? error.message : "Could not leave",
+            ),
+        }),
+      onToggleMute: mutes.toggle,
+      onToggleStar: stars.toggle,
+    }),
+    [
+      activeChannelId,
+      labelFor,
+      leaveChannel,
+      mutes.has,
+      mutes.toggle,
+      navigate,
+      profiles,
+      stars.has,
+      stars.toggle,
+    ],
   );
 
   return (
     <Sidebar>
+      {createOpen && (
+        <CreateChannelDialog
+          error={
+            createChannel.error instanceof Error
+              ? createChannel.error.message
+              : null
+          }
+          onClose={() => setCreateOpen(false)}
+          onCreate={(input) =>
+            createChannel.mutate(input, {
+              onSuccess: ({ channelId }) => {
+                setCreateOpen(false);
+                void navigate({
+                  to: "/c/$channelId",
+                  params: { channelId },
+                });
+              },
+            })
+          }
+          pending={createChannel.isPending}
+        />
+      )}
+
+      {newDmOpen && (
+        <NewDmDialog
+          error={openDm.error instanceof Error ? openDm.error.message : null}
+          onClose={() => setNewDmOpen(false)}
+          onOpen={(pubkeys) =>
+            openDm.mutate(pubkeys, {
+              onSuccess: () => {
+                setNewDmOpen(false);
+                // The relay allocates the channel and answers with its metadata,
+                // so there is no id to navigate to — the DM appears in the list
+                // once that lands.
+                toast.success("Direct message opened");
+              },
+            })
+          }
+          pending={openDm.isPending}
+        />
+      )}
+
       {/* Search sits above the navigation, as it does in the desktop client:
           it is how a reader gets to a message rather than to a room. */}
       <div
@@ -145,25 +276,58 @@ export function AppSidebar({
             {channelsError.message}
           </p>
         ) : (
-          groups.map((group) => (
+          <>
+            {groups.map((group) => (
+              <SidebarChannelSection
+                action={
+                  group.key === "channels" ? (
+                    <SidebarGroupAction
+                      aria-label="Create a channel"
+                      data-testid="open-create-channel"
+                      onClick={() => setCreateOpen(true)}
+                    >
+                      <Plus />
+                    </SidebarGroupAction>
+                  ) : undefined
+                }
+                activeChannelId={activeChannelId}
+                channels={group.channels}
+                emptyState={
+                  group.key === "channels"
+                    ? "No channels visible to this identity."
+                    : undefined
+                }
+                isCollapsed={collapsedGroups[group.key]}
+                key={group.key}
+                onToggleCollapsed={() => toggleCollapsed(group.key)}
+                rowActions={rowActions}
+                testId={`sidebar-group-${group.key}`}
+                title={group.title}
+                unreadChannelIds={unreadChannelIds}
+              />
+            ))}
+
             <SidebarChannelSection
-              activeChannelId={activeChannelId}
-              channels={group.channels}
-              emptyState={
-                group.key === "channels"
-                  ? "No channels visible to this identity."
-                  : undefined
+              action={
+                <SidebarGroupAction
+                  aria-label="New direct message"
+                  data-testid="open-new-dm"
+                  onClick={() => setNewDmOpen(true)}
+                >
+                  <Plus />
+                </SidebarGroupAction>
               }
-              isCollapsed={collapsedGroups[group.key]}
-              isStarred={stars.isStarred}
-              key={group.key}
-              onToggleCollapsed={() => toggleCollapsed(group.key)}
-              onToggleStar={stars.toggleStar}
-              testId={`sidebar-group-${group.key}`}
-              title={group.title}
+              activeChannelId={activeChannelId}
+              channels={dms}
+              emptyState="No direct messages yet."
+              isCollapsed={collapsedGroups.dms}
+              onToggleCollapsed={() => toggleCollapsed("dms")}
+              rowActions={rowActions}
+              testId="sidebar-group-dms"
+              title="Direct messages"
               unreadChannelIds={unreadChannelIds}
             />
-          ))
+          </>
         )}
       </SidebarContent>
 

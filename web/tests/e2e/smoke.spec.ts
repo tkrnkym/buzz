@@ -530,7 +530,9 @@ test("starring a channel moves it under Starred", async ({ page }) => {
   // section never takes up room.
   await expect(page.getByTestId("sidebar-group-starred")).toBeHidden();
 
-  await page.getByTestId("star-channel-general").click();
+  // Starring lives in the row's action menu, alongside mute and leave.
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-star").click();
   const starred = page.getByTestId("sidebar-group-starred");
   await expect(starred.getByText("general")).toBeVisible();
   // Only under Starred: listing it twice would double the unread badge and make
@@ -568,7 +570,8 @@ test("a star survives a reload for a durable identity", async ({ page }) => {
   await relay.install();
 
   await page.goto("/");
-  await page.getByTestId("star-channel-general").click();
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-star").click();
   await expect(
     page.getByTestId("sidebar-group-starred").getByText("general"),
   ).toBeVisible();
@@ -644,6 +647,30 @@ test("sending a message publishes kind:9 with the channel h tag", async ({
 });
 
 const CHANNEL_UUID = "11111111-1111-1111-1111-111111111111";
+
+/**
+ * A DM's group metadata, as the relay emits it: hidden, `t:dm`, and carrying the
+ * participants as `p` tags so a client can label it without a second fetch.
+ */
+function dmChannel(channelId: string) {
+  return {
+    id: channelId.replace(/-/g, "").padEnd(64, "0").slice(0, 64),
+    pubkey: "b".repeat(64),
+    kind: 39000,
+    created_at: 1_700_000_500,
+    tags: [
+      ["d", channelId],
+      ["name", "dm"],
+      ["hidden"],
+      ["closed"],
+      ["t", "dm"],
+      ["p", MY_PUBKEY],
+      ["p", "e".repeat(64)],
+    ],
+    content: "",
+    sig: "c".repeat(128),
+  };
+}
 
 function markdownMessage(id: string, content: string, tags: string[][] = []) {
   return {
@@ -842,6 +869,163 @@ test("replying publishes thread tags and shows the reply count", async ({
   // Root === parent for a direct reply, which nuxx-sdk collapses to one tag.
   expect(reply.tags).toContainEqual(["e", root.id, "", "reply"]);
   expect(reply.tags).toContainEqual(["h", CHANNEL_UUID]);
+});
+
+test("creating a channel publishes kind:9007 and opens the room", async ({
+  page,
+}) => {
+  // A NIP-29 command: the relay validates it and publishes the group metadata,
+  // which is why nothing is inserted optimistically.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("open-create-channel").click();
+  await page.getByTestId("create-channel-name").fill("#Design Review");
+
+  // The preview shows what the relay's own canonicalization will produce —
+  // leading `#` stripped, nothing else touched.
+  await expect(page.getByTestId("create-channel-name-preview")).toContainText(
+    "Design Review",
+  );
+
+  await page.getByTestId("create-channel-visibility-private").click();
+  await page.getByTestId("create-channel-type-forum").click();
+  await page.getByTestId("create-channel-about").fill("weekly");
+  await page.getByTestId("create-channel-submit").click();
+
+  const created = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9007,
+  ) as { tags: string[][] };
+  expect(created.tags).toContainEqual(["name", "Design Review"]);
+  expect(created.tags).toContainEqual(["visibility", "private"]);
+  expect(created.tags).toContainEqual(["channel_type", "forum"]);
+  expect(created.tags).toContainEqual(["about", "weekly"]);
+  // The client picks the id, because the `h` tag has to exist before the relay
+  // can scope anything to it.
+  const hTag = created.tags.find((tag) => tag[0] === "h");
+  expect(hTag?.[1]).toMatch(/^[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(new RegExp(`/c/${hTag?.[1]}$`));
+});
+
+test("muting a channel dims it but keeps an unread room legible", async ({
+  page,
+}) => {
+  // The one time a reader who muted a room still asked to be told.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-mute").click();
+
+  // A standalone `opacity-50`, not the base variant's `disabled:opacity-50` —
+  // a loose match here would pass whether or not the row was ever dimmed.
+  const dimmed = /(^|\s)opacity-50(\s|$)/;
+  const row = page.getByTestId("channel-general");
+  await expect(row).toHaveClass(dimmed);
+  await expect(page.getByLabel("Muted")).toBeVisible();
+
+  // Unmuting is the same menu item, now inverted.
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-mute").click();
+  await expect(row).not.toHaveClass(dimmed);
+  await expect(page.getByLabel("Muted")).toHaveCount(0);
+});
+
+test("leaving a channel publishes kind:9022 and leaves the room", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-leave-channel").click();
+
+  const left = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9022,
+  ) as { tags: string[][] };
+  expect(left.tags).toEqual([["h", CHANNEL_UUID]]);
+  // Staying would leave the reader looking at a timeline they can no longer load.
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test("a DM is listed and titled by who is in it", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraChannels: [dmChannel("22222222-2222-2222-2222-222222222222")],
+    profileEvents: [
+      {
+        id: "0b".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 0,
+        created_at: 1_700_000_000,
+        tags: [],
+        content: JSON.stringify({ display_name: "Erin Example" }),
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto("/");
+  // Not under Channels: the relay marks a DM hidden, and it is read as a
+  // conversation rather than as a room.
+  const dms = page.getByTestId("sidebar-group-dms");
+  await expect(dms.getByText("Erin Example")).toBeVisible();
+  await expect(
+    page.getByTestId("sidebar-group-channels").getByText("Erin Example"),
+  ).toHaveCount(0);
+
+  await dms.getByText("Erin Example").click();
+  // No hash: it is a person, and "#Erin Example" reads as a channel that does
+  // not exist.
+  await expect(
+    page.getByRole("heading", { name: "Erin Example", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Message Erin Example" }),
+  ).toBeVisible();
+});
+
+test("opening a DM publishes kind:41010 with only p tags", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("open-new-dm").click();
+  // Split on anything non-hex, so a pasted list works however it is separated.
+  await page
+    .getByTestId("new-dm-pubkeys")
+    .fill(`${"a".repeat(64)}, ${"b".repeat(64)}`);
+  await page.getByTestId("new-dm-submit").click();
+
+  const opened = relay.published.find(
+    (event) => (event as { kind: number }).kind === 41010,
+  ) as { tags: string[][] };
+  expect(opened.tags).toEqual([
+    ["p", "a".repeat(64)],
+    ["p", "b".repeat(64)],
+  ]);
+  // No `h` tag: the relay allocates the channel, so this client never derives an
+  // id for a set of people.
+  expect(opened.tags.every((tag) => tag[0] !== "h")).toBe(true);
+});
+
+test("a DM cannot be opened without a whole public key", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("open-new-dm").click();
+  await page.getByTestId("new-dm-pubkeys").fill("alice");
+  await expect(page.getByTestId("new-dm-submit")).toBeDisabled();
+  expect(
+    relay.published.filter(
+      (event) => (event as { kind: number }).kind === 41010,
+    ),
+  ).toEqual([]);
 });
 
 test("a message is attributed to its author's display name", async ({

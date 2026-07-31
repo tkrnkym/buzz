@@ -35,6 +35,8 @@ export const CH_GENERAL = "11111111-1111-4111-8111-111111111111";
 export const CH_DESIGN = "22222222-2222-4222-8222-222222222222";
 export const CH_RANDOM = "33333333-3333-4333-8333-333333333333";
 export const CH_ANNOUNCE = "44444444-4444-4444-8444-444444444444";
+/** A DM, which the sidebar lists apart from the channels. */
+export const CH_DM = "55555555-5555-4555-8555-555555555555";
 
 const now = Math.floor(Date.now() / 1000);
 /** Minutes ago, so the demo always looks alive regardless of when it loads. */
@@ -106,11 +108,40 @@ function reaction(
   };
 }
 
+/**
+ * A DM's metadata, as the relay emits it: hidden, `t:dm`, and carrying the
+ * participants as `p` tags so a client can title it without a second fetch.
+ *
+ * The visitor's own key is ephemeral and unknown at seed time, so the demo DM is
+ * between two personas — it shows the shape of the list, and the label resolution
+ * that goes with it, without pretending the visitor is in a conversation they
+ * never had.
+ */
+function dmChannel(channelId: string, participants: string[]): NostrEvent {
+  return {
+    id: id(`chan:${channelId}`),
+    pubkey: RELAY,
+    kind: KIND_NIP29_GROUP_METADATA,
+    created_at: ago(30),
+    tags: [
+      ["d", channelId],
+      ["name", "dm"],
+      ["hidden"],
+      ["closed"],
+      ["t", "dm"],
+      ...participants.map((pubkey) => ["p", pubkey]),
+    ],
+    content: "",
+    sig: SIG,
+  };
+}
+
 export const CHANNELS: NostrEvent[] = [
   channel(CH_GENERAL, "general", "Everything else", "ship the demo"),
   channel(CH_DESIGN, "design", "Tokens, type, and taste", "rem, never px"),
   channel(CH_RANDOM, "random", "Off topic", ""),
   channel(CH_ANNOUNCE, "announcements", "Read-only-ish", "release notes"),
+  dmChannel(CH_DM, [ALICE, BOB]),
 ];
 
 const GENERAL_THREAD_ROOT = "gen-3";
@@ -172,6 +203,9 @@ export const MESSAGES: NostrEvent[] = [
   ),
   // --- #random ---
   message("ran-1", CH_RANDOM, BOB, 400, "standup thread but it's just memes"),
+  // --- a DM, to show the list apart from the channels ---
+  message("dm-1", CH_DM, ALICE, 25, "got a minute to look at the shard math?"),
+  message("dm-2", CH_DM, BOB, 22, "yep — sending a diff in a sec"),
   // --- #announcements: recent activity the visitor has not read → badge ---
   message(
     "ann-1",
@@ -248,6 +282,7 @@ export const ACTIVITY: Record<string, number> = {
   [CH_DESIGN]: ago(200),
   [CH_RANDOM]: ago(400),
   [CH_ANNOUNCE]: ago(8),
+  [CH_DM]: ago(22),
 };
 
 /** Older #general history, served one page at a time to exercise scrollback. */

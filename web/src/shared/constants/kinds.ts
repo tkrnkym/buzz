@@ -17,11 +17,29 @@ export const KIND_REACTION = 7;
 export const KIND_STREAM_MESSAGE = 9;
 export const KIND_NIP29_DELETE_EVENT = 9005;
 /**
+ * NIP-29 group commands.
+ *
+ * Commands, not content: the relay validates each one, executes it, and
+ * publishes the outcome as new metadata (39000) or a system message (40099).
+ * Nothing here is stored as written, so there is no optimistic state to
+ * reconcile.
+ */
+export const KIND_NIP29_CREATE_GROUP = 9007;
+export const KIND_NIP29_JOIN_REQUEST = 9021;
+export const KIND_NIP29_LEAVE_REQUEST = 9022;
+/**
  * Presence heartbeat. Ephemeral, so never stored: current status lives in the
  * relay's Redis and is synthesized for an authored `POST /query`.
  */
 export const KIND_PRESENCE_UPDATE = 20001;
 export const KIND_TYPING_INDICATOR = 20002;
+/**
+ * Open a direct message.
+ *
+ * Carries only `p` tags: the relay allocates the channel and answers with its
+ * metadata, so a client never has to derive an id for a set of people.
+ */
+export const KIND_DM_OPEN = 41010;
 /** NIP-29 group metadata — the relay-signed channel descriptor. */
 export const KIND_NIP29_GROUP_METADATA = 39000;
 export const KIND_NIP29_GROUP_ADMINS = 39001;

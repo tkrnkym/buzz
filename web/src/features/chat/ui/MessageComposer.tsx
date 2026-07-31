@@ -21,6 +21,7 @@ const EMPTY_PUBKEYS: string[] = [];
 export function MessageComposer({
   channelId,
   channelName,
+  isDm = false,
   replyTo,
   onCancelReply,
   onComposing,
@@ -28,6 +29,8 @@ export function MessageComposer({
 }: {
   channelId: string;
   channelName: string;
+  /** A DM is addressed by a person's name, not by a hashed channel name. */
+  isDm?: boolean;
   replyTo: ReplyTarget | null;
   onCancelReply: () => void;
   /** Called as the user types; throttling is the caller's business. */
@@ -97,7 +100,9 @@ export function MessageComposer({
 
   const label = replyTo
     ? `Reply to ${replyToLabel}`
-    : `Message #${channelName}`;
+    : // No hash for a DM: the label is a person's name, and "Message #Alice" reads
+      // as a channel that does not exist.
+      `Message ${isDm ? "" : "#"}${channelName}`;
 
   return (
     <form
