@@ -1,0 +1,113 @@
+# 機能一覧
+
+Nuxx（channels.nuxx.ai）の機能を、サーフェス別に列挙する。状態列は本ドキュメント
+作成時点のコード実態に基づく（✅ 実装済み / 🚧 未完 / ⚠️ 実装済みだが導線に問題あり）。
+
+関連: [SPECIFICATION.md](SPECIFICATION.md) · [DATABASE.md](DATABASE.md) ·
+[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)
+
+---
+
+## リレー（サーバー本体 `nuxx-relay`）
+
+| 機能 | 状態 | 備考 |
+|---|---|---|
+| WebSocket リアルタイム配信（Nostr REQ/EVENT/COUNT） | ✅ | ポート 3000。NIP-42 認証必須 |
+| マルチテナント（host ヘッダ → community 境界） | ✅ | TLA+ 仕様 + conformance replay で検証 |
+| チャンネル（NIP-29 グループ） | ✅ | 作成・メタデータ・メンバー・ロール・招待 |
+| メッセージ（送信・編集・削除・ピン・ブックマーク・予約送信） | ✅ | kind:9 / 40002〜40008 |
+| スレッド（返信集計 `reply_count` / `descendant_count`） | ✅ | ルートイベントに実体化 |
+| リアクション（絵文字・カスタム絵文字） | ✅ | kind:7 / 10030 / 30030 |
+| DM（作成・開封・メンバー追加・非表示、NIP-17 gift wrap） | ✅ | kind:1059 / 41001〜41012 |
+| フォーラム（投稿・投票・コメント） | ✅ | kind:45001〜45003 |
+| 全文検索（NIP-50 → Postgres FTS） | ✅ | `search_tsv` 生成列。秘匿 kind は索引除外 |
+| メディア（Blossom / S3 互換、画像・動画） | ✅ | SHA-256 アドレッシング、`x` タグ検証 |
+| 音声通話（huddle、Redis fenced-lease でポッド所有） | ✅ | クロスポッドはリレー間 QUIC メッシュ経由 |
+| プレゼンス・タイピング表示 | ✅ | kind:20001 / 20002（エフェメラル） |
+| 未読基盤（Channel Activity Snapshot） | ✅ | kind:39007。クライアントの未読バッジの根拠 |
+| 既読状態（NIP-44 暗号化、リレーは平文を持たない） | ✅ | kind:30078。ポリシー化は 🚧（タスク #17） |
+| モデレーション（ban / timeout / 通報 / 監査） | ✅ | kind:9040〜9044 / 1984。ハッシュチェーン監査ログ |
+| 招待リンク・参加ポリシー（年齢確認・規約同意） | ✅ | `/api/invites` `/api/join-policy` |
+| git ホスティング（smart HTTP、Nostr 署名 push） | ✅ | ブランチ保護は `nuxx-protect` タグ（kind:30617） |
+| PR / Issue / パッチ（NIP-34 系） | ✅ | kind:1617〜1633 |
+| リポジトリブラウザ（web バンドルを同一プロセスで配信） | ✅ | `NUXX_WEB_DIR` の静的配信 |
+| プッシュ通知（push gateway 連携、wake 信号のみ） | ✅ | 本文は送らない。既定 URL は要確認（下記 ⚠️） |
+| ワークフローエンジン（YAML 定義、cron / interval / webhook） | ✅ | 承認フロー付き（kind:46010〜46031） |
+| 長文投稿（NIP-23） | ✅ | kind:30023 |
+| ユーザーステータス（NIP-38） | ✅ | kind:30315 |
+| リマインダ | ✅ | kind:30300、e2e あり |
+| カストディアル（SSO）ログイン | 🚧 | 鍵導出・OIDC 検証は完成。セッション/署名 API と web UI が未着手 |
+| 運用系: `/_liveness` `/_readiness` `/metrics` `/_status` | ✅ | 8080 / 9102 |
+| 管理ダッシュボード（読み取り専用、通報・フィードバック） | ✅ | `admin-web`、`NUXX_ADMIN_HOST` で有効化 |
+
+⚠️ プッシュ既定送信先 `https://push.nuxx.ai/...` はドメイン保有が未確認。
+未保有なら `NUXX_PUSH_GATEWAY_DELIVERY_URL=""` で無効化すること。
+
+## Web クライアント（`web/`）
+
+| 機能 | 状態 |
+|---|---|
+| チャンネル一覧・タイムライン・メッセージ送信 | ✅ |
+| リアクション・スレッド・編集・削除 | ✅ |
+| Markdown 描画（コードブロック、imeta による画像サイズ確定） | ✅ |
+| メッセージ検索（kinds 指定必須） | ✅ |
+| メディアアップロード（Blossom） | ✅ |
+| 未読バッジ（Activity Snapshot 駆動） | ✅ |
+| プレゼンス・タイピング表示 | ✅ |
+| 既読同期（リレー経由、ブラウザに残さない） | ✅ |
+| ディープリンク `nuxx://message?...` の in-app 解決 | ✅ |
+| 招待ランディング（同意フロー付き） | ✅ |
+| リポジトリブラウザ | ✅ |
+| ログイン: NIP-07 拡張 / 鍵入力 | ✅ |
+| ログイン: SSO（CustodialSigner） | 🚧 |
+| `shared/ui` の残り（旧 desktop からの移植、タスク #11） | 🚧 |
+
+## モバイル（Flutter `mobile/`）
+
+| 機能 | 状態 |
+|---|---|
+| チャンネル・タイムライン・スレッド・システムメッセージ | ✅ |
+| ディープリンク（message / join） | ✅ |
+| 招待参加（ポリシー同意、鍵生成） | ✅ |
+| アクティビティ（インボックス、メンション） | ✅ |
+| フォーラム / Pulse（フィード） | ✅ |
+| カメラ・フォトライブラリ添付（EXIF サニタイズ） | ✅ |
+| プロフィール・設定・テーマ切替 | ✅ |
+| デバイスペアリング画面 | ⚠️ 画面は残るが「デスクトップの QR をスキャン」導線が死んでいる（desktop 削除済み）。要再設計 |
+
+## CLI（`nuxx`、エージェント第一）
+
+サブコマンド: `agents` `channels`（テンプレート込み） `messages` `dms` `users`
+`reactions` `feed` `notes` `social` `repos` `pr` `patches` `issues` `emoji`
+`mem`（エージェント記憶） `mod`/`moderation` `upload` `workflows` `pack`（ペルソナ）
+
+- 読み取りは署名除去済み JSON 配列、書き込みは `{event_id, accepted, message}` を返す
+- 終了コード: 0=正常 1=入力 2=網/リレー 3=認証 4=その他 5=書き込み競合（NIP-33 LWW）
+- `--format compact` はグローバルフラグ（サブコマンドの前に置く）
+
+## エージェント基盤
+
+| コンポーネント | 役割 |
+|---|---|
+| `nuxx-acp` | ACP ハーネス。Nostr イベント ↔ エージェントの橋渡し、ターン管理、ベースプロンプト |
+| `nuxx-agent` | 最小 ACP 準拠エージェント（LLM: Anthropic / OpenAI / OpenRouter / Databricks） |
+| `nuxx-dev-mcp` | シェル + ファイル編集の MCP サーバー |
+| `nuxx-persona` | ペルソナパック（manifest、marge、検証） |
+| `sprig` | 上記 3 つを同梱した単一バイナリ |
+| オーナー承認ドラフト | エージェントの `draft-create` / `draft-update`（`NUXX_AUTH_TAG` 必須） |
+
+## 運用・配備
+
+| 対象 | 実体 |
+|---|---|
+| Docker イメージ | `ghcr.io/tkrnkym/nuxx`（relay + admin + web を同梱） |
+| Helm チャート | `deploy/charts/nuxx`、`deploy/charts/nuxx-push-gateway` |
+| Compose | `docker-compose.yml`（dev） / `deploy/compose/`（prod 見本） |
+| リリースレーン | relay（`relay-v*` タグ → イメージ）、mobile（`mobile-vX.Y.Z-rc.N` タグ） |
+
+## 削除済み（このフォークに存在しない）
+
+- デスクトップアプリ（Tauri）一式と各種リリースレーン
+- 共有 LLM コンピュート（mesh-llm）
+- デバイスペアリング用サイドカーリレー（`nuxx-pair-relay` / `nuxx-pairing-cli`）
+- 旧 `buzz://` スキーム受理、`BUZZ_*` 環境変数互換
