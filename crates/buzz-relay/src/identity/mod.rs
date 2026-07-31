@@ -4,3 +4,4 @@
 
 pub mod custodial;
 mod hkdf;
+pub mod oidc;
