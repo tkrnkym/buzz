@@ -9,6 +9,7 @@ import { Route as reposRouteImport } from "./routes/repos";
 import { Route as shellRouteImport } from "./routes/shell";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
 import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
+import { Route as settingsRouteImport } from "./routes/settings";
 import { Route as homeRouteImport } from "./routes/home";
 import { Route as cRouteImport } from "./routes/c";
 import { Route as indexRouteImport } from "./routes/index";
@@ -33,6 +34,11 @@ const inviteDotcodeRoute = inviteDotcodeRouteImport.update({
   id: "/invite/$code",
   path: "/invite/$code",
   getParentRoute: () => rootRouteImport,
+} as any);
+const settingsRoute = settingsRouteImport.update({
+  id: "/settings",
+  path: "/settings",
+  getParentRoute: () => shellRoute,
 } as any);
 const homeRoute = homeRouteImport.update({
   id: "/home",
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   "/repos": typeof reposRoute;
   "/c": typeof cRoute;
   "/home": typeof homeRoute;
+  "/settings": typeof settingsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/c/$channelId": typeof chatDotchannelIdRoute;
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   "/": typeof indexRoute;
   "/c": typeof cRoute;
   "/home": typeof homeRoute;
+  "/settings": typeof settingsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/c/$channelId": typeof chatDotchannelIdRoute;
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   "/_shell/": typeof indexRoute;
   "/_shell/c": typeof cRoute;
   "/_shell/home": typeof homeRoute;
+  "/_shell/settings": typeof settingsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/_shell/c/$channelId": typeof chatDotchannelIdRoute;
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | "/repos"
     | "/c"
     | "/home"
+    | "/settings"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/c/$channelId"
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | "/"
     | "/c"
     | "/home"
+    | "/settings"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/c/$channelId"
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | "/_shell/"
     | "/_shell/c"
     | "/_shell/home"
+    | "/_shell/settings"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/_shell/c/$channelId"
@@ -165,6 +177,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof inviteDotcodeRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/_shell/settings": {
+      id: "/_shell/settings";
+      path: "/settings";
+      fullPath: "/settings";
+      preLoaderRoute: typeof settingsRouteImport;
+      parentRoute: typeof shellRoute;
+    };
     "/_shell/home": {
       id: "/_shell/home";
       path: "/home";
@@ -207,6 +226,7 @@ interface shellRouteChildren {
   indexRoute: typeof indexRoute;
   cRoute: typeof cRoute;
   homeRoute: typeof homeRoute;
+  settingsRoute: typeof settingsRoute;
   chatDotchannelIdRoute: typeof chatDotchannelIdRoute;
 }
 
@@ -214,6 +234,7 @@ const shellRouteChildren: shellRouteChildren = {
   indexRoute: indexRoute,
   cRoute: cRoute,
   homeRoute: homeRoute,
+  settingsRoute: settingsRoute,
   chatDotchannelIdRoute: chatDotchannelIdRoute,
 };
 

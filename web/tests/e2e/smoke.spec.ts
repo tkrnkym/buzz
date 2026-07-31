@@ -199,6 +199,8 @@ function mockRelay(
      * cursor while the first publish is still in flight.
      */
     delayReadStateOkMs?: number;
+    /** kind:0 metadata served for a profile lookup. */
+    profileEvents?: unknown[];
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -296,7 +298,24 @@ function mockRelay(
 
         const events: unknown[] = [];
         for (const filter of filters) {
-          if (filter.kinds?.includes(20001)) {
+          if (filter.kinds?.includes(30315)) {
+            // Parameterized-replaceable: the newest published event on the
+            // coordinate is the whole answer, which is also how a clear works.
+            const statuses = published.filter(
+              (event) => (event as { kind: number }).kind === 30315,
+            );
+            const newest = statuses.at(-1);
+            if (newest) events.push(newest);
+          } else if (filter.kinds?.includes(0)) {
+            // Plus anything published this session, so a profile the spec saves
+            // is the one the timeline then names the author by.
+            events.push(
+              ...(options.profileEvents ?? []),
+              ...published.filter(
+                (event) => (event as { kind: number }).kind === 0,
+              ),
+            );
+          } else if (filter.kinds?.includes(20001)) {
             events.push(...(options.presenceEvents ?? []));
           } else if (filter.kinds?.includes(39007)) {
             events.push(...activitySnapshots());
@@ -823,6 +842,190 @@ test("replying publishes thread tags and shows the reply count", async ({
   // Root === parent for a direct reply, which nuxx-sdk collapses to one tag.
   expect(reply.tags).toContainEqual(["e", root.id, "", "reply"]);
   expect(reply.tags).toContainEqual(["h", CHANNEL_UUID]);
+});
+
+test("a message is attributed to its author's display name", async ({
+  page,
+}) => {
+  // Everything that names a person goes through one resolver, so a kind:0
+  // display name has to replace the truncated pubkey everywhere at once.
+  const relay = mockRelay(page, {
+    profileEvents: [
+      {
+        id: "0a".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 0,
+        created_at: 1_700_000_000,
+        tags: [],
+        content: JSON.stringify({
+          display_name: "Erin Example",
+          name: "erin",
+        }),
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("Erin Example").first()).toBeVisible();
+  await expect(page.getByText("eeeeeeee…eeee")).toHaveCount(0);
+});
+
+test("an author with no profile still has a name to show", async ({ page }) => {
+  // The truncated pubkey is the last resort, not an error state: a community
+  // where nobody has published kind:0 must still be readable.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("eeeeeeee…eeee").first()).toBeVisible();
+});
+
+test("profiles are fetched once per identity, not once per row", async ({
+  page,
+}) => {
+  // The store exists to stop a per-viewport refetch. Four messages from one
+  // author must produce one lookup for that author, coalesced into one request.
+  const relay = mockRelay(page, {
+    extraMessages: [
+      { ...markdownMessage("1", "first"), created_at: 1_700_000_300 },
+      { ...markdownMessage("2", "second"), created_at: 1_700_000_330 },
+      { ...markdownMessage("3", "third"), created_at: 1_700_000_360 },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("third")).toBeVisible();
+
+  const profileRequests = relay.queries.filter((filters) =>
+    filters.some((filter) => filter.kinds?.includes(0)),
+  );
+  expect(profileRequests.length).toBeLessThanOrEqual(2);
+  // And each one names its kind, which the relay's p-gate requires.
+  for (const filters of profileRequests) {
+    for (const filter of filters) {
+      expect(filter.kinds).toEqual([0]);
+    }
+  }
+});
+
+test("saving a profile publishes kind:0 and renames the reader", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraMessages: [myMessage("1", "mine")] });
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("settings-display-name").fill("Dana Dev");
+  await page.getByTestId("settings-name").fill("dana");
+  await page.getByTestId("save-profile").click();
+
+  const saved = relay.published.find(
+    (event) => (event as { kind: number }).kind === 0,
+  ) as { content: string; tags: string[][] };
+  expect(JSON.parse(saved.content)).toEqual({
+    display_name: "Dana Dev",
+    name: "dana",
+  });
+  // kind:0 carries no tags — it is replaceable by author, not addressable.
+  expect(saved.tags).toEqual([]);
+
+  // The reader's own edit shows without waiting for the relay to echo it back.
+  await expect(page.getByTestId("sidebar-profile-name")).toHaveText("Dana Dev");
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("Dana Dev").first()).toBeVisible();
+});
+
+test("the theme choice survives a reload", async ({ page }) => {
+  // A setting that resets on reload is worse than not offering it.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("theme-dark").click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.getByTestId("theme-dark")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("settings names the key custody honestly", async ({ page }) => {
+  // Everything else on the page is worthless if it is signed by a key that
+  // disappears, so the page has to say which case the reader is in.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await expect(page.getByTestId("settings-custody")).toContainText(
+    /minted for this page load only/,
+  );
+});
+
+test("presence and a status are published from the profile menu", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("sidebar-profile-card").click();
+  await expect(page.getByTestId("profile-popover")).toBeVisible();
+
+  await page.getByTestId("set-presence-away").click();
+  // The newest, not the first: the shell heartbeats the current status on mount,
+  // so an "online" beat precedes the choice.
+  await expect
+    .poll(() =>
+      relay.published
+        .filter((event) => (event as { kind: number }).kind === 20001)
+        .at(-1),
+    )
+    .toMatchObject({ content: "away", tags: [["status", "away"]] });
+
+  await page.getByTestId("sidebar-profile-card").click();
+  await page.getByTestId("status-preset-In a meeting").click();
+  const status = relay.published.find(
+    (event) => (event as { kind: number }).kind === 30315,
+  ) as { content: string; tags: string[][] };
+  expect(status.content).toBe("In a meeting");
+  expect(status.tags).toContainEqual(["d", "general"]);
+  expect(status.tags).toContainEqual(["emoji", "📅"]);
+
+  await expect(page.getByTestId("sidebar-profile-secondary")).toContainText(
+    "In a meeting",
+  );
+});
+
+test("clearing a status publishes an empty replaceable event", async ({
+  page,
+}) => {
+  // kind 30315 is parameterized-replaceable, so publishing nothing on the
+  // coordinate *is* the removal. There is no delete to issue.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("sidebar-profile-card").click();
+  await page.getByTestId("status-preset-Focusing").click();
+  await expect(page.getByTestId("sidebar-profile-secondary")).toContainText(
+    "Focusing",
+  );
+
+  await page.getByTestId("sidebar-profile-card").click();
+  await page.getByTestId("clear-user-status").click();
+
+  const cleared = relay.published
+    .filter((event) => (event as { kind: number }).kind === 30315)
+    .at(-1) as { content: string; tags: string[][] };
+  expect(cleared.content).toBe("");
+  expect(cleared.tags).toEqual([["d", "general"]]);
 });
 
 test("a burst from one author renders as one block", async ({ page }) => {

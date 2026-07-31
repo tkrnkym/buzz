@@ -10,6 +10,7 @@
 import {
   KIND_NIP29_GROUP_METADATA,
   KIND_PRESENCE_UPDATE,
+  KIND_PROFILE,
   KIND_REACTION,
   KIND_STREAM_MESSAGE,
 } from "@/shared/constants/kinds";
@@ -28,7 +29,7 @@ const SIG = "0".repeat(128);
 export const ALICE = "a11ce".padEnd(64, "a");
 export const BOB = "b0b".padEnd(64, "b");
 export const CAROL = "ca401".padEnd(64, "c");
-const RELAY = "fe1a".padEnd(64, "f");
+export const RELAY = "fe1a".padEnd(64, "f");
 
 export const CH_GENERAL = "11111111-1111-4111-8111-111111111111";
 export const CH_DESIGN = "22222222-2222-4222-8222-222222222222";
@@ -189,6 +190,48 @@ export const REACTIONS: NostrEvent[] = [
   reaction("r3", CH_GENERAL, ALICE, 44, "gen-2", "👍"),
 ];
 
+function profile(
+  pubkey: string,
+  fields: { display_name: string; name: string; about?: string },
+): NostrEvent {
+  return {
+    id: id(`profile:${pubkey}`),
+    pubkey,
+    kind: KIND_PROFILE,
+    created_at: ago(60 * 24 * 7),
+    tags: [],
+    content: JSON.stringify(fields),
+    sig: SIG,
+  };
+}
+
+/**
+ * kind:0 metadata for the demo personas.
+ *
+ * Deliberately without `picture`: the demo is served from GitHub Pages under a
+ * strict CSP that blocks every external host, so a remote avatar would render as
+ * a broken image. The initials disc is what a reader would see anyway for anyone
+ * who has not set a picture.
+ */
+export const PROFILES: NostrEvent[] = [
+  profile(ALICE, {
+    display_name: "Alice Nakamura",
+    name: "alice",
+    about: "Relay and protocol work.",
+  }),
+  profile(BOB, {
+    display_name: "Bob Ishikawa",
+    name: "bob",
+    about: "Web client.",
+  }),
+  profile(CAROL, {
+    display_name: "Carol Tan",
+    name: "carol",
+    about: "Design systems.",
+  }),
+  profile(RELAY, { display_name: "channels.nuxx.ai", name: "relay" }),
+];
+
 export const PRESENCE: NostrEvent[] = [ALICE, BOB].map((pubkey, i) => ({
   id: id(`presence:${pubkey}`),
   pubkey,
@@ -219,6 +262,7 @@ export const OLDER_MESSAGES: NostrEvent[] = Array.from({ length: 25 }, (_, i) =>
 );
 
 export const SEEDED: NostrEvent[] = [
+  ...PROFILES,
   ...CHANNELS,
   ...MESSAGES,
   ...SYSTEM_MESSAGES,

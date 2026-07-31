@@ -1,6 +1,7 @@
 import { useLocation, useParams, useSearch } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { ProfileStoreProvider } from "@/features/profile/profile-store";
 import { ShellProvider, useShell } from "@/features/shell/shell-context";
 import { AppSidebar } from "@/features/shell/ui/AppSidebar";
 import { CommunityRail } from "@/features/shell/ui/CommunityRail";
@@ -26,9 +27,14 @@ function communityNameFromRelay(): string {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <ShellProvider>
-      <AppShellFrame>{children}</AppShellFrame>
-    </ShellProvider>
+    // The profile cache sits above the shell so a name resolved for the sidebar
+    // is the same object the timeline reads — one fetch per identity, not one
+    // per surface that mentions them.
+    <ProfileStoreProvider>
+      <ShellProvider>
+        <AppShellFrame>{children}</AppShellFrame>
+      </ShellProvider>
+    </ProfileStoreProvider>
   );
 }
 
@@ -40,7 +46,12 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const { q } = useSearch({ strict: false }) as { q?: string };
   // Derived rather than passed down: the shell is a layout route, so it renders
   // before the child route's component and cannot be told which one won.
-  const view = useLocation().pathname.startsWith("/home") ? "inbox" : "chat";
+  const pathname = useLocation().pathname;
+  const view = pathname.startsWith("/home")
+    ? "inbox"
+    : pathname.startsWith("/settings")
+      ? "settings"
+      : "chat";
   const communityName = communityNameFromRelay();
   const hasUnread = channels.some((channel) => unread.isUnread(channel.id));
 

@@ -18,6 +18,7 @@ import {
 } from "@/features/chat/use-chat";
 import { usePresence, useTyping } from "@/features/chat/use-presence";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
+import { useProfiles } from "@/features/profile/profile-store";
 import type { MessageRowActions } from "@/features/messages/ui/MessageRow";
 import { MessageTimeline } from "@/features/messages/ui/MessageTimeline";
 import { ThreadPanel } from "@/features/messages/ui/ThreadPanel";
@@ -57,6 +58,9 @@ export function ChatPage({
     [timeline.rows],
   );
   const presence = usePresence(visibleAuthors);
+  // Same author set as presence: names and avatars are needed for exactly the
+  // people on screen, and the store keeps whatever it has already resolved.
+  const profiles = useProfiles(visibleAuthors);
   // Read the rows from a ref inside callbacks: depending on the array directly
   // would give every action a new identity on each delivered event, which is
   // exactly what defeats `React.memo` further down the tree.
@@ -224,6 +228,7 @@ export function ChatPage({
           },
         ),
       myPubkey,
+      profiles,
       pending:
         toggleReaction.isPending ||
         editMessage.isPending ||
@@ -231,6 +236,7 @@ export function ChatPage({
     }),
     [
       presence.statusOf,
+      profiles,
       toggleReaction.mutate,
       toggleReaction.isPending,
       editMessage.mutate,

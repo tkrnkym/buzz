@@ -10,13 +10,11 @@ import { useRelaySession } from "@/shared/api/relay-provider";
 import { postRelayQuery } from "@/shared/api/relay-http";
 import type { NostrEvent } from "@/shared/lib/nostr-client";
 import {
-  PRESENCE_HEARTBEAT_MS,
   type PresenceStatus,
   TYPING_REPUBLISH_MS,
   type TypingEntry,
   type TypingState,
   buildPresenceFilter,
-  buildPresenceTemplate,
   buildTypingFilter,
   buildTypingTemplate,
   completeTyping,
@@ -52,11 +50,11 @@ export interface PresenceApi {
  *
  * Snapshot over HTTP for initial state, subscription for live changes: the two
  * together are what make a status both correct on arrival and current afterwards.
- * Own heartbeat keeps this client visible to everyone else.
+ * Read-only: publishing this client's own presence is
+ * `profile/use-self-presence`.
  */
 export function usePresence(pubkeys: string[]): PresenceApi {
   const session = useRelaySession();
-  const myPubkey = useMyPubkey();
   const [statuses, setStatuses] = useState<
     Map<string, { status: PresenceStatus; at: number }>
   >(() => new Map());
@@ -104,18 +102,10 @@ export function usePresence(pubkeys: string[]): PresenceApi {
     });
   }, [session, pubkeyKey, absorb]);
 
-  // Heartbeat, so other clients see this one as online.
-  useEffect(() => {
-    if (!myPubkey) return;
-    const beat = () => {
-      void session.publish(buildPresenceTemplate("online")).catch(() => {
-        // Fire-and-forget: a missed beat expires in Redis on its own.
-      });
-    };
-    beat();
-    const timer = window.setInterval(beat, PRESENCE_HEARTBEAT_MS);
-    return () => window.clearInterval(timer);
-  }, [session, myPubkey]);
+  // The heartbeat that asserts *this* client's presence lives in
+  // `profile/use-self-presence`, not here. It used to sit in this hook and
+  // always publish "online", which put a reader who had gone invisible back
+  // online on the next beat.
 
   const statusOf = useCallback(
     (pubkey: string) => statuses.get(pubkey.toLowerCase())?.status ?? null,

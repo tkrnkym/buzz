@@ -4,7 +4,7 @@ import { Paperclip, X } from "lucide-react";
 import { useSendMessage } from "@/features/chat/use-chat";
 import { formatBytes } from "@/features/chat/upload";
 import { useUpload } from "@/features/chat/use-upload";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { useUserLabels } from "@/features/profile/use-user-label";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 
@@ -14,6 +14,9 @@ export interface ReplyTarget {
   authorPubkey: string;
   preview: string;
 }
+
+/** Stable empty list, so the label hook is not re-run on every render. */
+const EMPTY_PUBKEYS: string[] = [];
 
 export function MessageComposer({
   channelId,
@@ -36,6 +39,12 @@ export function MessageComposer({
   const sendMessage = useSendMessage(channelId);
   const upload = useUpload();
   const fileInput = useRef<HTMLInputElement>(null);
+  // The person being replied to. `labelOf`, so replying to yourself reads
+  // "Reply to You" rather than repeating your own name back at you.
+  const { labelOf } = useUserLabels(
+    replyTo ? [replyTo.authorPubkey] : EMPTY_PUBKEYS,
+  );
+  const replyToLabel = replyTo ? labelOf(replyTo.authorPubkey) : "";
 
   const onPickFile = async (file: File | undefined) => {
     if (!file) return;
@@ -87,7 +96,7 @@ export function MessageComposer({
   };
 
   const label = replyTo
-    ? `Reply to ${truncatePubkey(replyTo.authorPubkey)}`
+    ? `Reply to ${replyToLabel}`
     : `Message #${channelName}`;
 
   return (
@@ -98,8 +107,7 @@ export function MessageComposer({
       {replyTo && (
         <div className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1">
           <span className="min-w-0 flex-1 truncate text-2xs text-secondary-foreground">
-            Replying to {truncatePubkey(replyTo.authorPubkey)}:{" "}
-            {replyTo.preview}
+            Replying to {replyToLabel}: {replyTo.preview}
           </span>
           <button
             type="button"

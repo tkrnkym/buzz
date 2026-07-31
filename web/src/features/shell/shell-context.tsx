@@ -20,6 +20,10 @@ import {
 } from "@/features/chat/use-read-state";
 import { useUnreadChannels, type UnreadApi } from "@/features/chat/use-unread";
 import {
+  useSelfPresence,
+  type SelfPresenceApi,
+} from "@/features/profile/use-self-presence";
+import {
   useChannelStars,
   type ChannelStarsApi,
 } from "@/features/shell/use-channel-stars";
@@ -31,6 +35,7 @@ export interface ShellValue {
   readState: ReadStateApi;
   unread: UnreadApi;
   stars: ChannelStarsApi;
+  presence: SelfPresenceApi;
 }
 
 const ShellContext = createContext<ShellValue | null>(null);
@@ -42,6 +47,10 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   // every message in the community. See `chat/unread.ts`.
   const unread = useUnreadChannels(readState.contexts);
   const stars = useChannelStars();
+  // Here rather than in the profile card: the heartbeat has to keep running
+  // while the reader is looking at any page in the shell, not only while the
+  // card that shows it happens to be mounted.
+  const presence = useSelfPresence();
 
   const value: ShellValue = {
     channels: channels.data ?? [],
@@ -50,6 +59,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     readState,
     unread,
     stars,
+    presence,
   };
 
   return (

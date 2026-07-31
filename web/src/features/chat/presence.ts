@@ -56,13 +56,34 @@ export function buildTypingFilter(channelId: string): NostrFilter {
   return { kinds: [KIND_TYPING_INDICATOR], "#h": [channelId] };
 }
 
-/** Own presence heartbeat. Channel-less: presence is a property of the person. */
+export const PRESENCE_STATUSES = ["online", "away", "offline"] as const;
+
+/** What each status is called in the UI. "Invisible" is plainer than "offline". */
+export const PRESENCE_LABELS: Record<PresenceStatus, string> = {
+  online: "Online",
+  away: "Away",
+  offline: "Invisible",
+};
+
+/**
+ * Own presence heartbeat. Channel-less: presence is a property of the person.
+ *
+ * The status goes in both the content and a `status` tag, matching
+ * `nuxx-sdk::build_presence_update`. Not redundancy for its own sake: the relay
+ * reads the content, and the tag is what makes the value reachable to a filter.
+ * This client emitted no tag for a while, which produced presence events other
+ * Nuxx clients do not.
+ */
 export function buildPresenceTemplate(status: PresenceStatus): {
   kind: number;
   tags: string[][];
   content: string;
 } {
-  return { kind: KIND_PRESENCE_UPDATE, tags: [], content: status };
+  return {
+    kind: KIND_PRESENCE_UPDATE,
+    tags: [["status", status]],
+    content: status,
+  };
 }
 
 /**

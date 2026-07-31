@@ -2,6 +2,11 @@ import { ChevronRight } from "lucide-react";
 
 import { formatThreadSummaryLastReplyTime } from "@/features/messages/lib/date-formatters";
 import type { ThreadSummary } from "@/features/messages/lib/thread-summary";
+import {
+  resolveAvatarUrl,
+  resolveUserLabel,
+  type ProfileLookup,
+} from "@/features/profile/profile-model";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
 const MAX_AVATARS = 4;
@@ -15,9 +20,11 @@ const MAX_AVATARS = 4;
  */
 export function ThreadSummaryRow({
   onOpenThread,
+  profiles,
   summary,
 }: {
   onOpenThread: () => void;
+  profiles: ProfileLookup;
   summary: ThreadSummary;
 }) {
   const replyLabel = summary.replyCount === 1 ? "reply" : "replies";
@@ -36,8 +43,14 @@ export function ThreadSummaryRow({
       <span aria-hidden className="flex shrink-0 items-center -space-x-1">
         {shown.map((pubkey) => (
           <PubkeyAvatar
+            avatarUrl={resolveAvatarUrl(pubkey, profiles)}
             className="rounded-full ring-2 ring-background"
             key={pubkey}
+            label={resolveUserLabel({
+              pubkey,
+              profiles,
+              preferResolvedSelfLabel: true,
+            })}
             pubkey={pubkey}
             size="sm"
           />

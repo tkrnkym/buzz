@@ -10,6 +10,7 @@ export const routes = rootRoute("root.tsx", [
     route("/c", "c.tsx"),
     route("/c/$channelId", "chat.$channelId.tsx"),
     route("/home", "home.tsx"),
+    route("/settings", "settings.tsx"),
   ]),
   route("/invite/$code", "invite.$code.tsx"),
   // The repo browser is a separate destination, deliberately outside the shell:

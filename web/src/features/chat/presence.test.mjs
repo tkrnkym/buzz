@@ -51,13 +51,29 @@ test("the presence filter names both a kind and explicit authors", () => {
   assert.deepEqual(filter.authors, [ME, OTHER]);
 });
 
-test("a presence heartbeat is channel-less", () => {
-  // Presence is a property of the person, not of a room.
+test("a presence heartbeat is channel-less and carries the status tag", () => {
+  // Channel-less because presence is a property of the person, not of a room.
+  // The `status` tag matches `nuxx-sdk::build_presence_update`: the relay reads
+  // the content, and the tag is what makes the value reachable to a filter. This
+  // client emitted no tag for a while, producing events other Nuxx clients do
+  // not.
   assert.deepEqual(buildPresenceTemplate("online"), {
     kind: 20001,
-    tags: [],
+    tags: [["status", "online"]],
     content: "online",
   });
+  assert.deepEqual(buildPresenceTemplate("offline"), {
+    kind: 20001,
+    tags: [["status", "offline"]],
+    content: "offline",
+  });
+  // No `h` tag under any status.
+  for (const status of ["online", "away", "offline"]) {
+    assert.ok(
+      buildPresenceTemplate(status).tags.every((tag) => tag[0] !== "h"),
+      `${status} must not be channel-scoped`,
+    );
+  }
 });
 
 test("presence status reads both the bare and legacy encodings", () => {

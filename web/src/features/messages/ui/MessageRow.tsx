@@ -8,8 +8,12 @@ import { MessageEditor } from "@/features/messages/ui/MessageEditor";
 import { MessageReactions } from "@/features/messages/ui/MessageReactions";
 import { MessageTimestamp } from "@/features/messages/ui/MessageTimestamp";
 import { ThreadSummaryRow } from "@/features/messages/ui/ThreadSummaryRow";
+import {
+  resolveAvatarUrl,
+  resolveUserLabel,
+  type ProfileLookup,
+} from "@/features/profile/profile-model";
 import { cn } from "@/shared/lib/cn";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
 /** Width of the avatar gutter. Continuations align their time inside it. */
@@ -30,6 +34,13 @@ export interface MessageRowActions {
   onDelete: (row: TimelineRow) => void;
   /** The reading user, for edit/delete permission. */
   myPubkey: string | null;
+  /**
+   * Resolved kind:0 metadata, for names and avatars.
+   *
+   * The whole cache rather than a per-row slice: rows read it by key, and
+   * slicing per row would hand each one a fresh object on every delivered event.
+   */
+  profiles: ProfileLookup;
   pending?: boolean;
 }
 
@@ -97,6 +108,13 @@ export function MessageRow({
   const isMine =
     actions.myPubkey !== null &&
     message.pubkey.toLowerCase() === actions.myPubkey.toLowerCase();
+  // The author's own name, never "You": a timeline where your messages are
+  // labelled "You" and everyone else's carry a name reads as two conversations.
+  const authorLabel = resolveUserLabel({
+    pubkey: message.pubkey,
+    profiles: actions.profiles,
+    preferResolvedSelfLabel: true,
+  });
 
   return (
     <li
@@ -117,7 +135,9 @@ export function MessageRow({
           </span>
         ) : (
           <PubkeyAvatar
+            avatarUrl={resolveAvatarUrl(message.pubkey, actions.profiles)}
             badge={<PresenceBadge status={actions.statusOf(message.pubkey)} />}
+            label={authorLabel}
             pubkey={message.pubkey}
           />
         )}
@@ -126,9 +146,7 @@ export function MessageRow({
       <div className="min-w-0 flex-1">
         {!isContinuation && (
           <div className="flex items-baseline gap-2">
-            <span className="font-mono text-base font-semibold">
-              {truncatePubkey(message.pubkey)}
-            </span>
+            <span className="text-base font-semibold">{authorLabel}</span>
             <MessageTimestamp createdAt={message.createdAt} />
             {row.edited && (
               <span className="text-2xs text-muted-foreground">(edited)</span>
@@ -174,6 +192,7 @@ export function MessageRow({
         {threadSummary && (
           <ThreadSummaryRow
             onOpenThread={() => actions.onOpenThread(message.id)}
+            profiles={actions.profiles}
             summary={threadSummary}
           />
         )}

@@ -9,6 +9,8 @@
  * array. An open-ended filter trips the relay's p-gate and comes back 403.
  */
 
+/** NIP-01 profile metadata. Self-asserted: signed by its own subject. */
+export const KIND_PROFILE = 0;
 export const KIND_DELETION = 5;
 export const KIND_REACTION = 7;
 /** Chat message in a stream channel (NIP-29 group chat). What clients write. */
@@ -35,6 +37,14 @@ export const KIND_SYSTEM_MESSAGE = 40099;
  * marker — so a filter for read state must scope on both.
  */
 export const KIND_READ_STATE = 30078;
+
+/**
+ * NIP-38 user status — the free-text "in a meeting" line beside a name.
+ *
+ * Parameterized-replaceable on `d:general`, so an event carrying neither text
+ * nor emoji is how a status is cleared.
+ */
+export const KIND_USER_STATUS = 30315;
 
 /**
  * Forum post and comment.

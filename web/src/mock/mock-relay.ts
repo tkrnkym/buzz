@@ -20,6 +20,7 @@
 import {
   KIND_CHANNEL_ACTIVITY_SNAPSHOT,
   KIND_PRESENCE_UPDATE,
+  KIND_PROFILE,
   KIND_STREAM_MESSAGE,
 } from "@/shared/constants/kinds";
 import type {
@@ -175,6 +176,10 @@ function answerQuery(filters: CursorFilter[]): NostrEvent[] {
   for (const filter of filters) {
     if (filter.kinds?.includes(KIND_CHANNEL_ACTIVITY_SNAPSHOT)) {
       events.push(...activitySnapshots());
+    } else if (filter.kinds?.includes(KIND_PROFILE)) {
+      // Profiles come from the same store as everything else, so a profile the
+      // demo visitor publishes is the one the timeline then shows them by.
+      events.push(...store.filter((event) => matches(filter, event)));
     } else if (filter.kinds?.includes(KIND_PRESENCE_UPDATE)) {
       events.push(...PRESENCE.filter((event) => matches(filter, event)));
     } else if (filter.search !== undefined) {

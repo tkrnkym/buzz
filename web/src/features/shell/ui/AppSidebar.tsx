@@ -40,7 +40,7 @@ export function AppSidebar({
   communityName: string;
   /** The committed search, from the URL. */
   query: string;
-  view: "chat" | "inbox";
+  view: "chat" | "inbox" | "settings";
 }) {
   const { channels, channelsError, channelsLoading, stars, unread } =
     useShell();

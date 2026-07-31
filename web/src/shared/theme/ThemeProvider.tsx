@@ -21,15 +21,30 @@ function getSystemDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-function getInitialTheme(): Theme {
-  if (!import.meta.env.DEV) return "system";
+const STORAGE_KEY = "nuxx-theme";
 
-  const previewTheme = new URLSearchParams(window.location.search).get(
-    "previewTheme",
-  );
-  return previewTheme === "light" || previewTheme === "dark"
-    ? previewTheme
-    : "system";
+function isTheme(value: string | null): value is Theme {
+  return value === "light" || value === "dark" || value === "system";
+}
+
+function getInitialTheme(): Theme {
+  // The dev-only preview override wins, so a screenshot spec can pin a theme
+  // without touching the reader's stored choice.
+  if (import.meta.env.DEV) {
+    const previewTheme = new URLSearchParams(window.location.search).get(
+      "previewTheme",
+    );
+    if (previewTheme === "light" || previewTheme === "dark") {
+      return previewTheme;
+    }
+  }
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (isTheme(stored)) return stored;
+  } catch {
+    // A blocked localStorage is not a reason to fail to render.
+  }
+  return "system";
 }
 
 function applyClass(isDark: boolean) {
@@ -66,8 +81,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", handler);
   }, [theme]);
 
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
+  const setTheme = useCallback((next: Theme) => {
+    setThemeState(next);
+    // Persisted, because a theme choice that vanishes on reload is worse than
+    // not offering the setting at all.
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Same as above: the choice still applies to this page load.
+    }
   }, []);
 
   return (
