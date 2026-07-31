@@ -147,19 +147,21 @@ defaults; non-empty values override its entrypoint and arguments respectively.
 
 ## Device pairing relay
 
-The chart can run Nuxx's stateless pairing WebSocket relay as an independent
-Deployment and Service using the same image as the main relay:
+The chart no longer runs a pairing relay. `nuxx-pair-relay` was removed with the
+desktop client it paired identities from, so there is no bundled NIP-AB relay to
+deploy.
+
+If you run an NIP-AB relay of your own, advertise it and clients will use it
+instead of the same-host `/pair` fallback:
 
 ```yaml
 pairingRelay:
-  enabled: true
   url: wss://pairing.example.com
 ```
 
-`pairingRelay.url` is advertised in the main relay's NIP-11 document so Nuxx
-clients connect directly to the dedicated endpoint. The chart does not create
-an Ingress or HTTPRoute for the pairing Service; route the public hostname to
-`<release>-nuxx-pairing:5000` with your platform's ingress configuration.
+That value becomes `NUXX_PAIRING_RELAY_URL` on the relay, which publishes it in
+its NIP-11 document. Routing the hostname to your relay is up to you; the chart
+creates no Service, Ingress, or HTTPRoute for it.
 
 ## HA (production)
 

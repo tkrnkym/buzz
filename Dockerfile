@@ -68,15 +68,13 @@ COPY --from=planner /build/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --locked -p nuxx-relay --bin nuxx-relay \
-                                   -p nuxx-admin --bin nuxx-admin \
-                                   -p nuxx-pair-relay --bin nuxx-pair-relay
+                                   -p nuxx-admin --bin nuxx-admin
 
 # Derive the normal release binaries from the same optimized ELF files as the
 # debug image so the two variants cannot drift at code-generation time.
 FROM builder AS stripped-binaries
 RUN strip target/release/nuxx-relay \
-    && strip target/release/nuxx-admin \
-    && strip target/release/nuxx-pair-relay
+    && strip target/release/nuxx-admin
 
 # ─── Stage 4: web bundle (pnpm + vite) ──────────────────────────────────────
 # Independent of the Rust layers so a CSS change doesn't bust Rust cache and
@@ -168,11 +166,9 @@ ENTRYPOINT ["/usr/local/bin/nuxx-relay"]
 FROM runtime-base AS runtime-debug
 COPY --from=builder /build/target/release/nuxx-relay /usr/local/bin/nuxx-relay
 COPY --from=builder /build/target/release/nuxx-admin /usr/local/bin/nuxx-admin
-COPY --from=builder /build/target/release/nuxx-pair-relay /usr/local/bin/nuxx-pair-relay
 
 # Keep the stripped runtime as the final/default Dockerfile target so existing
 # `docker build .` callers and release tags retain their current behavior.
 FROM runtime-base AS runtime
 COPY --from=stripped-binaries /build/target/release/nuxx-relay /usr/local/bin/nuxx-relay
 COPY --from=stripped-binaries /build/target/release/nuxx-admin /usr/local/bin/nuxx-admin
-COPY --from=stripped-binaries /build/target/release/nuxx-pair-relay /usr/local/bin/nuxx-pair-relay

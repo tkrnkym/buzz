@@ -204,27 +204,12 @@ extraInitContainers: []
 extraVolumes: []
 
 # ── Device pairing relay ─────────────────────────────────────────────────────
-# Optional, stateless NIP-AB relay. When enabled, the main relay advertises
-# pairingRelay.url in NIP-11 and Nuxx clients use it instead of the legacy
-# same-host /pair convention.
+# NIP-AB device pairing. The chart no longer ships a pairing-relay deployment —
+# the nuxx-pair-relay sidecar was removed along with the desktop client it paired
+# from. Set `url` to advertise an external NIP-AB relay in NIP-11; leave it empty
+# and clients fall back to the same-host /pair convention.
 pairingRelay:
-  enabled: false
   url: ""
-  replicaCount: 1
-  service:
-    type: ClusterIP
-    port: 5000
-    annotations: {}
-  podAnnotations: {}
-  podLabels: {}
-  resources:
-    requests:
-      cpu: "50m"
-      memory: "32Mi"
-    limits:
-      cpu: "250m"
-      memory: "128Mi"
-
 # ── Service ──────────────────────────────────────────────────────────────────
 service:
   type: ClusterIP

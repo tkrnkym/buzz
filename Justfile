@@ -170,31 +170,6 @@ test-unit:
 test-integration:
     ./scripts/run-tests.sh integration
 
-# Real serve->client->inference on this machine (not CI).
-mesh-e2e-hardware:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export MESH_LLM_NATIVE_RUNTIME_CACHE_DIR="$(./scripts/ensure-mesh-native-runtime.sh)"
-    cargo run -p nuxx-relay --example mesh_serve_client_smoke
-
-# Three isolated node processes: trusted member joins and infers; stranger is rejected.
-# Uses temp homes and explicit mesh owner keystores. Never reads the Nuxx Keychain.
-mesh-e2e-admission:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export MESH_LLM_NATIVE_RUNTIME_CACHE_DIR="$(./scripts/ensure-mesh-native-runtime.sh)"
-    cargo run -p nuxx-relay --example mesh_admission_smoke
-
-# Full hardware confidence suite: routing, owner admission, and real agent inference.
-mesh-e2e-confidence:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export MESH_LLM_NATIVE_RUNTIME_CACHE_DIR="$(./scripts/ensure-mesh-native-runtime.sh)"
-    cargo build --release -p nuxx-agent -p nuxx-dev-mcp
-    cargo run -p nuxx-relay --example mesh_serve_client_smoke
-    cargo run -p nuxx-relay --example mesh_admission_smoke
-    cargo run -p nuxx-relay --example mesh_agent_e2e
-
 # ─── Run ──────────────────────────────────────────────────────────────────────
 
 # Start the relay server (auto-starts Docker services if needed)

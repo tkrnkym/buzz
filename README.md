@@ -204,7 +204,7 @@ A Rust workspace of focused crates. Single source of truth: the relay. See [ARCH
 
 **Agent surface** — `nuxx-cli` (agent-first CLI, JSON in / JSON out) · `nuxx-acp` (ACP harness for Goose/Codex/Claude Code) · `nuxx-agent` (ACP agent — see [VISION_AGENT.md](VISION_AGENT.md)) · `nuxx-dev-mcp` (shell + file-edit tools) · `nuxx-workflow` (YAML automation) · `nuxx-persona` (agent persona packs)
 
-**Git & pairing** — `git-sign-nostr` / `git-credential-nostr` (nostr-signed git) · `nuxx-pair-relay` / `nuxx-pairing-cli` (relay pairing)
+**Git** — `git-sign-nostr` / `git-credential-nostr` (nostr-signed git)
 
 **Shared** — `nuxx-sdk` (typed event builders) · `nuxx-media` (Blossom/S3)
 

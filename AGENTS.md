@@ -43,8 +43,6 @@ crates/
   nuxx-persona        # Agent persona packs
   nuxx-workflow       # YAML-as-code workflow engine (evalexpr conditions)
   # Clients + interop
-  nuxx-pair-relay     # Ephemeral sidecar relay for NIP-AB device pairing
-  nuxx-pairing-cli    # CLI for NIP-AB device pairing interop testing
   git-sign-nostr      # Sign git objects with a Nostr key
   git-credential-nostr # Git credential helper for Nostr-authed push/fetch
   # Tooling + shared
