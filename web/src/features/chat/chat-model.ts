@@ -187,6 +187,46 @@ export function buildChannelTimelineFilter(
   };
 }
 
+/**
+ * A page cursor: the `(created_at, id)` of the oldest row already loaded.
+ *
+ * Both halves are required. Paging on a timestamp alone loses and duplicates
+ * rows whenever several messages share a second — the relay's own window spec
+ * calls that "the dense-second dup/loss bug this surface exists to kill" — and a
+ * busy channel produces those constantly.
+ */
+export interface HistoryCursor {
+  createdAt: number;
+  id: string;
+}
+
+/**
+ * Filter for one page of older history.
+ *
+ * `before_id` is a Buzz bridge extension on `POST /query`, not vanilla NIP-01,
+ * and it is the reason this read cannot go over the WebSocket: a WS `REQ` can
+ * only express `until`, so it can only page ambiguously. The relay pairs the two
+ * into a keyset — `created_at < until OR (created_at = until AND id > before_id)`
+ * against `ORDER BY created_at DESC, id ASC` — which walks dense seconds exactly
+ * once (`crates/buzz-db/src/event.rs`).
+ *
+ * The relay rejects `before_id` without `until`, so the cursor is passed as one
+ * value rather than two optional fields that could disagree.
+ */
+export function buildChannelHistoryFilter(
+  channelId: string,
+  limit: number,
+  cursor: HistoryCursor,
+): NostrFilter {
+  return {
+    kinds: CHANNEL_TIMELINE_CONTENT_KINDS,
+    "#h": [channelId],
+    limit,
+    until: cursor.createdAt,
+    before_id: cursor.id,
+  };
+}
+
 /** Cold-read filter for the channel list. */
 export function buildChannelListFilter(limit: number): NostrFilter {
   return { kinds: [KIND_NIP29_GROUP_METADATA], limit };

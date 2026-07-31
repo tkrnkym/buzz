@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import type { TimelineRow } from "@/features/chat/timeline";
 import { MessageContent } from "@/features/chat/ui/MessageContent";
@@ -150,22 +150,63 @@ export function MessageTimeline({
   loaded,
   error,
   actions,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadOlder,
 }: {
   rows: TimelineRow[];
   loaded: boolean;
   error: string | null;
   actions: TimelineActions;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadOlder?: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Distance from the bottom, captured just before a prepend.
+   *
+   * Non-null means "a page of older history is on its way", which both scroll
+   * effects read: one to restore the reader's position, the other to know not to
+   * jump to the tail.
+   */
+  const prependAnchor = useRef<number | null>(null);
 
-  // Follow the tail. Virtualization and read-position restore are later work;
-  // this keeps the newest message visible in the meantime. Keyed on the count so
-  // a reaction or edit does not yank the viewport.
   const rowCount = rows.length;
+  const newestId = rowCount > 0 ? rows[rowCount - 1].message.id : null;
+  const oldestId = rowCount > 0 ? rows[0].message.id : null;
+
+  // Follow the tail. Keyed on the newest row's id rather than the row count:
+  // a count also grows when older history is prepended, and scrolling to the
+  // bottom then would throw the reader out of the history they just asked for.
+  // A reaction or edit changes neither, so neither yanks the viewport.
   useEffect(() => {
-    if (rowCount === 0) return;
+    if (!newestId || prependAnchor.current !== null) return;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [rowCount]);
+  }, [newestId]);
+
+  // Restore position after a prepend. Prepending rows pushes everything down by
+  // the height of what arrived, which is not known in advance — but the distance
+  // from the *bottom* is unchanged by a prepend, so restoring that puts the
+  // reader back on the same row. Layout effect, so it lands before paint and the
+  // jump is never visible.
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    // `oldestId` is both the trigger and a guard: no rows means there is no
+    // prepend to compensate for.
+    if (!oldestId || !container || prependAnchor.current === null) return;
+    container.scrollTop = container.scrollHeight - prependAnchor.current;
+    prependAnchor.current = null;
+  }, [oldestId]);
+
+  const loadOlder = () => {
+    const container = scrollRef.current;
+    prependAnchor.current = container
+      ? container.scrollHeight - container.scrollTop
+      : null;
+    onLoadOlder?.();
+  };
 
   if (error) {
     return (
@@ -194,7 +235,25 @@ export function MessageTimeline({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      {onLoadOlder && (
+        <div className="flex justify-center py-2">
+          {hasMore ? (
+            <button
+              type="button"
+              onClick={loadOlder}
+              disabled={isLoadingMore}
+              className="rounded-md px-3 py-1 text-2xs text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-60"
+            >
+              {isLoadingMore ? "Loading…" : "Load older messages"}
+            </button>
+          ) : (
+            <span className="px-3 py-1 text-2xs text-muted-foreground">
+              Beginning of the channel
+            </span>
+          )}
+        </div>
+      )}
       <ul className="flex flex-col py-2">
         {rows.map((row) => (
           <MessageRow key={row.message.id} row={row} actions={actions} />

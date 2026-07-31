@@ -18,6 +18,14 @@ export interface NostrFilter {
   since?: number;
   until?: number;
   limit?: number;
+  /**
+   * Keyset cursor companion to `until` — a Buzz bridge extension, not NIP-01.
+   *
+   * Only `POST /query` honours it; a WebSocket `REQ` parses filters through
+   * `nostr::Filter`, which drops unknown fields, so sending it over the socket
+   * silently degrades to timestamp-only paging rather than failing.
+   */
+  before_id?: string;
   [tag: `#${string}`]: string[] | undefined;
 }
 

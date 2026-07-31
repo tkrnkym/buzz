@@ -144,6 +144,9 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
               rows={timeline.rows}
               loaded={timeline.loaded}
               error={timeline.error}
+              hasMore={timeline.hasMore}
+              isLoadingMore={timeline.isLoadingMore}
+              onLoadOlder={timeline.loadOlder}
               actions={{
                 statusOf: presence.statusOf,
                 onToggleReaction,

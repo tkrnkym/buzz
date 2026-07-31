@@ -9,11 +9,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { postRelayQuery } from "@/shared/api/relay-http";
 import { useRelaySession } from "@/shared/api/relay-provider";
 import { resolveSigner } from "@/shared/lib/signer";
 import type { NostrEvent } from "@/shared/lib/nostr-client";
 import {
   type Channel,
+  buildChannelHistoryFilter,
   buildChannelListFilter,
   buildChannelTimelineFilter,
   buildMessageTemplate,
@@ -86,6 +88,12 @@ export interface ChannelTimeline {
   loaded: boolean;
   /** Set when the relay refused the subscription (auth, membership, …). */
   error: string | null;
+  /** Whether older history may still exist above the oldest loaded row. */
+  hasMore: boolean;
+  /** A page of older history is in flight. */
+  isLoadingMore: boolean;
+  /** Load one page of older history. */
+  loadOlder: () => void;
 }
 
 /**
@@ -110,6 +118,8 @@ export function useChannelMessages(channelId: string | null): ChannelTimeline {
   );
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setLoadingMore] = useState(false);
 
   const absorb = useCallback((event: NostrEvent) => {
     setEvents((previous) => mergeEvents(previous, [event]));
@@ -120,6 +130,9 @@ export function useChannelMessages(channelId: string | null): ChannelTimeline {
     setEvents(new Map());
     setLoaded(false);
     setError(null);
+    // Assumed until a short page proves otherwise, so the control appears
+    // before any scrolling has happened.
+    setHasMore(true);
 
     if (!channelId) return;
 
@@ -169,7 +182,37 @@ export function useChannelMessages(channelId: string | null): ChannelTimeline {
     };
   }, [session, reactionIdKey, absorb]);
 
-  return { rows, loaded, error };
+  // The cursor is the oldest row on screen, not the oldest event in the map:
+  // reactions and deletions are absorbed into the same map but are not timeline
+  // rows, and paging from one of those would skip real messages.
+  const oldestRow = rows.length > 0 ? rows[0] : null;
+  const cursor = oldestRow
+    ? { createdAt: oldestRow.message.createdAt, id: oldestRow.message.id }
+    : null;
+
+  const loadOlder = useCallback(() => {
+    if (!channelId || !cursor || isLoadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    postRelayQuery([
+      buildChannelHistoryFilter(channelId, TIMELINE_LIMIT, cursor),
+    ])
+      .then((older) => {
+        setEvents((previous) => mergeEvents(previous, older));
+        // No server fact for exhaustion is available on this path — the
+        // `kind:39006` bounds overlay only exists on the `top_level` window
+        // surface. A short page is therefore the signal. It can be wrong in one
+        // direction only: an exactly-full final page offers "load older" once
+        // more and then comes back empty. It never hides history.
+        if (older.length < TIMELINE_LIMIT) setHasMore(false);
+      })
+      .catch((thrown: unknown) => {
+        setError(thrown instanceof Error ? thrown.message : "Load failed");
+      })
+      .finally(() => setLoadingMore(false));
+  }, [channelId, cursor, isLoadingMore, hasMore]);
+
+  return { rows, loaded, error, hasMore, isLoadingMore, loadOlder };
 }
 
 /**

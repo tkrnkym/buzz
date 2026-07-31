@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildChannelListFilter,
+  buildChannelHistoryFilter,
   buildChannelTimelineFilter,
   buildMessageTemplate,
   buildReactionFilter,
@@ -302,4 +303,31 @@ test("chunkIds keeps each filter inside the relay's limits", () => {
   assert.deepEqual(chunkIds(["a", "b", "c"], 2), [["a", "b"], ["c"]]);
   assert.deepEqual(chunkIds([], 2), []);
   assert.equal(chunkIds(new Array(250).fill("x")).length, 3);
+});
+
+test("a history page is asked for with a composite cursor", () => {
+  // Both halves, always. Paging on a timestamp alone loses and duplicates rows
+  // whenever several messages share a second, which a busy channel produces
+  // constantly — the relay rejects `before_id` without `until` for that reason.
+  const filter = buildChannelHistoryFilter("chan-1", 50, {
+    createdAt: 1_700_000_000,
+    id: "ab".repeat(32),
+  });
+
+  assert.equal(filter.until, 1_700_000_000);
+  assert.equal(filter.before_id, "ab".repeat(32));
+  assert.equal(filter.limit, 50);
+  assert.deepEqual(filter["#h"], ["chan-1"]);
+});
+
+test("a history page asks for the same kinds the timeline renders", () => {
+  // A narrower set here would make older pages quietly drop system rows that
+  // the live subscription shows.
+  const history = buildChannelHistoryFilter("chan-1", 50, {
+    createdAt: 1,
+    id: "aa".repeat(32),
+  });
+  const live = buildChannelTimelineFilter("chan-1", 50);
+
+  assert.deepEqual(history.kinds, live.kinds);
 });

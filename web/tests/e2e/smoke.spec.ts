@@ -365,6 +365,7 @@ interface QueryFilter {
   authors?: string[];
   since?: number;
   limit?: number;
+  before_id?: string;
   "#h"?: string[];
 }
 
@@ -387,6 +388,8 @@ function mockRelay(
     readStateEvents?: unknown[];
     /** Served to the kind:20002 typing subscription. */
     typingEvents?: unknown[];
+    /** Served to a `POST /query` carrying a scrollback cursor. */
+    olderMessages?: unknown[];
     /**
      * Hold back the OK for a read-state write, so a spec can advance a second
      * cursor while the first publish is still in flight.
@@ -399,6 +402,8 @@ function mockRelay(
   const subscriptions: QueryFilter[] = [];
   /** Every `POST /query` body, as an array of filters per request. */
   const queries: QueryFilter[][] = [];
+  /** Cursors the client paged with, in order. */
+  const historyRequests: { until: number; beforeId: string }[] = [];
 
   const channelMetadata = {
     id: "a".repeat(64),
@@ -461,6 +466,7 @@ function mockRelay(
     published,
     subscriptions,
     queries,
+    historyRequests,
     install: async () => {
       await page.route("**/query", async (route) => {
         const body = JSON.parse(route.request().postData() ?? "{}") as {
@@ -475,6 +481,22 @@ function mockRelay(
             events.push(...(options.presenceEvents ?? []));
           } else if (filter.kinds?.includes(39007)) {
             events.push(...activitySnapshots());
+          } else if (filter.before_id) {
+            // A scrollback page. The relay requires `until` alongside
+            // `before_id` and rejects one without the other, so the mock does
+            // too — a client that sent a half cursor would pass otherwise.
+            if (filter.until === undefined) {
+              await route.fulfill({
+                status: 400,
+                body: "before_id requires until",
+              });
+              return;
+            }
+            historyRequests.push({
+              until: filter.until,
+              beforeId: filter.before_id,
+            });
+            events.push(...(options.olderMessages ?? []));
           }
         }
 
@@ -538,7 +560,14 @@ function mockRelay(
                     subId,
                     {
                       ...message,
-                      id: `${filter["#h"][0]}`.padEnd(64, "0").slice(0, 64),
+                      // Real event ids are 64 hex chars; the channel UUID's
+                      // dashes would make this an id no relay could emit, and a
+                      // spec asserting on cursor shape would fail on the
+                      // fixture rather than on the client.
+                      id: `${filter["#h"][0]}`
+                        .replace(/-/g, "")
+                        .padEnd(64, "0")
+                        .slice(0, 64),
                       tags: [["h", filter["#h"][0]]],
                     },
                   ]),
@@ -1113,6 +1142,124 @@ test("a channel read past its newest message shows no badge", async ({
 
   const nav = page.getByRole("navigation", { name: "Channels" });
   await expect(nav.getByText("Unread messages")).toHaveCount(0);
+});
+
+test("older history is paged in with a composite cursor", async ({ page }) => {
+  const older = Array.from({ length: 3 }, (_unused, index) => ({
+    id: `0${index}`.padEnd(64, "a"),
+    pubkey: "e".repeat(64),
+    kind: 9,
+    created_at: 1_600_000_000 + index,
+    tags: [["h", CHANNEL_UUID]],
+    content: `older message ${index}`,
+    sig: "f".repeat(128),
+  }));
+
+  const relay = mockRelay(page, { olderMessages: older });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("hello from the mocked relay")).toBeVisible();
+  await expect(page.getByText("older message 0")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Load older messages" }).click();
+
+  await expect(page.getByText("older message 0")).toBeVisible();
+  await expect(page.getByText("older message 2")).toBeVisible();
+  // The live tail is still there: a page of history must extend the timeline,
+  // not replace it.
+  await expect(page.getByText("hello from the mocked relay")).toBeVisible();
+
+  // The cursor is the oldest row that was on screen, sent as both halves. A
+  // timestamp alone would drop or repeat rows sharing that second.
+  expect(relay.historyRequests).toHaveLength(1);
+  expect(relay.historyRequests[0].beforeId).toMatch(/^[0-9a-f]{64}$/);
+  expect(relay.historyRequests[0].until).toBeGreaterThan(0);
+});
+
+test("a short page ends the scrollback", async ({ page }) => {
+  // The general query path has no `kind:39006` bounds overlay, so a short page
+  // is the only exhaustion signal available. It must actually stop the control.
+  const relay = mockRelay(page, {
+    olderMessages: [
+      {
+        id: "0a".padEnd(64, "b"),
+        pubkey: "e".repeat(64),
+        kind: 9,
+        created_at: 1_600_000_000,
+        tags: [["h", CHANNEL_UUID]],
+        content: "the first thing anyone said",
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByRole("button", { name: "Load older messages" }).click();
+
+  await expect(page.getByText("the first thing anyone said")).toBeVisible();
+  await expect(page.getByText("Beginning of the channel")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Load older messages" }),
+  ).toHaveCount(0);
+});
+
+test("paging in history keeps the reader where they were", async ({ page }) => {
+  // Prepending rows pushes everything down. Following the tail on row count —
+  // which is what the timeline did before scrollback existed — would throw the
+  // reader to the bottom, out of the history they just asked for.
+  const older = Array.from({ length: 40 }, (_unused, index) => ({
+    id: `${index}`.padStart(2, "0").padEnd(64, "c"),
+    pubkey: "e".repeat(64),
+    kind: 9,
+    created_at: 1_600_000_000 + index,
+    tags: [["h", CHANNEL_UUID]],
+    content: `older message ${index}`,
+    sig: "f".repeat(128),
+  }));
+
+  const relay = mockRelay(page, {
+    olderMessages: older,
+    // Enough live rows that the viewport actually scrolls.
+    extraMessages: Array.from({ length: 40 }, (_unused, index) => ({
+      id: `${index}`.padStart(2, "0").padEnd(64, "d"),
+      pubkey: "e".repeat(64),
+      kind: 9,
+      created_at: 1_700_000_200 + index,
+      tags: [["h", CHANNEL_UUID]],
+      content: `recent message ${index}`,
+      sig: "f".repeat(128),
+    })),
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("recent message 39")).toBeVisible();
+
+  const scroller = page.locator("div.overflow-y-auto").first();
+  await scroller.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+
+  const before = await scroller.evaluate((el) => ({
+    fromBottom: el.scrollHeight - el.scrollTop,
+  }));
+
+  await page.getByRole("button", { name: "Load older messages" }).click();
+  await expect(page.getByText("older message 39")).toBeVisible();
+
+  const after = await scroller.evaluate((el) => ({
+    fromBottom: el.scrollHeight - el.scrollTop,
+    scrollTop: el.scrollTop,
+  }));
+
+  // Distance from the bottom is what a prepend leaves unchanged, so restoring it
+  // puts the reader back on the same row.
+  expect(Math.abs(after.fromBottom - before.fromBottom)).toBeLessThan(4);
+  // And they are demonstrably not at the bottom, which is the failure this
+  // guards against.
+  expect(after.scrollTop).toBeGreaterThan(0);
 });
 
 test("attaching a file uploads it and publishes its imeta", async ({
