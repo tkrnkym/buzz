@@ -19,6 +19,19 @@
  * broken" rather than "that kind is not indexed". So the request is built from
  * the indexed set rather than from whatever the timeline happens to render;
  * system rows (40099), for instance, are deliberately absent.
+ *
+ * # A limitation worth knowing before trusting results
+ *
+ * The index uses Postgres' `simple` dictionary, whose tokenizer splits on
+ * whitespace and punctuation. That makes it unusable for languages written
+ * without spaces: a Japanese sentence becomes a *single* lexeme, so
+ * `会議の資料を共有します` is one token and searching `資料` finds nothing.
+ * Latin words embedded in such a run are equally unreachable
+ * (`Buzzのdeployが完了` indexes as one token; `deploy` does not match).
+ *
+ * Verified against Postgres 16, not inferred. Fixing it is a relay-side change —
+ * a CJK-aware tokenizer (`pg_bigm`, PGroonga) or an n-gram index — so this
+ * module cannot work around it, and the UI should not imply coverage it lacks.
  */
 
 import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
@@ -104,10 +117,20 @@ export function toSearchHits(events: NostrEvent[]): SearchHit[] {
  * A short excerpt around the first match, for a result row.
  *
  * The relay returns whole events, so a long message would otherwise fill the
- * result list with text that has nothing to do with the query. Matching is
- * case-insensitive and falls back to the head of the message when the term does
- * not appear literally — full-text search matches stems, so "running" can
- * legitimately return a message containing only "run".
+ * result list with text that has nothing to do with the query.
+ *
+ * Matching is case-insensitive and falls back to the head of the message when
+ * the term does not appear literally. That fallback is reached more often than
+ * it looks, because the typed query is not a substring pattern:
+ * `websearch_to_tsquery` treats `"quoted phrases"` and `-negation` as operators,
+ * prefix mode matches on lexeme prefixes, and only the query's *first* word is
+ * used as the anchor here.
+ *
+ * It is **not** reached because of stemming. The relay indexes and queries with
+ * Postgres' `simple` dictionary (`migrations/0008_...`, `buzz-search/query.rs`),
+ * which lowercases and splits but does not stem — "deploy" does not match
+ * "deployed". Do not add stemming-shaped behaviour to this function on the
+ * assumption that the index has it.
  */
 export function excerpt(content: string, query: string, radius = 90): string {
   const collapsed = content.replace(/\s+/g, " ").trim();
