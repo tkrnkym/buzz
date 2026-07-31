@@ -23,7 +23,7 @@ RUN cargo build --release --locked -p nuxx-push-gateway --bin nuxx-push-gateway 
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
 LABEL org.opencontainers.image.title="Nuxx Push Gateway" \
       org.opencontainers.image.description="Capability-gated APNs last hop for Nuxx" \
-      org.opencontainers.image.source="https://github.com/tkrnkym/buzz" \
+      org.opencontainers.image.source="https://github.com/tkrnkym/nuxx" \
       org.opencontainers.image.licenses="Apache-2.0"
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \

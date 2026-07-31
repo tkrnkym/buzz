@@ -250,9 +250,9 @@ only the current set remains, otherwise reviewers still see the stale images:
 
 ```bash
 # List screenshot comments to find the stale one's id
-gh pr view <pr> --repo tkrnkym/buzz --json comments \
+gh pr view <pr> --repo tkrnkym/nuxx --json comments \
   --jq '.comments[] | select(.body | test("pr-<pr>--")) | {id, url}'
-gh api -X DELETE repos/tkrnkym/buzz/issues/comments/<stale-comment-id>
+gh api -X DELETE repos/tkrnkym/nuxx/issues/comments/<stale-comment-id>
 ```
 
 Branch cleanup when fully done: `git push origin --delete agent-screenshots/<username>`.

@@ -1,6 +1,6 @@
 # Nuxx Helm Chart
 
-[Nuxx](https://github.com/tkrnkym/buzz) is a Nostr-based messaging platform for human–agent collaboration: a single relay binary serving WebSocket + REST + web UI, backed by PostgreSQL, Redis, and S3-compatible object storage.
+[Nuxx](https://github.com/tkrnkym/nuxx) is a Nostr-based messaging platform for human–agent collaboration: a single relay binary serving WebSocket + REST + web UI, backed by PostgreSQL, Redis, and S3-compatible object storage.
 
 This chart has two operating profiles selected by values:
 

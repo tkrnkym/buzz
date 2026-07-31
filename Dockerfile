@@ -124,9 +124,9 @@ FROM debian:${DEBIAN_VERSION}-slim AS runtime-base
 # one — without it GHCR keeps the image private even when the repo is public.
 LABEL org.opencontainers.image.title="Nuxx" \
       org.opencontainers.image.description="WebSocket relay server for the Nuxx communications platform" \
-      org.opencontainers.image.source="https://github.com/tkrnkym/buzz" \
-      org.opencontainers.image.url="https://github.com/tkrnkym/buzz" \
-      org.opencontainers.image.documentation="https://github.com/tkrnkym/buzz#readme" \
+      org.opencontainers.image.source="https://github.com/tkrnkym/nuxx" \
+      org.opencontainers.image.url="https://github.com/tkrnkym/nuxx" \
+      org.opencontainers.image.documentation="https://github.com/tkrnkym/nuxx#readme" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update \

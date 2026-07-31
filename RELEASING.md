@@ -55,7 +55,7 @@ Every push to `main` continues to publish the rolling relay `:main` and
 ### Mobile
 
 1. **Publish a candidate.** From a clean checkout whose `origin` is the
-   canonical `tkrnkym/buzz` repository, run
+   canonical `tkrnkym/nuxx` repository, run
    `scripts/mobile-release.sh candidate X.Y.Z`. The script resolves and fetches
    the exact current `origin/main` commit, derives the next number from exact
    remote tags for that marketing version, and publishes an annotated
@@ -136,19 +136,19 @@ GitHub Release or a stable `mobile-vX.Y.Z` alias.
 
 ## Prerequisites
 
-- **Write access** to the `tkrnkym/buzz` GitHub repository
-- An `origin` remote whose configured URL is the canonical `tkrnkym/buzz`
+- **Write access** to the `tkrnkym/nuxx` GitHub repository
+- An `origin` remote whose configured URL is the canonical `tkrnkym/nuxx`
   repository
 - `gh` CLI version 2.87.0 or newer, authenticated with permission to dispatch
   the candidate workflow
-- Release tag ruleset [`14378754`](https://github.com/tkrnkym/buzz/rules/14378754)
+- Release tag ruleset [`14378754`](https://github.com/tkrnkym/nuxx/rules/14378754)
   active for `mobile-v*`, with creation, update, deletion, and non-fast-forward
   protections and `nuxx-release-bot` as its sole always-bypass actor
 - The `nuxx-release-bot` App credentials configured for GitHub Actions
 
 Mobile candidate publication requires workflow-dispatch access and the existing
 release App because strict tag protection denies direct human creation. The App
-must be installed on `tkrnkym/buzz`, have Contents write and Metadata read, and
+must be installed on `tkrnkym/nuxx`, have Contents write and Metadata read, and
 retain an `always` bypass on the immutable `mobile-v*` tag rules. It does not
 require GitHub Releases permissions, repository Administration permission, or a
 mobile release-branch ruleset. The publisher validates the App token's effective

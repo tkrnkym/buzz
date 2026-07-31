@@ -133,7 +133,7 @@ You'll need [Docker](https://docs.docker.com/get-docker/) and [Hermit](https://c
 
 **Once:**
 ```bash
-git clone https://github.com/tkrnkym/buzz.git && cd nuxx
+git clone https://github.com/tkrnkym/nuxx.git && cd nuxx
 . ./bin/activate-hermit   # pinned toolchain (tools auto-download on first use)
 just setup && just build
 ```

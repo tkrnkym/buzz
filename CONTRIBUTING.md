@@ -4,7 +4,7 @@ Welcome, and thank you for your interest in contributing! Nuxx is an
 open-source project and we're glad you're here. This guide will help you
 get from zero to a merged pull request.
 
-If you have questions that aren't answered here, [open an issue](https://github.com/tkrnkym/buzz/issues/new).
+If you have questions that aren't answered here, [open an issue](https://github.com/tkrnkym/nuxx/issues/new).
 
 ---
 
@@ -35,7 +35,7 @@ unacceptable behavior to **conduct@nuxx-relay.org**.
 
 ## Before You Open a PR
 
-Before starting, search [open PRs](https://github.com/tkrnkym/buzz/pulls) and [open issues](https://github.com/tkrnkym/buzz/issues) for duplicates — someone may already be working on the same thing. When you open your PR, link the closest existing one in the description (or say "none found").
+Before starting, search [open PRs](https://github.com/tkrnkym/nuxx/pulls) and [open issues](https://github.com/tkrnkym/nuxx/issues) for duplicates — someone may already be working on the same thing. When you open your PR, link the closest existing one in the description (or say "none found").
 
 For anything beyond a small fix, opening an issue first is strongly recommended. Describe the problem and proposed solution so a maintainer can acknowledge the approach before you build — it avoids two people building the same thing in parallel.
 
@@ -133,7 +133,7 @@ clippy`, `just test-unit`, and `just test` need no GTK.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/tkrnkym/buzz.git
+git clone https://github.com/tkrnkym/nuxx.git
 cd nuxx
 
 # 2. Activate Hermit (optional but recommended)
@@ -386,7 +386,7 @@ to existing clients.
 
 ## Ecosystem
 
-Nuxx is developed across multiple repositories. This repo (`tkrnkym/buzz`)
+Nuxx is developed across multiple repositories. This repo (`tkrnkym/nuxx`)
 is the open-source home for all application code — the relay, desktop app,
 mobile app, CLI, and agent harness. Internal repositories handle
 enterprise-signed builds and infrastructure deployment.
@@ -394,7 +394,7 @@ enterprise-signed builds and infrastructure deployment.
 See [AGENTS.md § Ecosystem](AGENTS.md#ecosystem) for the full repo table and
 dependency diagram.
 
-**External contributors:** Fork `tkrnkym/buzz`, open a PR, and CI runs
+**External contributors:** Fork `tkrnkym/nuxx`, open a PR, and CI runs
 automatically. No special access is required.
 
 See [RELEASING.md](RELEASING.md) for the release process.

@@ -9,9 +9,9 @@ description: |
 type: application
 version: 0.1.7
 appVersion: "0.1.0"
-home: https://github.com/tkrnkym/buzz
+home: https://github.com/tkrnkym/nuxx
 sources:
-  - https://github.com/tkrnkym/buzz
+  - https://github.com/tkrnkym/nuxx
 keywords:
   - nostr
   - relay
