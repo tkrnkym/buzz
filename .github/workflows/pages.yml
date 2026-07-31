@@ -5,8 +5,9 @@
 # UI, timeline behavior, unread badges, threads, and publish round-trips are
 # the production code paths running against seeded events.
 #
-# One-time setup: repository Settings → Pages → Source = "GitHub Actions".
-# Until that is set, the deploy job fails with a Pages-not-enabled error.
+# configure-pages runs with `enablement: true`, so the first run creates the
+# Pages site itself — no manual Settings → Pages step. Run #1 failed exactly
+# there before this was set.
 #
 # The Vite base and the router basepath come from VITE_BASE, derived from the
 # repository name so the site survives the repo rename. 404.html is a copy of
@@ -49,6 +50,8 @@ jobs:
       - name: Add the SPA 404 fallback
         run: cp web/dist/index.html web/dist/404.html
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: web/dist
