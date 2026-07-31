@@ -76,7 +76,11 @@ export function MessageComposer({
             pubkey: event.pubkey,
             threadHeadId: replyTo?.parentId ?? null,
           });
-          onCancelReply();
+          // The reply target deliberately survives the send. It is bound to the
+          // open thread panel now, so clearing it here would drop the reader out
+          // of the thread they are in the middle of — and their next message
+          // would land in the channel instead. Closing the panel is what ends
+          // the reply.
         },
       },
     );

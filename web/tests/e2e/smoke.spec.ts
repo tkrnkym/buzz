@@ -803,7 +803,7 @@ test("replying publishes thread tags and shows the reply count", async ({
   const rootRow = page
     .getByRole("listitem")
     .filter({ hasText: "the original" });
-  await rootRow.getByRole("button", { name: "Reply" }).click();
+  await rootRow.getByRole("button", { name: "Reply in thread" }).click();
   await expect(page.getByText(/Replying to/)).toBeVisible();
 
   const composer = page.getByRole("textbox", { name: /^Reply to/ });
@@ -823,6 +823,219 @@ test("replying publishes thread tags and shows the reply count", async ({
   // Root === parent for a direct reply, which nuxx-sdk collapses to one tag.
   expect(reply.tags).toContainEqual(["e", root.id, "", "reply"]);
   expect(reply.tags).toContainEqual(["h", CHANNEL_UUID]);
+});
+
+test("a burst from one author renders as one block", async ({ page }) => {
+  // Grouping is what makes the timeline read as conversation rather than as a
+  // log. The structural decision is unit-tested in `timeline-items`; this checks
+  // it actually reaches the DOM.
+  const relay = mockRelay(page, {
+    extraMessages: [
+      { ...markdownMessage("1", "first"), created_at: 1_700_000_300 },
+      { ...markdownMessage("2", "second"), created_at: 1_700_000_330 },
+      { ...markdownMessage("3", "third"), created_at: 1_700_000_360 },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("third")).toBeVisible();
+
+  // Four messages from one author (the mock's baseline plus these three), and
+  // the author line appears once — the continuations show only a time.
+  const authorLines = page.getByText("eeeeeeee…eeee", { exact: true });
+  await expect(authorLines).toHaveCount(1);
+});
+
+test("the timeline is dated", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(
+    page.getByTestId("message-timeline-day-divider").first(),
+  ).toBeVisible();
+});
+
+test("a reply lands in the thread panel, not in the channel", async ({
+  page,
+}) => {
+  // The trade that keeps a channel readable when one thread gets busy: replies
+  // are reached through the panel, and the channel keeps a summary row.
+  const root = markdownMessage("9", "the original");
+  const relay = mockRelay(page, { extraMessages: [root] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const rootRow = page
+    .getByRole("listitem")
+    .filter({ hasText: "the original" });
+  await rootRow.getByRole("button", { name: "Reply in thread" }).click();
+
+  // Replying opens the thread, because the reply would otherwise be sent
+  // somewhere the reader cannot see.
+  const panel = page.getByTestId("thread-panel");
+  await expect(panel).toBeVisible();
+
+  const composer = page.getByRole("textbox", { name: /^Reply to/ });
+  await composer.fill("a threaded answer");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(panel.getByText("a threaded answer")).toBeVisible();
+  await expect(rootRow.getByText("1 reply")).toBeVisible();
+  // Still in the thread after sending: a reader mid-conversation should not have
+  // to re-open it, and their next message must not land in the channel.
+  await expect(page.getByRole("textbox", { name: /^Reply to/ })).toBeVisible();
+
+  await panel.getByTestId("close-thread").click();
+  await expect(panel).toBeHidden();
+  // Closing returns the composer to the channel: leaving it aimed at a thread
+  // the reader can no longer see is how a reply goes missing.
+  await expect(
+    page.getByRole("textbox", { name: "Message #general" }),
+  ).toBeVisible();
+  // Closed, the reply is nowhere in the channel — only its summary row is.
+  await expect(page.getByText("a threaded answer")).toHaveCount(0);
+  await expect(rootRow.getByText("1 reply")).toBeVisible();
+});
+
+/**
+ * Author pubkey for the manage-my-own-messages specs.
+ *
+ * Edit and delete are offered only on the reader's own messages, so these need a
+ * stable identity: without a NIP-07 extension the signer mints a fresh key per
+ * page load and nothing in a fixture can belong to it.
+ */
+const MY_PUBKEY = "1a".repeat(32);
+
+/** A fixture message authored by the reader rather than the mock's stranger. */
+function myMessage(id: string, content: string) {
+  return { ...markdownMessage(id, content), pubkey: MY_PUBKEY };
+}
+
+test("opening a thread aims the composer at it", async ({ page }) => {
+  // A panel open with the composer still aimed at the channel is the trap: the
+  // reader is looking at a thread, types, and the message lands in the room.
+  const root = markdownMessage("9", "the subject");
+  const reply = {
+    ...markdownMessage("a", "an existing answer"),
+    created_at: 1_700_000_300,
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["e", markdownMessage("9", "the subject").id, "", "reply"],
+    ],
+  };
+  const relay = mockRelay(page, { extraMessages: [root, reply] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const rootRow = page.getByRole("listitem").filter({ hasText: "the subject" });
+  await rootRow.getByText("1 reply").click();
+
+  await expect(page.getByTestId("thread-panel")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /^Reply to/ })).toBeVisible();
+
+  await page.getByRole("textbox", { name: /^Reply to/ }).fill("me too");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number; content: string }).kind === 9 &&
+      (event as { content: string }).content === "me too",
+  ) as { tags: string[][] };
+  expect(sent.tags).toContainEqual(["e", root.id, "", "reply"]);
+});
+
+test("editing a message publishes kind:40003 against the original", async ({
+  page,
+}) => {
+  // A signed event cannot be rewritten, so an edit is a separate event the
+  // timeline overlays. The `h` tag is what makes it visible to everyone already
+  // subscribed.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const target = myMessage("1", "typo here");
+  const relay = mockRelay(page, { extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "typo here" });
+  await row.getByTestId("edit-message").click();
+
+  await page.getByTestId("message-editor").fill("fixed now");
+  await page.getByTestId("save-edit").click();
+
+  await expect(page.getByText("fixed now")).toBeVisible();
+  await expect(page.getByText("(edited)").first()).toBeVisible();
+
+  const edit = relay.published.find(
+    (event) => (event as { kind: number }).kind === 40003,
+  ) as { tags: string[][]; content: string };
+  expect(edit.content).toBe("fixed now");
+  expect(edit.tags).toContainEqual(["h", CHANNEL_UUID]);
+  expect(edit.tags).toContainEqual(["e", target.id]);
+});
+
+test("an unchanged edit publishes nothing", async ({ page }) => {
+  // Publishing it would stamp the message "(edited)" for everyone over a change
+  // that was never made.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [myMessage("1", "leave me alone")],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "leave me alone" });
+  await row.getByTestId("edit-message").click();
+  await page.getByTestId("save-edit").click();
+
+  await expect(page.getByTestId("message-editor")).toBeHidden();
+  expect(
+    relay.published.filter(
+      (event) => (event as { kind: number }).kind === 40003,
+    ),
+  ).toEqual([]);
+});
+
+test("deleting a message publishes the channel-scoped tombstone", async ({
+  page,
+}) => {
+  // Kind 9005, not NIP-09's kind:5 — the Nuxx tombstone carries the `h` tag, so
+  // readers with the timeline open see the removal.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const target = myMessage("1", "delete me");
+  const relay = mockRelay(page, { extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "delete me" });
+  await row.getByTestId("delete-message").click();
+
+  await expect(page.getByText("Message deleted")).toBeVisible();
+  await expect(page.getByText("delete me")).toHaveCount(0);
+
+  const tombstone = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9005,
+  ) as { tags: string[][] };
+  expect(tombstone.tags).toContainEqual(["h", CHANNEL_UUID]);
+  expect(tombstone.tags).toContainEqual(["e", target.id]);
+});
+
+test("someone else's message offers no edit or delete", async ({ page }) => {
+  // The relay refuses it too, but offering a button that is going to be refused
+  // is worse than not offering it. Same identity as the specs above, so the
+  // contrast is authorship and nothing else.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [markdownMessage("1", "not yours")],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "not yours" });
+  await expect(row.getByTestId("reply-in-thread")).toHaveCount(1);
+  await expect(row.getByTestId("edit-message")).toHaveCount(0);
+  await expect(row.getByTestId("delete-message")).toHaveCount(0);
 });
 
 test("a deleted message renders as a tombstone", async ({ page }) => {
@@ -1525,7 +1738,11 @@ test("presence comes from the HTTP snapshot, which is the only path that has it"
   await page.goto(`/c/${CHANNEL_UUID}`);
   await expect(page.getByText("hello from the mocked relay")).toBeVisible();
 
-  await expect(page.getByText("Status: online")).toBeAttached();
+  // The dot's accessible name, not sr-only text: it is a `role="img"` badge on
+  // the author avatar, so its name is what a screen reader announces.
+  await expect(
+    page.getByRole("img", { name: "Status: online" }),
+  ).toBeAttached();
 
   const presence = relay.queries
     .flat()

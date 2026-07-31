@@ -19,6 +19,9 @@ const overrides = new Set([
   "src/shared/ui/PubkeyAvatar.tsx:57",
   // Array window (first N pubkeys), not string truncation.
   "src/features/repos/ui/OrgSidebar.tsx:22",
+  // Also an array window: the first few thread participants for the avatar
+  // stack. Each pubkey is passed through whole.
+  "src/features/messages/ui/ThreadSummaryRow.tsx:25",
 ]);
 
 await runPubkeyTruncationCheck({

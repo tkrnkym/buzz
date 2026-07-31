@@ -10,9 +10,11 @@ import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
 import {
   CHANNEL_TIMELINE_CONTENT_KINDS,
   KIND_DELETION,
+  KIND_NIP29_DELETE_EVENT,
   KIND_NIP29_GROUP_METADATA,
   KIND_REACTION,
   KIND_STREAM_MESSAGE,
+  KIND_STREAM_MESSAGE_EDIT,
   KIND_SYSTEM_MESSAGE,
 } from "@/shared/constants/kinds";
 import {
@@ -359,6 +361,60 @@ export function buildReactionWithdrawalTemplate(reactionEventId: string): {
   return {
     kind: KIND_DELETION,
     tags: [["e", reactionEventId]],
+    content: "",
+  };
+}
+
+/** Longest message body the relay accepts, per `nuxx-sdk::check_content`. */
+export const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
+
+/**
+ * Event template for an edit, matching `nuxx-sdk::build_edit`.
+ *
+ * An edit is a separate kind:40003 event pointing at the original, not a
+ * rewrite of it — a signed event cannot be changed after the fact. The `h` tag
+ * is what makes the edit visible to a channel-scoped subscription; without it
+ * the timeline would keep showing the original text to everyone already
+ * connected.
+ */
+export function buildEditTemplate(
+  channelId: string,
+  targetEventId: string,
+  content: string,
+): { kind: number; tags: string[][]; content: string } {
+  return {
+    kind: KIND_STREAM_MESSAGE_EDIT,
+    tags: [
+      ["h", channelId],
+      ["e", targetEventId],
+    ],
+    content,
+  };
+}
+
+/**
+ * Event template for a delete, matching `nuxx-sdk::build_delete_message`.
+ *
+ * Kind 9005 rather than NIP-09's kind:5: the Nuxx-native tombstone carries the
+ * `h` tag, so channel subscribers see the removal. A bare kind:5 carries no
+ * channel, and every reader with the timeline already open would go on showing
+ * the message.
+ *
+ * The moderation fields (`action_id`, `reason_code`, `public_reason`) are
+ * deliberately not settable here: this is the author deleting their own message,
+ * and a client-supplied reason on a self-delete would read as a moderator
+ * action.
+ */
+export function buildDeleteMessageTemplate(
+  channelId: string,
+  targetEventId: string,
+): { kind: number; tags: string[][]; content: string } {
+  return {
+    kind: KIND_NIP29_DELETE_EVENT,
+    tags: [
+      ["h", channelId],
+      ["e", targetEventId],
+    ],
     content: "",
   };
 }

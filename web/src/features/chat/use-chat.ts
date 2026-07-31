@@ -17,6 +17,8 @@ import {
   type Channel,
   buildChannelHistoryFilter,
   buildChannelListFilter,
+  buildDeleteMessageTemplate,
+  buildEditTemplate,
   buildChannelTimelineFilter,
   buildMessageTemplate,
   buildReactionFilter,
@@ -255,6 +257,50 @@ export function useSendMessage(channelId: string | null) {
     onSuccess: () => {
       // A first message in a channel can change what the sidebar should show.
       void queryClient.invalidateQueries({ queryKey: ["chat", "channels"] });
+    },
+  });
+}
+
+/**
+ * Edit a message.
+ *
+ * Publishes a kind:40003 pointing at the original rather than replacing it — a
+ * signed event is immutable, so "editing" is an overlay the timeline applies
+ * (see `deriveTimeline`, which only honours an edit from the original author).
+ */
+export function useEditMessage(channelId: string | null) {
+  const session = useRelaySession();
+
+  return useMutation({
+    mutationFn: async (input: { messageId: string; content: string }) => {
+      if (!channelId) throw new Error("No channel selected");
+      const trimmed = input.content.trim();
+      // An empty edit is a delete in disguise. Refusing it keeps the two
+      // intentions separate: a blank row is not something a reader can act on,
+      // and a tombstone is.
+      if (!trimmed) throw new Error("An edited message cannot be empty");
+      return session.publish(
+        buildEditTemplate(channelId, input.messageId, trimmed),
+      );
+    },
+  });
+}
+
+/**
+ * Delete a message.
+ *
+ * Kind 9005, which carries the channel tag, so everyone with the timeline open
+ * sees the tombstone. See `buildDeleteMessageTemplate` for why not kind:5.
+ */
+export function useDeleteMessage(channelId: string | null) {
+  const session = useRelaySession();
+
+  return useMutation({
+    mutationFn: async (input: { messageId: string }) => {
+      if (!channelId) throw new Error("No channel selected");
+      return session.publish(
+        buildDeleteMessageTemplate(channelId, input.messageId),
+      );
     },
   });
 }
