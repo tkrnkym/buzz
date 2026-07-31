@@ -163,20 +163,20 @@ impl GitS3Probe {
         // they must receive the same provider connection and URL style as the
         // relay. Unit/live MinIO probes in nuxx-relay keep explicit local
         // fixtures and do not need provider overrides.
-        let endpoint = std::env::var("BUZZ_S3_ENDPOINT")
+        let endpoint = std::env::var("NUXX_S3_ENDPOINT")
             .unwrap_or_else(|_| "http://localhost:9000".to_string());
         let access_key =
-            std::env::var("BUZZ_S3_ACCESS_KEY").unwrap_or_else(|_| "buzz_dev".to_string());
+            std::env::var("NUXX_S3_ACCESS_KEY").unwrap_or_else(|_| "nuxx_dev".to_string());
         let secret_key =
-            std::env::var("BUZZ_S3_SECRET_KEY").unwrap_or_else(|_| "buzz_dev_secret".to_string());
+            std::env::var("NUXX_S3_SECRET_KEY").unwrap_or_else(|_| "nuxx_dev_secret".to_string());
         let bucket_name =
-            std::env::var("BUZZ_S3_BUCKET").unwrap_or_else(|_| "nuxx-media".to_string());
+            std::env::var("NUXX_S3_BUCKET").unwrap_or_else(|_| "nuxx-media".to_string());
         let region_name =
-            std::env::var("BUZZ_S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
-        let addressing_style = std::env::var("BUZZ_S3_ADDRESSING_STYLE")
+            std::env::var("NUXX_S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
+        let addressing_style = std::env::var("NUXX_S3_ADDRESSING_STYLE")
             .unwrap_or_else(|_| "path".to_string())
             .parse::<S3AddressingStyle>()
-            .expect("BUZZ_S3_ADDRESSING_STYLE must be 'path' or 'virtual'");
+            .expect("NUXX_S3_ADDRESSING_STYLE must be 'path' or 'virtual'");
 
         let bucket = Self::bucket(
             endpoint,
@@ -191,7 +191,7 @@ impl GitS3Probe {
 
     fn pointer_key(owner: &str, repo: &str) -> String {
         let repo = repo.strip_suffix(".git").unwrap_or(repo);
-        if let Ok(community) = std::env::var("BUZZ_E2E_GIT_COMMUNITY_ID") {
+        if let Ok(community) = std::env::var("NUXX_E2E_GIT_COMMUNITY_ID") {
             return format!("repos/{community}/{owner}/{repo}/pointer");
         }
         format!("repos/{owner}/{repo}/pointer")
@@ -431,7 +431,7 @@ async fn git_concurrent_push_one_wins_and_repo_recovers() {
     post_event(&announce).await;
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let tmp = tempdir_named("buzz-e2e-git-concurrent");
+    let tmp = tempdir_named("nuxx-e2e-git-concurrent");
     let url = format!("{}/git/{}/{}", relay_http_url(), owner_hex, repo);
 
     git(&["clone", "--quiet", &url, "seed"], tmp.path(), &owner_nsec);
@@ -543,7 +543,7 @@ impl Drop for TempDir {
     }
 }
 fn tempdir() -> TempDir {
-    tempdir_named("buzz-e2e-git")
+    tempdir_named("nuxx-e2e-git")
 }
 
 fn tempdir_named(prefix: &str) -> TempDir {

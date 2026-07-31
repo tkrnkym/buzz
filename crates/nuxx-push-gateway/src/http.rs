@@ -96,7 +96,7 @@ fn endpoint_bytes(endpoint: &str) -> Option<Vec<u8>> {
 fn endpoint_fingerprint(profile: AppProfile, token: &[u8]) -> [u8; 32] {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
-    h.update(b"buzz-apns-endpoint-v1\0");
+    h.update(b"nuxx-apns-endpoint-v1\0");
     h.update(profile.as_str().as_bytes());
     h.update([0]);
     h.update(token);
@@ -177,7 +177,7 @@ async fn enroll(State(s): State<AppState>, body: Bytes) -> Response {
     };
     let t = EnrollTranscript {
         v: r.v,
-        audience: "https://push.buzz.xyz/v1/installations",
+        audience: "https://push.nuxx.xyz/v1/installations",
         challenge_id: r.challenge_id,
         challenge: &r.challenge,
         key_id: &r.key_id,
@@ -186,7 +186,7 @@ async fn enroll(State(s): State<AppState>, body: Bytes) -> Response {
         endpoint_epoch: r.endpoint_epoch,
         expires_at: r.expires_at,
     };
-    let signed = match transcript("buzz.push.enroll.v1", &t) {
+    let signed = match transcript("nuxx.push.enroll.v1", &t) {
         Some(v) => v,
         None => return error(StatusCode::BAD_REQUEST, "invalid_request"),
     };
@@ -310,7 +310,7 @@ async fn delegate(State(s): State<AppState>, body: Bytes) -> Response {
     }
     let t = DelegateTranscript {
         v: r.v,
-        audience: "https://push.buzz.xyz/v1/delegations",
+        audience: "https://push.nuxx.xyz/v1/delegations",
         challenge_id: r.challenge_id,
         challenge: &r.challenge,
         installation_handle: r.installation_handle,
@@ -326,7 +326,7 @@ async fn delegate(State(s): State<AppState>, body: Bytes) -> Response {
         r.challenge_id,
         &r.challenge,
         &r.assertion,
-        "buzz.push.delegate.v1",
+        "nuxx.push.delegate.v1",
         &t,
     )
     .await
@@ -404,7 +404,7 @@ async fn rotate_endpoint(State(s): State<AppState>, body: Bytes) -> Response {
     };
     let t = RotateTranscript {
         v: r.v,
-        audience: "https://push.buzz.xyz/v1/installations/endpoint",
+        audience: "https://push.nuxx.xyz/v1/installations/endpoint",
         challenge_id: r.challenge_id,
         challenge: &r.challenge,
         installation_handle: r.installation_handle,
@@ -418,7 +418,7 @@ async fn rotate_endpoint(State(s): State<AppState>, body: Bytes) -> Response {
         r.challenge_id,
         &r.challenge,
         &r.assertion,
-        "buzz.push.rotate-endpoint.v1",
+        "nuxx.push.rotate-endpoint.v1",
         &t,
     )
     .await
@@ -464,7 +464,7 @@ async fn revoke_delegation(State(s): State<AppState>, body: Bytes) -> Response {
     }
     let t = RevokeDelegationTranscript {
         v: r.v,
-        audience: "https://push.buzz.xyz/v1/delegations/revoke",
+        audience: "https://push.nuxx.xyz/v1/delegations/revoke",
         challenge_id: r.challenge_id,
         challenge: &r.challenge,
         installation_handle: r.installation_handle,
@@ -477,7 +477,7 @@ async fn revoke_delegation(State(s): State<AppState>, body: Bytes) -> Response {
         r.challenge_id,
         &r.challenge,
         &r.assertion,
-        "buzz.push.revoke-delegation.v1",
+        "nuxx.push.revoke-delegation.v1",
         &t,
     )
     .await
@@ -516,7 +516,7 @@ async fn revoke_installation(State(s): State<AppState>, body: Bytes) -> Response
     }
     let t = RevokeInstallationTranscript {
         v: r.v,
-        audience: "https://push.buzz.xyz/v1/installations/revoke",
+        audience: "https://push.nuxx.xyz/v1/installations/revoke",
         challenge_id: r.challenge_id,
         challenge: &r.challenge,
         installation_handle: r.installation_handle,
@@ -529,7 +529,7 @@ async fn revoke_installation(State(s): State<AppState>, body: Bytes) -> Response
         r.challenge_id,
         &r.challenge,
         &r.assertion,
-        "buzz.push.revoke-installation.v1",
+        "nuxx.push.revoke-installation.v1",
         &t,
     )
     .await

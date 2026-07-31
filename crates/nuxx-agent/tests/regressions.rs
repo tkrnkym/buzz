@@ -96,14 +96,14 @@ impl Harness {
     async fn spawn_with_env(base_url: &str, extra: &[(&str, &str)]) -> Self {
         let bin = env!("CARGO_BIN_EXE_nuxx-agent");
         let mut cmd = tokio::process::Command::new(bin);
-        cmd.env("BUZZ_AGENT_PROVIDER", "openai")
+        cmd.env("NUXX_AGENT_PROVIDER", "openai")
             .env("OPENAI_COMPAT_API_KEY", "test")
             .env("OPENAI_COMPAT_MODEL", "fake-model")
             .env("OPENAI_COMPAT_BASE_URL", base_url)
-            .env("BUZZ_AGENT_LLM_TIMEOUT_SECS", "5")
-            .env("BUZZ_AGENT_TOOL_TIMEOUT_SECS", "5")
-            .env("BUZZ_AGENT_MAX_ROUNDS", "8")
-            .env("BUZZ_AGENT_MCP_INIT_TIMEOUT_SECS", "2");
+            .env("NUXX_AGENT_LLM_TIMEOUT_SECS", "5")
+            .env("NUXX_AGENT_TOOL_TIMEOUT_SECS", "5")
+            .env("NUXX_AGENT_MAX_ROUNDS", "8")
+            .env("NUXX_AGENT_MCP_INIT_TIMEOUT_SECS", "2");
         for (k, v) in extra {
             cmd.env(k, v);
         }
@@ -563,8 +563,8 @@ async fn history_budget_evicts_old_turns() {
     let mut h = Harness::spawn_with_env(
         &llm.url,
         &[
-            ("BUZZ_AGENT_MAX_HISTORY_BYTES", &BUDGET.to_string()),
-            ("BUZZ_AGENT_MAX_HANDOFFS", "0"), // exercise truncation, not handoff
+            ("NUXX_AGENT_MAX_HISTORY_BYTES", &BUDGET.to_string()),
+            ("NUXX_AGENT_MAX_HANDOFFS", "0"), // exercise truncation, not handoff
         ],
     )
     .await;
@@ -803,7 +803,7 @@ async fn hook_stop_blocks_premature_end() {
         &llm.url,
         &[
             ("MCP_HOOK_SERVERS", "fake"),
-            ("BUZZ_AGENT_STOP_MAX_REJECTIONS", "10"),
+            ("NUXX_AGENT_STOP_MAX_REJECTIONS", "10"),
         ],
     )
     .await;
@@ -884,7 +884,7 @@ async fn hook_stop_budget_exhausted() {
         &llm.url,
         &[
             ("MCP_HOOK_SERVERS", "fake"),
-            ("BUZZ_AGENT_STOP_MAX_REJECTIONS", "1"),
+            ("NUXX_AGENT_STOP_MAX_REJECTIONS", "1"),
         ],
     )
     .await;
@@ -937,7 +937,7 @@ async fn hook_stop_consecutive_end_turn_uses_rejection_budget() {
         &llm.url,
         &[
             ("MCP_HOOK_SERVERS", "fake"),
-            ("BUZZ_AGENT_STOP_MAX_REJECTIONS", "2"),
+            ("NUXX_AGENT_STOP_MAX_REJECTIONS", "2"),
         ],
     )
     .await;
@@ -991,7 +991,7 @@ async fn hook_stop_budget_resets_per_prompt() {
         &llm.url,
         &[
             ("MCP_HOOK_SERVERS", "fake"),
-            ("BUZZ_AGENT_STOP_MAX_REJECTIONS", "1"),
+            ("NUXX_AGENT_STOP_MAX_REJECTIONS", "1"),
         ],
     )
     .await;
@@ -1131,9 +1131,9 @@ async fn hook_post_compact_injects_after_handoff() {
         &llm.url,
         &[
             ("MCP_HOOK_SERVERS", "fake"),
-            ("BUZZ_AGENT_MAX_HISTORY_BYTES", &(1024 * 1024).to_string()),
+            ("NUXX_AGENT_MAX_HISTORY_BYTES", &(1024 * 1024).to_string()),
             // Allow at least one handoff.
-            ("BUZZ_AGENT_MAX_HANDOFFS", "3"),
+            ("NUXX_AGENT_MAX_HANDOFFS", "3"),
         ],
     )
     .await;
@@ -1231,11 +1231,11 @@ async fn handoff_summary_prompt_includes_full_history_within_context_budget() {
     let mut h = Harness::spawn_with_env(
         &llm.url,
         &[
-            ("BUZZ_AGENT_MAX_CONTEXT_TOKENS", "10000"),
-            ("BUZZ_AGENT_MAX_OUTPUT_TOKENS", "1000"),
-            ("BUZZ_AGENT_MAX_HANDOFFS", "3"),
+            ("NUXX_AGENT_MAX_CONTEXT_TOKENS", "10000"),
+            ("NUXX_AGENT_MAX_OUTPUT_TOKENS", "1000"),
+            ("NUXX_AGENT_MAX_HANDOFFS", "3"),
             (
-                "BUZZ_AGENT_MAX_HISTORY_BYTES",
+                "NUXX_AGENT_MAX_HISTORY_BYTES",
                 &(16 * 1024 * 1024).to_string(),
             ),
         ],
@@ -1299,11 +1299,11 @@ async fn handoff_summary_prompt_keeps_latest_item_when_one_item_exceeds_budget()
     let mut h = Harness::spawn_with_env(
         &llm.url,
         &[
-            ("BUZZ_AGENT_MAX_CONTEXT_TOKENS", "10000"),
-            ("BUZZ_AGENT_MAX_OUTPUT_TOKENS", "1000"),
-            ("BUZZ_AGENT_MAX_HANDOFFS", "3"),
+            ("NUXX_AGENT_MAX_CONTEXT_TOKENS", "10000"),
+            ("NUXX_AGENT_MAX_OUTPUT_TOKENS", "1000"),
+            ("NUXX_AGENT_MAX_HANDOFFS", "3"),
             (
-                "BUZZ_AGENT_MAX_HISTORY_BYTES",
+                "NUXX_AGENT_MAX_HISTORY_BYTES",
                 &(16 * 1024 * 1024).to_string(),
             ),
         ],
@@ -1368,13 +1368,13 @@ async fn token_usage_over_budget_triggers_handoff() {
     let mut h = Harness::spawn_with_env(
         &llm.url,
         &[
-            ("BUZZ_AGENT_MAX_CONTEXT_TOKENS", "1000"),
-            ("BUZZ_AGENT_MAX_OUTPUT_TOKENS", "100"),
-            ("BUZZ_AGENT_MAX_HANDOFFS", "3"),
+            ("NUXX_AGENT_MAX_CONTEXT_TOKENS", "1000"),
+            ("NUXX_AGENT_MAX_OUTPUT_TOKENS", "100"),
+            ("NUXX_AGENT_MAX_HANDOFFS", "3"),
             // Huge byte budget so the byte path can NOT be what fires — only
             // the token gate can explain a handoff on these tiny prompts.
             (
-                "BUZZ_AGENT_MAX_HISTORY_BYTES",
+                "NUXX_AGENT_MAX_HISTORY_BYTES",
                 &(16 * 1024 * 1024).to_string(),
             ),
         ],
@@ -1458,13 +1458,13 @@ async fn stale_usage_plus_history_growth_triggers_handoff() {
     let mut h = Harness::spawn_with_env(
         &llm.url,
         &[
-            ("BUZZ_AGENT_MAX_CONTEXT_TOKENS", "10000"),
-            ("BUZZ_AGENT_MAX_OUTPUT_TOKENS", "1000"),
-            ("BUZZ_AGENT_MAX_HANDOFFS", "3"),
+            ("NUXX_AGENT_MAX_CONTEXT_TOKENS", "10000"),
+            ("NUXX_AGENT_MAX_OUTPUT_TOKENS", "1000"),
+            ("NUXX_AGENT_MAX_HANDOFFS", "3"),
             // Huge byte budget so the None-path byte fallback can't be what
             // fires — only the token-mode growth estimate can explain it.
             (
-                "BUZZ_AGENT_MAX_HISTORY_BYTES",
+                "NUXX_AGENT_MAX_HISTORY_BYTES",
                 &(16 * 1024 * 1024).to_string(),
             ),
         ],
@@ -1497,7 +1497,7 @@ async fn stale_usage_plus_history_growth_triggers_handoff() {
     h.shutdown().await;
 }
 
-/// `_Stop` hook that takes longer than `BUZZ_AGENT_HOOK_TIMEOUT_MS`
+/// `_Stop` hook that takes longer than `NUXX_AGENT_HOOK_TIMEOUT_MS`
 /// must be treated as no-objection (fail-open). Agent stops normally.
 ///
 /// Note on server-kill-on-timeout: `call_hooks` calls `kill_server` on a
@@ -1518,7 +1518,7 @@ async fn hook_stop_timeout_failopen() {
         &[
             ("MCP_HOOK_SERVERS", "fake"),
             // Hook delay (3s) >> hook timeout (200ms) → fail-open.
-            ("BUZZ_AGENT_HOOK_TIMEOUT_MS", "200"),
+            ("NUXX_AGENT_HOOK_TIMEOUT_MS", "200"),
         ],
     )
     .await;
@@ -1602,7 +1602,7 @@ async fn cancel_kills_inflight_tool_via_mcp_notification() {
 
     // Use a unique marker (PID + timestamp) to avoid stale-file collisions.
     let marker = format!(
-        "buzz_cancel_test_{}_{:x}",
+        "nuxx_cancel_test_{}_{:x}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1710,7 +1710,7 @@ async fn cancel_kills_inflight_tool_via_mcp_notification() {
 async fn cancel_sends_notifications_cancelled_to_any_mcp_server() {
     let cancel_log = std::env::temp_dir()
         .join(format!(
-            "buzz_cancel_proto_{}_{:x}.log",
+            "nuxx_cancel_proto_{}_{:x}.log",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

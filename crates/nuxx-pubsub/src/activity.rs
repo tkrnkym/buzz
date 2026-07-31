@@ -41,8 +41,8 @@
 //! With [`ACTIVITY_SHARD_COUNT`](nuxx_core::activity::ACTIVITY_SHARD_COUNT)
 //! shards, a shard holds ~188 fields at 3000 channels, and `HGETALL` of that is
 //! not the bottleneck. The switch becomes worth making when it is — concretely,
-//! when `buzz_activity_shard_entries` runs into the thousands or
-//! `buzz_activity_rebuild_duration_seconds` becomes visible next to the signing
+//! when `nuxx_activity_shard_entries` runs into the thousands or
+//! `nuxx_activity_rebuild_duration_seconds` becomes visible next to the signing
 //! cost. Both are recorded on the rebuild path so the decision can be made from
 //! production numbers rather than prediction.
 
@@ -54,7 +54,7 @@ use nuxx_core::TenantContext;
 use uuid::Uuid;
 
 use crate::error::PubSubError;
-use crate::topic::BUZZ_PREFIX;
+use crate::topic::NUXX_PREFIX;
 
 /// How long a rebuild claim is held, in milliseconds.
 ///
@@ -71,15 +71,15 @@ pub const ACTIVITY_COALESCE_MS: u64 = 1_000;
 pub const ACTIVITY_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 
 fn shard_key(ctx: &TenantContext, shard: u32) -> String {
-    format!("{BUZZ_PREFIX}:{}:activity:{shard}", ctx.community())
+    format!("{NUXX_PREFIX}:{}:activity:{shard}", ctx.community())
 }
 
 fn dirty_key(ctx: &TenantContext) -> String {
-    format!("{BUZZ_PREFIX}:{}:activity:dirty", ctx.community())
+    format!("{NUXX_PREFIX}:{}:activity:dirty", ctx.community())
 }
 
 fn claim_key(ctx: &TenantContext, shard: u32) -> String {
-    format!("{BUZZ_PREFIX}:{}:activity:claim:{shard}", ctx.community())
+    format!("{NUXX_PREFIX}:{}:activity:claim:{shard}", ctx.community())
 }
 
 /// Record activity in a channel and mark its shard for rebuild.

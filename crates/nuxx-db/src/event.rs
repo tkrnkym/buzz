@@ -1506,10 +1506,10 @@ mod tests {
     use super::*;
     use nostr::{EventBuilder, Keys, Kind, Tag};
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
 
     async fn setup_pool() -> PgPool {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_owned());
 
@@ -1641,7 +1641,7 @@ mod tests {
         // TTL transition holds the per-channel advisory key EXCLUSIVE, which
         // is what the event trigger's shared acquisition now waits on.
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-            .bind(format!("buzz_channel_ttl:{community_uuid}:{racing}"))
+            .bind(format!("nuxx_channel_ttl:{community_uuid}:{racing}"))
             .execute(&mut *activation)
             .await
             .expect("acquire exclusive channel TTL key");

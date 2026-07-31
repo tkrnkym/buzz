@@ -520,7 +520,7 @@ fn advance_query_cursor(
 
 pub struct BuzzClient {
     http: reqwest::Client,
-    relay_url: String, // base URL, no trailing slash, e.g. "https://relay.buzz.place"
+    relay_url: String, // base URL, no trailing slash, e.g. "https://relay.nuxx.place"
     keys: Keys,
     /// Optional NIP-OA auth tag injected into every signed event.
     auth_tag: Option<Tag>,
@@ -534,8 +534,8 @@ impl BuzzClient {
     /// Timeout defaults are tuned for degraded WAN links and can be overridden
     /// via environment variables:
     ///
-    /// - `BUZZ_CONNECT_TIMEOUT_SECS` — TCP connect timeout (default 15 s)
-    /// - `BUZZ_TIMEOUT_SECS` — per-request total timeout (default 30 s)
+    /// - `NUXX_CONNECT_TIMEOUT_SECS` — TCP connect timeout (default 15 s)
+    /// - `NUXX_TIMEOUT_SECS` — per-request total timeout (default 30 s)
     ///
     /// A value of zero for either variable is treated as invalid and falls back to the default.
     pub fn new(
@@ -545,8 +545,8 @@ impl BuzzClient {
         auth_tag_json: Option<String>,
     ) -> Result<Self, CliError> {
         let http = reqwest::Client::builder()
-            .timeout(env_duration_secs("BUZZ_TIMEOUT_SECS", 30))
-            .connect_timeout(env_duration_secs("BUZZ_CONNECT_TIMEOUT_SECS", 15))
+            .timeout(env_duration_secs("NUXX_TIMEOUT_SECS", 30))
+            .connect_timeout(env_duration_secs("NUXX_CONNECT_TIMEOUT_SECS", 15))
             .build()
             .map_err(|e| CliError::Other(e.to_string()))?;
         Ok(Self {
@@ -988,9 +988,9 @@ impl BuzzClient {
                                     .map(str::to_string)
                             })
                             .unwrap_or(body_text);
-                        let message = if status == 403 && std::env::var("BUZZ_AUTH_TAG").is_ok() {
+                        let message = if status == 403 && std::env::var("NUXX_AUTH_TAG").is_ok() {
                             format!(
-                                "{message} (BUZZ_AUTH_TAG is set — it may be stale or revoked; try unsetting it)"
+                                "{message} (NUXX_AUTH_TAG is set — it may be stale or revoked; try unsetting it)"
                             )
                         } else {
                             message
@@ -1268,9 +1268,9 @@ impl BuzzClient {
                         .map(|s| s.to_string())
                 })
                 .unwrap_or(body);
-            if status == 403 && std::env::var("BUZZ_AUTH_TAG").is_ok() {
+            if status == 403 && std::env::var("NUXX_AUTH_TAG").is_ok() {
                 let message = format!(
-                    "{message} (BUZZ_AUTH_TAG is set — it may be stale or revoked; try unsetting it)"
+                    "{message} (NUXX_AUTH_TAG is set — it may be stale or revoked; try unsetting it)"
                 );
                 return Err(CliError::Relay {
                     status,
@@ -1287,7 +1287,7 @@ impl BuzzClient {
 }
 
 /// Normalize a relay URL: ws:// → http://, wss:// → https://, strip trailing slash.
-/// BUZZ_RELAY_URL may be ws/wss (copied from MCP config).
+/// NUXX_RELAY_URL may be ws/wss (copied from MCP config).
 pub fn normalize_relay_url(url: &str) -> String {
     url.replace("wss://", "https://")
         .replace("ws://", "http://")
@@ -1555,7 +1555,7 @@ mod retry_tests {
     #[test]
     fn env_duration_secs_parsing() {
         // All assertions share one env var key; sequential set/remove prevents races.
-        const KEY: &str = "BUZZ_CLI_TEST_DURATION_SECS";
+        const KEY: &str = "NUXX_CLI_TEST_DURATION_SECS";
 
         // Valid numeric value is parsed.
         std::env::set_var(KEY, "42");

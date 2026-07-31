@@ -344,8 +344,8 @@ pub async fn set_canvas(
 /// on the channel row: membership is its own contention domain and must not
 /// serialize against unrelated channel metadata writers (`update_channel`,
 /// `set_topic`, the TTL transition). Distinct key domain from
-/// `buzz_channel_ttl:`.
-const CHANNEL_MEMBERSHIP_LOCK_NAMESPACE: &str = "buzz_channel_membership:";
+/// `nuxx_channel_ttl:`.
+const CHANNEL_MEMBERSHIP_LOCK_NAMESPACE: &str = "nuxx_channel_membership:";
 
 /// Take the per-channel membership lock. MUST be the first statement in the
 /// transaction that then reads roles/owner counts and writes membership, so the
@@ -1238,7 +1238,7 @@ pub async fn update_channel(
         let mut tx = pool.begin().await?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
             .bind(format!(
-                "buzz_channel_ttl:{}:{}",
+                "nuxx_channel_ttl:{}:{}",
                 community_id.as_uuid(),
                 channel_id
             ))
@@ -1527,7 +1527,7 @@ mod tests {
     use crate::user::{ensure_user, set_agent_owner};
     use nostr::Keys;
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
 
     async fn setup_pool() -> PgPool {
         PgPool::connect(TEST_DB_URL)
@@ -1899,7 +1899,7 @@ mod tests {
     #[ignore = "requires Postgres"]
     async fn accessible_channel_ids_are_not_truncated_at_one_thousand() {
         let database_url =
-            std::env::var("BUZZ_TEST_DATABASE_URL").unwrap_or_else(|_| TEST_DB_URL.to_string());
+            std::env::var("NUXX_TEST_DATABASE_URL").unwrap_or_else(|_| TEST_DB_URL.to_string());
         let pool = PgPool::connect(&database_url)
             .await
             .expect("connect to test DB");

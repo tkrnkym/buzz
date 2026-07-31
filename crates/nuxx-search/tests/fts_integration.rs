@@ -1,6 +1,6 @@
 //! Integration tests for community-scoped Postgres FTS.
 //!
-//! Run with a local PG: `BUZZ_TEST_DATABASE_URL=postgres://buzz:buzz_dev@localhost:5432/buzz cargo test -p nuxx-search --tests -- --include-ignored`
+//! Run with a local PG: `NUXX_TEST_DATABASE_URL=postgres://buzz:nuxx_dev@localhost:5432/buzz cargo test -p nuxx-search --tests -- --include-ignored`
 //!
 //! Each test creates a uniquely-named schema, applies every FTS-affecting
 //! migration in order, exercises a scenario, and drops it. Tests are
@@ -17,7 +17,7 @@ use nuxx_search::{ChannelScope, SearchQuery, SearchService};
 use sqlx::{postgres::PgPoolOptions, Executor, PgPool};
 use uuid::Uuid;
 
-const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz";
+const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
 const MIGRATION_0001_SQL: &str = include_str!("../../../migrations/0001_initial_schema.sql");
 const MIGRATION_0002_SQL: &str = include_str!("../../../migrations/0002_git_repo_names.sql");
 const MIGRATION_0003_SQL: &str = include_str!("../../../migrations/0003_community_icon.sql");
@@ -30,7 +30,7 @@ const MIGRATION_0008_SQL: &str =
 const MIGRATION_0014_SQL: &str = include_str!("../../../migrations/0014_push_lease_fts.sql");
 
 async fn setup() -> (PgPool, String) {
-    let url = std::env::var("BUZZ_TEST_DATABASE_URL").unwrap_or_else(|_| TEST_DB_URL.to_string());
+    let url = std::env::var("NUXX_TEST_DATABASE_URL").unwrap_or_else(|_| TEST_DB_URL.to_string());
     let schema = format!("fts_test_{}", Uuid::new_v4().simple());
     // Connect to the default schema first to create the test schema.
     let admin_pool = PgPoolOptions::new()
@@ -89,7 +89,7 @@ async fn teardown(pool: PgPool, schema: &str) {
     let admin_pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(
-            &std::env::var("BUZZ_TEST_DATABASE_URL").unwrap_or_else(|_| TEST_DB_URL.to_string()),
+            &std::env::var("NUXX_TEST_DATABASE_URL").unwrap_or_else(|_| TEST_DB_URL.to_string()),
         )
         .await
         .expect("reconnect for drop");
@@ -274,14 +274,14 @@ async fn kind0_search_by_display_name_works_without_flattening() {
         rand_bytes32(),
         pk,
         0,
-        r#"{"display_name":"Alice Wonderland","name":"alice","nip05":"alice@buzz.app","about":"hello"}"#,
+        r#"{"display_name":"Alice Wonderland","name":"alice","nip05":"alice@nuxx.app","about":"hello"}"#,
         None,
         1700000000,
     )
     .await;
 
     let svc = SearchService::new(pool.clone());
-    for q in ["wonderland", "alice", "alice@buzz.app"] {
+    for q in ["wonderland", "alice", "alice@nuxx.app"] {
         let r = svc
             .search(&SearchQuery {
                 community: c,

@@ -140,7 +140,7 @@ async fn check_operator_replay(
 /// `RELAY_OPERATOR_PUBKEYS`, body:
 ///
 /// ```json
-/// { "host": "acme.communities.buzz.xyz", "initial_owner_pubkey": "<hex>" }
+/// { "host": "acme.communities.nuxx.xyz", "initial_owner_pubkey": "<hex>" }
 /// ```
 ///
 /// The request is authenticated against `RELAY_OPERATOR_API_ORIGIN` and does
@@ -533,7 +533,7 @@ mod tests {
         }
     }
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
     const INGRESS_HOST: &str = "operator-ingress.example";
 
     fn nip98_auth_header(keys: &Keys, url: &str, method: &str, body: Option<&[u8]>) -> String {

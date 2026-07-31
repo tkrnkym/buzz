@@ -111,7 +111,7 @@ pub(crate) async fn rebuild_shard(
     let started = std::time::Instant::now();
     let entries = redis_activity::read_shard(&state.redis_pool, tenant, shard).await?;
 
-    metrics::histogram!("buzz_activity_shard_entries").record(entries.len() as f64);
+    metrics::histogram!("nuxx_activity_shard_entries").record(entries.len() as f64);
     if entries.is_empty() {
         return Ok(());
     }
@@ -142,9 +142,9 @@ pub(crate) async fn rebuild_shard(
         rebuild_member_shards(tenant, state, shard, &restricted).await?;
     }
 
-    metrics::histogram!("buzz_activity_rebuild_duration_seconds")
+    metrics::histogram!("nuxx_activity_rebuild_duration_seconds")
         .record(started.elapsed().as_secs_f64());
-    metrics::counter!("buzz_activity_shard_rebuilds_total").increment(1);
+    metrics::counter!("nuxx_activity_shard_rebuilds_total").increment(1);
     Ok(())
 }
 
@@ -220,7 +220,7 @@ async fn rebuild_member_shards(
         }
     }
 
-    metrics::histogram!("buzz_activity_member_shard_readers").record(readers.len() as f64);
+    metrics::histogram!("nuxx_activity_member_shard_readers").record(readers.len() as f64);
 
     for (pubkey, channels) in readers {
         publish_snapshot(

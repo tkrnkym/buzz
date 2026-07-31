@@ -235,7 +235,7 @@ mod tests {
         let m = parse_manifest(json).unwrap();
         assert_eq!(m.id, "full-pack");
         assert_eq!(m.keywords, vec!["ai", "bot"]);
-        assert_eq!(m.engines.unwrap().buzz.as_deref(), Some(">=0.9.0"));
+        assert_eq!(m.engines.unwrap().nuxx.as_deref(), Some(">=0.9.0"));
         assert_eq!(m.personas.len(), 2);
         assert_eq!(m.pack_instructions.as_deref(), Some("instructions.md"));
         let d = m.defaults.unwrap();

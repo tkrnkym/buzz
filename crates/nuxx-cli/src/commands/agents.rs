@@ -151,12 +151,12 @@ pub async fn dispatch(command: AgentsCmd, client: &BuzzClient) -> Result<(), Cli
     }
 }
 
-/// Require `BUZZ_AUTH_TAG` and parse the owner pubkey from it. Used only by
+/// Require `NUXX_AUTH_TAG` and parse the owner pubkey from it. Used only by
 /// the `draft-create` and `draft-update` paths.
 fn require_owner(client: &BuzzClient) -> Result<PublicKey, CliError> {
     let hex = client
         .auth_tag_owner_hex()
-        .ok_or_else(|| CliError::Auth("agent draft requests require BUZZ_AUTH_TAG".into()))?;
+        .ok_or_else(|| CliError::Auth("agent draft requests require NUXX_AUTH_TAG".into()))?;
     PublicKey::parse(&hex).map_err(|e| CliError::Auth(format!("invalid owner attestation: {e}")))
 }
 

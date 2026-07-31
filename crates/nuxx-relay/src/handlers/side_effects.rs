@@ -1178,7 +1178,7 @@ async fn handle_agent_profile(
         .await?
     {
         metrics::counter!(
-            "buzz_users_created_total",
+            "nuxx_users_created_total",
             "community" => tenant.host().to_owned()
         )
         .increment(1);
@@ -1236,7 +1236,7 @@ async fn handle_kind0_profile(
         .await?
     {
         metrics::counter!(
-            "buzz_users_created_total",
+            "nuxx_users_created_total",
             "community" => tenant.host().to_owned()
         )
         .increment(1);
@@ -1806,7 +1806,7 @@ async fn handle_create_group(
                     )
                     .await?;
                 metrics::counter!(
-                    "buzz_channels_created_total",
+                    "nuxx_channels_created_total",
                     "community" => tenant.host().to_owned(),
                     "type" => channel_type.to_string()
                 )
@@ -1828,7 +1828,7 @@ async fn handle_create_group(
             )
             .await?;
         metrics::counter!(
-            "buzz_channels_created_total",
+            "nuxx_channels_created_total",
             "community" => tenant.host().to_owned(),
             "type" => channel_type.to_string()
         )
@@ -2899,14 +2899,14 @@ pub async fn reconcile_nip43_membership_snapshots(state: &Arc<AppState>) -> anyh
             Ok(true) => reconciled += 1,
             Ok(false) => {}
             Err(error) => {
-                metrics::counter!("buzz_nip43_membership_reconciliation_failures_total")
+                metrics::counter!("nuxx_nip43_membership_reconciliation_failures_total")
                     .increment(1);
                 warn!(%community_id, %host, %error, "NIP-43 membership reconciliation failed");
             }
         }
     }
 
-    metrics::counter!("buzz_nip43_membership_reconciliations_total").increment(reconciled as u64);
+    metrics::counter!("nuxx_nip43_membership_reconciliations_total").increment(reconciled as u64);
     Ok(reconciled)
 }
 
@@ -2925,13 +2925,13 @@ pub async fn publish_nip43_membership_list(
     state: &Arc<AppState>,
 ) -> anyhow::Result<()> {
     let started_at = std::time::Instant::now();
-    metrics::counter!("buzz_nip43_membership_publications_total", "result" => "attempted")
+    metrics::counter!("nuxx_nip43_membership_publications_total", "result" => "attempted")
         .increment(1);
     let result = publish_nip43_membership_list_inner(tenant, state).await;
-    metrics::histogram!("buzz_nip43_membership_publication_seconds")
+    metrics::histogram!("nuxx_nip43_membership_publication_seconds")
         .record(started_at.elapsed().as_secs_f64());
     metrics::counter!(
-        "buzz_nip43_membership_publications_total",
+        "nuxx_nip43_membership_publications_total",
         "result" => if result.is_ok() { "succeeded" } else { "failed" }
     )
     .increment(1);

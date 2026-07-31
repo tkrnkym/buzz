@@ -951,9 +951,9 @@ mod tests {
     fn static_keys_build_store_with_configured_region() {
         let store = GitStore::new(
             "http://localhost:9000",
-            "buzz_dev",
-            "buzz_dev_secret",
-            "buzz-git",
+            "nuxx_dev",
+            "nuxx_dev_secret",
+            "nuxx-git",
             "us-west-2",
             nuxx_media::config::S3AddressingStyle::Path,
         )
@@ -969,20 +969,20 @@ mod tests {
         for (style, expected_url, path_style) in [
             (
                 nuxx_media::config::S3AddressingStyle::Path,
-                "https://storage.example/buzz-git",
+                "https://storage.example/nuxx-git",
                 true,
             ),
             (
                 nuxx_media::config::S3AddressingStyle::Virtual,
-                "https://buzz-git.storage.example",
+                "https://nuxx-git.storage.example",
                 false,
             ),
         ] {
             let store = GitStore::new(
                 "https://storage.example",
-                "buzz_dev",
-                "buzz_dev_secret",
-                "buzz-git",
+                "nuxx_dev",
+                "nuxx_dev_secret",
+                "nuxx-git",
                 "us-east-1",
                 style,
             )
@@ -994,12 +994,12 @@ mod tests {
 
     #[test]
     fn partial_static_keys_are_rejected() {
-        for (access, secret) in [("buzz_dev", ""), ("", "buzz_dev_secret")] {
+        for (access, secret) in [("nuxx_dev", ""), ("", "nuxx_dev_secret")] {
             let err = match GitStore::new(
                 "http://localhost:9000",
                 access,
                 secret,
-                "buzz-git",
+                "nuxx-git",
                 "us-east-1",
                 nuxx_media::config::S3AddressingStyle::Path,
             ) {
@@ -1021,15 +1021,15 @@ mod probe {
     //! Empirical probe of rust-s3 + `fail-on-err` + MinIO surfacing of 412.
     //!
     //! Run manually:
-    //!   BUZZ_GIT_S3_PROBE=1 cargo test -p nuxx-relay --lib \
+    //!   NUXX_GIT_S3_PROBE=1 cargo test -p nuxx-relay --lib \
     //!     api::git::store::probe -- --nocapture --test-threads=1
     //!
-    //! Pre-req: `docker compose up minio` and the `buzz-git` bucket exists.
+    //! Pre-req: `docker compose up minio` and the `nuxx-git` bucket exists.
 
     use super::*;
 
     fn probe_enabled() -> bool {
-        std::env::var("BUZZ_GIT_S3_PROBE").as_deref() == Ok("1")
+        std::env::var("NUXX_GIT_S3_PROBE").as_deref() == Ok("1")
     }
 
     fn store() -> GitStore {
@@ -1037,16 +1037,16 @@ mod probe {
         // signing inputs are overridable for a real provider such as Railway.
         // The hydrate/CAS live tests use explicit local MinIO fixtures instead.
         let endpoint =
-            std::env::var("BUZZ_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".into());
-        let access_key = std::env::var("BUZZ_S3_ACCESS_KEY").unwrap_or_else(|_| "buzz_dev".into());
+            std::env::var("NUXX_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".into());
+        let access_key = std::env::var("NUXX_S3_ACCESS_KEY").unwrap_or_else(|_| "nuxx_dev".into());
         let secret_key =
-            std::env::var("BUZZ_S3_SECRET_KEY").unwrap_or_else(|_| "buzz_dev_secret".into());
-        let bucket = std::env::var("BUZZ_S3_BUCKET").unwrap_or_else(|_| "buzz-git".into());
-        let region = std::env::var("BUZZ_S3_REGION").unwrap_or_else(|_| "us-east-1".into());
-        let addressing_style = std::env::var("BUZZ_S3_ADDRESSING_STYLE")
+            std::env::var("NUXX_S3_SECRET_KEY").unwrap_or_else(|_| "nuxx_dev_secret".into());
+        let bucket = std::env::var("NUXX_S3_BUCKET").unwrap_or_else(|_| "nuxx-git".into());
+        let region = std::env::var("NUXX_S3_REGION").unwrap_or_else(|_| "us-east-1".into());
+        let addressing_style = std::env::var("NUXX_S3_ADDRESSING_STYLE")
             .unwrap_or_else(|_| "path".into())
             .parse()
-            .expect("BUZZ_S3_ADDRESSING_STYLE must be path or virtual");
+            .expect("NUXX_S3_ADDRESSING_STYLE must be path or virtual");
         GitStore::new(
             &endpoint,
             &access_key,
@@ -1067,7 +1067,7 @@ mod probe {
     #[tokio::test]
     async fn probe_412_surfacing() {
         if !probe_enabled() {
-            eprintln!("skipping: set BUZZ_GIT_S3_PROBE=1 to run against live MinIO");
+            eprintln!("skipping: set NUXX_GIT_S3_PROBE=1 to run against live MinIO");
             return;
         }
         let st = store();

@@ -2255,7 +2255,7 @@ fn apply_openrouter_mutations(
         }
 
         // A7: Anthropic cache_control injection for anthropic/* models. Gated on
-        // `prompt_caching` (`BUZZ_AGENT_PROMPT_CACHING`) for the same reason as
+        // `prompt_caching` (`NUXX_AGENT_PROMPT_CACHING`) for the same reason as
         // the native Anthropic route: these are Anthropic-dialect breakpoints on
         // an Anthropic model, so the documented kill switch must reach them too.
         if prompt_caching && effective_model.starts_with("anthropic/") {
@@ -5209,7 +5209,7 @@ mod tests {
         );
     }
 
-    /// `BUZZ_AGENT_PROMPT_CACHING=0` must reach the OpenRouter `anthropic/*`
+    /// `NUXX_AGENT_PROMPT_CACHING=0` must reach the OpenRouter `anthropic/*`
     /// route too, not just the native Anthropic Messages routes. The switch and
     /// this route landed in separate changes, so nothing but this test stops the
     /// gate from being dropped and the kill switch silently becoming a no-op on
@@ -5228,7 +5228,7 @@ mod tests {
         apply_openrouter_mutations(&mut body, None, "anthropic/claude-opus-4-7", false);
         assert!(
             !body.to_string().contains("cache_control"),
-            "BUZZ_AGENT_PROMPT_CACHING=0 must suppress every breakpoint: {body}"
+            "NUXX_AGENT_PROMPT_CACHING=0 must suppress every breakpoint: {body}"
         );
         // The switch is scoped to caching — the routing-contract mutations that
         // make the request serveable at all must still be applied.

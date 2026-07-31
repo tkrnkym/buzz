@@ -18,8 +18,8 @@ pub enum AppProfile {
 impl AppProfile {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::BuzzIosProduction => "buzz-ios-production",
-            Self::BuzzIosSandbox => "buzz-ios-sandbox",
+            Self::BuzzIosProduction => "nuxx-ios-production",
+            Self::BuzzIosSandbox => "nuxx-ios-sandbox",
         }
     }
 }

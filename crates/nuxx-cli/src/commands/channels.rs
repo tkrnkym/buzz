@@ -1018,7 +1018,7 @@ pub async fn cmd_set_add_policy(client: &BuzzClient, policy: &str) -> Result<(),
     // this check. Full enforcement requires relay-side validation, which is
     // intentionally out of scope for this change (see team decision: no
     // relay-side enforcement of client behavior).
-    if let Ok(allowed_raw) = std::env::var("BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES") {
+    if let Ok(allowed_raw) = std::env::var("NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES") {
         let allowed: Vec<&str> = allowed_raw
             .split(',')
             .map(str::trim)
@@ -1027,7 +1027,7 @@ pub async fn cmd_set_add_policy(client: &BuzzClient, policy: &str) -> Result<(),
         if !allowed.is_empty() && !allowed.contains(&policy) {
             return Err(CliError::Usage(format!(
                 "channel_add_policy '{policy}' is not permitted on this deployment \
-                 (BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES={allowed_raw})"
+                 (NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES={allowed_raw})"
             )));
         }
     }
@@ -1193,7 +1193,7 @@ mod tests {
     fn from_event_extracts_known_tags() {
         let ev = event(json!([
             ["d", "11111111-1111-1111-1111-111111111111"],
-            ["name", "buzz-chat-composer"],
+            ["name", "nuxx-chat-composer"],
             ["t", "stream"],
             ["public"],
             ["about", "About text"],
@@ -1202,7 +1202,7 @@ mod tests {
         ]));
         let s = ChannelSummary::from_event(&ev).expect("parse");
         assert_eq!(s.channel_id, "11111111-1111-1111-1111-111111111111");
-        assert_eq!(s.name, "buzz-chat-composer");
+        assert_eq!(s.name, "nuxx-chat-composer");
         assert_eq!(s.channel_type.as_deref(), Some("stream"));
         assert_eq!(s.visibility.as_deref(), Some("public"));
         assert!(!s.archived);
@@ -1291,7 +1291,7 @@ mod tests {
         assert!(validate_ttl_seconds(i32::MAX as i64 + 1).is_err());
     }
 
-    // --- BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES gate ---
+    // --- NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES gate ---
 
     fn check_allowed_channel_add_policy(allowed_raw: &str, policy: &str) -> Result<(), CliError> {
         let allowed: Vec<&str> = allowed_raw
@@ -1302,7 +1302,7 @@ mod tests {
         if !allowed.is_empty() && !allowed.contains(&policy) {
             return Err(CliError::Usage(format!(
                 "channel_add_policy '{policy}' is not permitted on this deployment \
-                 (BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES={allowed_raw})"
+                 (NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES={allowed_raw})"
             )));
         }
         Ok(())
@@ -1346,7 +1346,7 @@ mod tests {
     //
     // This test calls cmd_set_add_policy directly with the env var set. The function
     // returns early with an error before any network call, so no relay is needed.
-    // If the BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES check were removed from cmd_set_add_policy,
+    // If the NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES check were removed from cmd_set_add_policy,
     // this test would fail (it would proceed to sign_event and return a different error).
 
     fn make_test_client() -> BuzzClient {
@@ -1360,10 +1360,10 @@ mod tests {
 
     #[tokio::test]
     async fn set_add_policy_env_gate_rejects_disallowed_via_full_path() {
-        std::env::set_var("BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES", "owner_only,nobody");
+        std::env::set_var("NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES", "owner_only,nobody");
         let client = make_test_client();
         let result = cmd_set_add_policy(&client, "anyone").await;
-        std::env::remove_var("BUZZ_ACP_ALLOWED_CHANNEL_ADD_POLICIES");
+        std::env::remove_var("NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES");
 
         assert!(
             result.is_err(),

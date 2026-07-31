@@ -49,7 +49,7 @@ pub async fn handle_command(
     {
         Ok(true) => {
             metrics::counter!(
-                "buzz_users_created_total",
+                "nuxx_users_created_total",
                 "community" => tenant.host().to_owned()
             )
             .increment(1);
@@ -373,7 +373,7 @@ async fn handle_dm_open(
     // 5. Side effects if newly created (post-commit, best-effort)
     if was_created {
         metrics::counter!(
-            "buzz_channels_created_total",
+            "nuxx_channels_created_total",
             "community" => tenant.host().to_owned(),
             "type" => "dm"
         )
@@ -534,7 +534,7 @@ async fn handle_dm_add_member(
     // 7. Cache invalidation + notifications for new DM (post-commit, best-effort)
     if was_created {
         metrics::counter!(
-            "buzz_channels_created_total",
+            "nuxx_channels_created_total",
             "community" => tenant.host().to_owned(),
             "type" => "dm"
         )

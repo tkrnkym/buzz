@@ -576,7 +576,7 @@ fn validate_jpeg_metadata_free(bytes: &[u8]) -> Result<(), MediaError> {
 /// embeds a manifest in a single tEXt chunk — so they are exempt from the
 /// metadata ban. Exactly one snapshot chunk is permitted per file; every
 /// other textual/metadata chunk remains forbidden.
-const PNG_SNAPSHOT_KEYWORDS: [&[u8]; 2] = [b"nuxx_agent_snapshot", b"buzz_team_snapshot"];
+const PNG_SNAPSHOT_KEYWORDS: [&[u8]; 2] = [b"nuxx_agent_snapshot", b"nuxx_team_snapshot"];
 
 /// Returns true when a raw tEXt chunk payload is a Buzz snapshot manifest:
 /// the payload must start with an allowlisted keyword followed by the
@@ -1309,7 +1309,7 @@ mod tests {
         // Agent/team snapshot manifests ride in an allowlisted tEXt chunk;
         // the relay must accept exactly one such chunk per file.
         let config = test_config();
-        for keyword in [b"nuxx_agent_snapshot".as_slice(), b"buzz_team_snapshot"] {
+        for keyword in [b"nuxx_agent_snapshot".as_slice(), b"nuxx_team_snapshot"] {
             let mut payload = keyword.to_vec();
             payload.push(0);
             payload.extend_from_slice(b"eyJmb3JtYXQiOiJidXp6In0=");

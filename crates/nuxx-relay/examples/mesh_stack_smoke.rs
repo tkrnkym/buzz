@@ -1,7 +1,7 @@
 //! Tokio worker stack-size smoke — reproduces and verifies the fix for the
 //! mesh-llm model-download stack overflow (SIGABRT via stack guard).
 //!
-//! Crash report (2026-07-08, buzz-desktop 0.3.46): enabling Share compute
+//! Crash report (2026-07-08, nuxx-desktop 0.3.46): enabling Share compute
 //! aborted the app on a `tokio-rt-worker` thread inside
 //! `mesh_llm_host_runtime::models::resolve::download_model_ref_with_progress_details`
 //! — Rust's stack-overflow signal handler fired on tokio's default 2 MiB
@@ -28,7 +28,7 @@ use std::process::{Command, Stdio};
 const MODEL: &str = "jc-builds/SmolLM2-135M-Instruct-Q4_K_M-GGUF:Q4_K_M";
 
 const TOKIO_DEFAULT_STACK: usize = 2 * 1024 * 1024;
-/// Must match `buzz_lib::mesh_llm::MESH_WORKER_STACK_SIZE` (desktop crate is
+/// Must match `nuxx_lib::mesh_llm::MESH_WORKER_STACK_SIZE` (desktop crate is
 /// not a dependency of nuxx-relay, so the value is duplicated here).
 const FIXED_STACK: usize = 8 * 1024 * 1024;
 

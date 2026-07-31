@@ -1,9 +1,9 @@
-//! `buzz-test-cli` — Manual testing CLI for the Buzz relay.
+//! `nuxx-test-cli` — Manual testing CLI for the Buzz relay.
 //!
 //! # Usage
 //!
 //! ```text
-//! buzz-test-cli [OPTIONS]
+//! nuxx-test-cli [OPTIONS]
 //!
 //! Options:
 //!   --url <URL>        Relay WebSocket URL [default: ws://localhost:3000]
@@ -17,12 +17,12 @@
 //!
 //! Send a message:
 //! ```text
-//! buzz-test-cli --channel my-channel --send "Hello, Buzz!"
+//! nuxx-test-cli --channel my-channel --send "Hello, Buzz!"
 //! ```
 //!
 //! Subscribe and watch events:
 //! ```text
-//! buzz-test-cli --channel my-channel --subscribe
+//! nuxx-test-cli --channel my-channel --subscribe
 //! ```
 
 use std::time::Duration;
@@ -47,8 +47,8 @@ async fn main() {
     let channel = opts.channel.as_deref().unwrap_or("default");
     let kind = opts.kind.unwrap_or(9);
 
-    let keys = match std::env::var("BUZZ_PRIVATE_KEY") {
-        Ok(sk) => Keys::parse(&sk).expect("invalid BUZZ_PRIVATE_KEY"),
+    let keys = match std::env::var("NUXX_PRIVATE_KEY") {
+        Ok(sk) => Keys::parse(&sk).expect("invalid NUXX_PRIVATE_KEY"),
         Err(_) => Keys::generate(),
     };
     println!("Using pubkey: {}", keys.public_key());
@@ -209,10 +209,10 @@ fn parse_args(args: &[String]) -> CliOpts {
 
 fn print_help() {
     println!(
-        r#"buzz-test-cli — Manual testing CLI for the Buzz relay
+        r#"nuxx-test-cli — Manual testing CLI for the Buzz relay
 
 USAGE:
-    buzz-test-cli [OPTIONS]
+    nuxx-test-cli [OPTIONS]
 
 OPTIONS:
     --url <URL>        Relay WebSocket URL [default: ws://localhost:3000]
@@ -224,13 +224,13 @@ OPTIONS:
 
 EXAMPLES:
     # Send a message to a channel
-    buzz-test-cli --channel my-channel --send "Hello, Buzz!"
+    nuxx-test-cli --channel my-channel --send "Hello, Buzz!"
 
     # Subscribe and watch live events
-    buzz-test-cli --channel my-channel --subscribe
+    nuxx-test-cli --channel my-channel --subscribe
 
     # Use a different relay URL
-    buzz-test-cli --url ws://relay.example.com --channel test --subscribe
+    nuxx-test-cli --url ws://relay.example.com --channel test --subscribe
 "#
     );
 }

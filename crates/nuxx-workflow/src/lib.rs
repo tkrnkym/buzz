@@ -1697,9 +1697,9 @@ steps:
     // -- SEC-006: event-path regression (requires Postgres) ----------------
 
     async fn setup_db() -> nuxx_db::Db {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
-            .unwrap_or_else(|_| "postgres://buzz:buzz_dev@localhost:5432/buzz".to_owned());
+            .unwrap_or_else(|_| "postgres://buzz:nuxx_dev@localhost:5432/buzz".to_owned());
         nuxx_db::Db::new(&nuxx_db::DbConfig {
             database_url,
             ..Default::default()

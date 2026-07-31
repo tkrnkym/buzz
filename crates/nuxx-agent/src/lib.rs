@@ -21,7 +21,7 @@ pub use types::AgentError;
 #[cfg(windows)]
 pub const WINDOWS_SHELL_RESOLUTION_ENV: &[&str] = &[
     "PATH",
-    "BUZZ_SHELL",
+    "NUXX_SHELL",
     "GIT_BASH",
     "SystemRoot",
     "ProgramFiles",

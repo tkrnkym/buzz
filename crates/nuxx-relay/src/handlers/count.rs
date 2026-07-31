@@ -191,7 +191,7 @@ pub async fn handle_count(
                 {
                     Ok(stored_events) => {
                         if super::req::count_fallback_exceeded(stored_events.len()) {
-                            metrics::counter!("buzz_count_fallback_rejections_total").increment(1);
+                            metrics::counter!("nuxx_count_fallback_rejections_total").increment(1);
                             conn.send(RelayMessage::closed(
                                 &sub_id,
                                 "restricted: count filter requires narrower constraints",
@@ -264,7 +264,7 @@ pub async fn handle_count(
                 {
                     Ok(stored_events) => {
                         if super::req::count_fallback_exceeded(stored_events.len()) {
-                            metrics::counter!("buzz_count_fallback_rejections_total").increment(1);
+                            metrics::counter!("nuxx_count_fallback_rejections_total").increment(1);
                             conn.send(RelayMessage::closed(
                                 &sub_id,
                                 "restricted: count filter requires narrower constraints",

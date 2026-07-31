@@ -179,9 +179,9 @@ where
 ///
 /// This is intentionally independent from `RUST_LOG`: changing stdout log
 /// verbosity must not remove parent spans from exported traces. Set
-/// `BUZZ_OTEL_FILTER` to override the default targets.
+/// `NUXX_OTEL_FILTER` to override the default targets.
 pub fn otel_env_filter(configured: Option<&str>) -> EnvFilter {
-    EnvFilter::new(configured.unwrap_or("nuxx_relay=info,buzz_datastore=info"))
+    EnvFilter::new(configured.unwrap_or("nuxx_relay=info,nuxx_datastore=info"))
 }
 
 /// Build the OTEL [`Resource`] used by the trace provider.

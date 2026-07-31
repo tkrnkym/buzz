@@ -119,8 +119,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         // Webhook trigger (secret-authenticated, no NIP-98)
         .route("/hooks/{id}", post(api::bridge::workflow_webhook))
-        // Mesh demo echo probe — testbed-only; 404 unless BUZZ_MESH=on and
-        // BUZZ_MESH_DEMO_ECHO=on (see api::mesh_demo).
+        // Mesh demo echo probe — testbed-only; 404 unless NUXX_MESH=on and
+        // NUXX_MESH_DEMO_ECHO=on (see api::mesh_demo).
         .route("/_mesh/demo/echo", post(api::mesh_demo::demo_echo))
         // Huddle audio WebSocket route
         .route(
@@ -432,7 +432,7 @@ fn build_cors_layer(cors_origins: &[String]) -> CorsLayer {
 
     if origins.is_empty() {
         tracing::error!(
-            "BUZZ_CORS_ORIGINS set but no valid origins could be parsed — \
+            "NUXX_CORS_ORIGINS set but no valid origins could be parsed — \
              refusing to fall back to permissive CORS. Fix the origins or unset \
              the variable for development mode."
         );
@@ -508,7 +508,7 @@ mod tests {
                 |_: axum::http::Request<axum::body::Body>| async {
                     async {}
                         .instrument(tracing::info_span!(
-                            target: "buzz_datastore",
+                            target: "nuxx_datastore",
                             "SELECT",
                             otel.kind = "client",
                             db.system.name = "postgresql",

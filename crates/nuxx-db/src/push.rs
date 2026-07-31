@@ -19,7 +19,7 @@ use crate::error::Result;
 /// a concurrent event insert either sees the committed lease or strictly
 /// precedes the activation (in which case no wake was owed). Distinct key
 /// domain from the audit lock and the lease address/author locks.
-const PUSH_GATE_LOCK_NAMESPACE: &str = "buzz_push_gate:";
+const PUSH_GATE_LOCK_NAMESPACE: &str = "nuxx_push_gate:";
 
 async fn acquire_push_gate_lock(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -1267,9 +1267,9 @@ mod tests {
     use tokio::sync::Barrier;
 
     async fn setup_pool() -> PgPool {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
-            .unwrap_or_else(|_| "postgres://buzz:buzz_dev@localhost:5432/buzz".into());
+            .unwrap_or_else(|_| "postgres://buzz:nuxx_dev@localhost:5432/buzz".into());
         let pool = PgPool::connect(&database_url)
             .await
             .expect("connect to test DB");

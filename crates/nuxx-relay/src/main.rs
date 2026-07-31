@@ -26,7 +26,7 @@ use nuxx_relay::telemetry;
 use nuxx_workflow::WorkflowEngine;
 use tokio_util::sync::CancellationToken;
 
-fn buzz_auto_migrate_enabled(value: Option<&str>) -> bool {
+fn nuxx_auto_migrate_enabled(value: Option<&str>) -> bool {
     value.map(str::trim).is_some_and(|value| {
         matches!(
             value.to_ascii_lowercase().as_str(),
@@ -42,9 +42,9 @@ fn buzz_auto_migrate_enabled(value: Option<&str>) -> bool {
 /// communities would incur five-figure monthly costs if every community always
 /// gets a full set of series.  This knob is the cost lever.
 ///
-/// Fleet-wide totals (`buzz_total_*`) always emit regardless of mode.
+/// Fleet-wide totals (`nuxx_total_*`) always emit regardless of mode.
 ///
-/// Set via `BUZZ_USAGE_METRICS_PER_COMMUNITY`:
+/// Set via `NUXX_USAGE_METRICS_PER_COMMUNITY`:
 ///   - `all` — emit per-community series for every community (default)
 ///   - `off` — suppress all per-community series; fleet totals only
 ///
@@ -59,7 +59,7 @@ enum EmissionScope {
 
 impl EmissionScope {
     fn from_env() -> Self {
-        let raw = std::env::var("BUZZ_USAGE_METRICS_PER_COMMUNITY")
+        let raw = std::env::var("NUXX_USAGE_METRICS_PER_COMMUNITY")
             .unwrap_or_default()
             .trim()
             .to_ascii_lowercase();
@@ -69,7 +69,7 @@ impl EmissionScope {
             other => {
                 warn!(
                     value = other,
-                    "BUZZ_USAGE_METRICS_PER_COMMUNITY: unknown value — defaulting to all"
+                    "NUXX_USAGE_METRICS_PER_COMMUNITY: unknown value — defaulting to all"
                 );
                 EmissionScope::All
             }
@@ -85,6 +85,11 @@ const USAGE_METRICS_LOCK_KEY: i64 = 0x4255_5A5A_4D45_5452;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Before anything reads configuration: accept the pre-rename `BUZZ_*`
+    // variables so an existing deployment's manifests keep working across the
+    // rollout. Warned about once, with the list, rather than per read.
+    let legacy_env = nuxx_core::env_compat::promote_legacy_env();
+
     // Install the ring CryptoProvider for rustls. Required before any rustls
     // TLS connection (rediss:// to ElastiCache, wss://, S3 over TLS): both
     // aws-lc-rs and ring are compiled in transitively, so rustls can't
@@ -126,11 +131,20 @@ async fn main() -> anyhow::Result<()> {
         )
         .with(otel_layer.map(|layer| {
             layer.with_filter(telemetry::otel_env_filter(
-                std::env::var("BUZZ_OTEL_FILTER").ok().as_deref(),
+                std::env::var("NUXX_OTEL_FILTER").ok().as_deref(),
             ))
         }))
         .with(trace_context_lookup_layer)
         .init();
+
+    if !legacy_env.is_empty() {
+        tracing::warn!(
+            count = legacy_env.len(),
+            variables = %legacy_env.join(", "),
+            "using pre-rename BUZZ_* environment variables; rename them to NUXX_* \
+             (the NUXX_* name wins where both are set)"
+        );
+    }
 
     // Log any exporter-build failure now that the subscriber is installed.
     if let telemetry::TracerInit::ExporterBuildFailed(ref e) = tracer_init {
@@ -186,7 +200,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let auto_migrate =
-        buzz_auto_migrate_enabled(std::env::var("BUZZ_AUTO_MIGRATE").ok().as_deref());
+        nuxx_auto_migrate_enabled(std::env::var("NUXX_AUTO_MIGRATE").ok().as_deref());
     if auto_migrate {
         db.migrate().await.map_err(|e| {
             error!("Failed to run database migrations: {e}");
@@ -194,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
         })?;
         info!("Database migrations complete");
     } else {
-        info!("Skipping database migrations because BUZZ_AUTO_MIGRATE is not enabled");
+        info!("Skipping database migrations because NUXX_AUTO_MIGRATE is not enabled");
     }
 
     if let Err(e) = db.ensure_future_partitions(3).await {
@@ -206,7 +220,7 @@ async fn main() -> anyhow::Result<()> {
     // the migration decision: spawn_fence_probe first verifies the
     // commit-time floor guard (catalog shape + observed behavior through the
     // armed pool) against the live schema, so a relay running with
-    // BUZZ_AUTO_MIGRATE off and migration 0021 unapplied can never open the
+    // NUXX_AUTO_MIGRATE off and migration 0021 unapplied can never open the
     // fence over an unenforced floor. Verification failure is loud but
     // non-fatal: the fence stays closed and every cursor page routes to the
     // writer.
@@ -227,11 +241,11 @@ async fn main() -> anyhow::Result<()> {
     // that no one can administer.
     if config.require_relay_membership && config.relay_owner_pubkey.is_none() {
         error!(
-            "BUZZ_REQUIRE_RELAY_MEMBERSHIP=true but RELAY_OWNER_PUBKEY is not set or invalid. \
+            "NUXX_REQUIRE_RELAY_MEMBERSHIP=true but RELAY_OWNER_PUBKEY is not set or invalid. \
              Set RELAY_OWNER_PUBKEY to a valid 64-char hex pubkey."
         );
         return Err(anyhow::anyhow!(
-            "RELAY_OWNER_PUBKEY required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true"
+            "RELAY_OWNER_PUBKEY required when NUXX_REQUIRE_RELAY_MEMBERSHIP=true"
         ));
     }
 
@@ -240,7 +254,7 @@ async fn main() -> anyhow::Result<()> {
     // or bootstrapping if we'll reject the config anyway.
     if config.require_relay_membership && config.relay_private_key.is_none() {
         return Err(anyhow::anyhow!(
-            "BUZZ_RELAY_PRIVATE_KEY is required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true. \
+            "NUXX_RELAY_PRIVATE_KEY is required when NUXX_REQUIRE_RELAY_MEMBERSHIP=true. \
              NIP-43 events signed with an ephemeral key become unverifiable after restart."
         ));
     }
@@ -261,7 +275,7 @@ async fn main() -> anyhow::Result<()> {
         if host.is_empty() {
             if config.require_relay_membership {
                 return Err(anyhow::anyhow!(
-                    "Cannot derive a community host from BUZZ_RELAY_URL ({:?}); a resolvable host is required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true",
+                    "Cannot derive a community host from NUXX_RELAY_URL ({:?}); a resolvable host is required when NUXX_REQUIRE_RELAY_MEMBERSHIP=true",
                     config.relay_url
                 ));
             }
@@ -280,7 +294,7 @@ async fn main() -> anyhow::Result<()> {
                     if config.require_relay_membership {
                         error!("Fatal: failed to ensure deployment community with membership enforcement enabled: {e}");
                         return Err(anyhow::anyhow!(
-                            "Failed to ensure deployment community (required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true): {e}"
+                            "Failed to ensure deployment community (required when NUXX_REQUIRE_RELAY_MEMBERSHIP=true): {e}"
                         ));
                     }
                     error!("Failed to ensure deployment community (non-fatal, membership not required): {e}");
@@ -304,7 +318,7 @@ async fn main() -> anyhow::Result<()> {
                         "Fatal: failed to backfill allowlist with membership enforcement enabled: {e}"
                     );
                     return Err(anyhow::anyhow!(
-                        "Failed to backfill pubkey_allowlist (required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true): {e}"
+                        "Failed to backfill pubkey_allowlist (required when NUXX_REQUIRE_RELAY_MEMBERSHIP=true): {e}"
                     ));
                 } else {
                     error!("Failed to backfill pubkey_allowlist (non-fatal): {e}");
@@ -327,7 +341,7 @@ async fn main() -> anyhow::Result<()> {
                     // in a broken state.
                     error!("Fatal: failed to bootstrap relay owner with membership enforcement enabled: {e}");
                     return Err(anyhow::anyhow!(
-                        "Failed to bootstrap relay owner (required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true): {e}"
+                        "Failed to bootstrap relay owner (required when NUXX_REQUIRE_RELAY_MEMBERSHIP=true): {e}"
                     ));
                 } else {
                     error!(
@@ -356,7 +370,7 @@ async fn main() -> anyhow::Result<()> {
         info!("Audit service ready");
         Some(AuditService::new(audit_pool))
     } else {
-        info!("Audit logging disabled by BUZZ_AUDIT_ENABLED");
+        info!("Audit logging disabled by NUXX_AUDIT_ENABLED");
         None
     };
 
@@ -418,7 +432,7 @@ async fn main() -> anyhow::Result<()> {
 
     let relay_keypair = if let Some(hex) = &config.relay_private_key {
         nostr::Keys::parse(hex)
-            .map_err(|e| anyhow::anyhow!("invalid BUZZ_RELAY_PRIVATE_KEY: {e}"))?
+            .map_err(|e| anyhow::anyhow!("invalid NUXX_RELAY_PRIVATE_KEY: {e}"))?
     } else if !config.require_auth_token {
         // Dev mode: use a deterministic keypair so addressable events (kind:39000/39001/39002)
         // replace correctly across restarts. Without this, each restart generates a new pubkey
@@ -428,13 +442,13 @@ async fn main() -> anyhow::Result<()> {
         let keys = nostr::Keys::parse(DEV_RELAY_PRIVKEY).expect("hardcoded dev key is valid");
         tracing::warn!(
             pubkey = %keys.public_key().to_hex(),
-            "Using hardcoded dev relay keypair (BUZZ_REQUIRE_AUTH_TOKEN=false). \
-             Set BUZZ_RELAY_PRIVATE_KEY for production."
+            "Using hardcoded dev relay keypair (NUXX_REQUIRE_AUTH_TOKEN=false). \
+             Set NUXX_RELAY_PRIVATE_KEY for production."
         );
         keys
     } else {
         panic!(
-            "BUZZ_RELAY_PRIVATE_KEY must be set when BUZZ_REQUIRE_AUTH_TOKEN=true. \
+            "NUXX_RELAY_PRIVATE_KEY must be set when NUXX_REQUIRE_AUTH_TOKEN=true. \
              A stable relay identity is required for production."
         );
     };
@@ -461,7 +475,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let state = Arc::new(app_state);
 
-    // Inter-relay mesh (BUZZ_MESH seam). `boot_mesh` returns None when the
+    // Inter-relay mesh (NUXX_MESH seam). `boot_mesh` returns None when the
     // kill switch is off — nothing is bound, published, or spawned, so the
     // relay behaves byte-identically to a build without the mesh. When
     // enabled, a misconfigured mesh is fatal here (bind/Redis failure): an
@@ -477,7 +491,7 @@ async fn main() -> anyhow::Result<()> {
         let runtime_id = handle.local_runtime_id;
         // Register the per-profile inbound consumers (huddle datagram fan-in,
         // HuddleControl accept loop, reliable-stream accept + optional
-        // BUZZ_MESH_DEMO_ECHO) before peers can route traffic here.
+        // NUXX_MESH_DEMO_ECHO) before peers can route traffic here.
         handle.wire_consumers(
             Arc::clone(&state.audio_rooms),
             state.config.mesh_demo_echo,
@@ -493,15 +507,15 @@ async fn main() -> anyhow::Result<()> {
     // linearizable conditional-write axiom (A3) before serving git traffic.
     // Failure is fatal: a backend that cannot satisfy pointer CAS invalidates
     // the manifest-pointer protocol. This is a deployment gate, not a proof.
-    if std::env::var("BUZZ_GIT_CONFORMANCE_PROBE")
+    if std::env::var("NUXX_GIT_CONFORMANCE_PROBE")
         .map(|v| v != "false")
         .unwrap_or(true)
     {
-        let race_width = std::env::var("BUZZ_GIT_PROBE_WRITERS")
+        let race_width = std::env::var("NUXX_GIT_PROBE_WRITERS")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(32);
-        let race_rounds = std::env::var("BUZZ_GIT_PROBE_ROUNDS")
+        let race_rounds = std::env::var("NUXX_GIT_PROBE_ROUNDS")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(3);
@@ -541,7 +555,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         let reconcile_state = Arc::clone(&state);
-        let interval_secs = std::env::var("BUZZ_NIP43_RECONCILE_INTERVAL_SECS")
+        let interval_secs = std::env::var("NUXX_NIP43_RECONCILE_INTERVAL_SECS")
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(60)
@@ -571,9 +585,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Emit kind:39000/39002 discovery events for channels that exist in the DB
     // but don't have corresponding events (e.g. seeded via direct SQL inserts).
-    // Only runs when BUZZ_RECONCILE_CHANNELS=true (dev/CI environments).
+    // Only runs when NUXX_RECONCILE_CHANNELS=true (dev/CI environments).
     // Production relays create channels through the event pipeline and don't need this.
-    if std::env::var("BUZZ_RECONCILE_CHANNELS").is_ok() {
+    if std::env::var("NUXX_RECONCILE_CHANNELS").is_ok() {
         let reconcile_state = Arc::clone(&state);
         tokio::spawn(async move {
             // Resolve the deployment's community from the configured relay URL
@@ -633,7 +647,7 @@ async fn main() -> anyhow::Result<()> {
     // together with the workflow engine in a future multi-pod coordination pass.
     {
         let reaper_state = Arc::clone(&state);
-        let reaper_interval_secs: u64 = std::env::var("BUZZ_REAPER_INTERVAL_SECS")
+        let reaper_interval_secs: u64 = std::env::var("NUXX_REAPER_INTERVAL_SECS")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(60);
@@ -858,7 +872,7 @@ async fn main() -> anyhow::Result<()> {
                         .await;
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        metrics::counter!("buzz_multinode_fanout_lag_total").increment(n);
+                        metrics::counter!("nuxx_multinode_fanout_lag_total").increment(n);
                         tracing::warn!("Multi-node fan-out lagged by {n} messages");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -889,7 +903,7 @@ async fn main() -> anyhow::Result<()> {
                             .apply_cache_invalidation(scoped.community_id, scoped.invalidation);
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        metrics::counter!("buzz_cache_invalidation_lag_total").increment(n);
+                        metrics::counter!("nuxx_cache_invalidation_lag_total").increment(n);
                         tracing::warn!("Cache-invalidation consumer lagged by {n} messages");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -906,7 +920,7 @@ async fn main() -> anyhow::Result<()> {
     // so missed archive commands still converge without a global DB scan.
     {
         let lifecycle_state = Arc::clone(&state);
-        let interval_secs = std::env::var("BUZZ_COMMUNITY_REVALIDATE_INTERVAL_SECS")
+        let interval_secs = std::env::var("NUXX_COMMUNITY_REVALIDATE_INTERVAL_SECS")
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(30)
@@ -951,7 +965,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     },
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        metrics::counter!("buzz_conn_control_lag_total").increment(n);
+                        metrics::counter!("nuxx_conn_control_lag_total").increment(n);
                         tracing::warn!("Connection-control consumer lagged by {n} messages");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -969,7 +983,7 @@ async fn main() -> anyhow::Result<()> {
     // Pool metrics: periodic background task polling DB + Redis pool stats.
     {
         let pool_state = Arc::clone(&state);
-        let interval_secs = std::env::var("BUZZ_POOL_METRICS_INTERVAL_SECS")
+        let interval_secs = std::env::var("NUXX_POOL_METRICS_INTERVAL_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(10)
@@ -1014,10 +1028,10 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 let rs = pool_state.redis_pool.status();
-                metrics::gauge!("buzz_redis_pool_available").set(rs.available as f64);
-                metrics::gauge!("buzz_redis_pool_size").set(rs.size as f64);
-                metrics::gauge!("buzz_redis_pool_max").set(rs.max_size as f64);
-                metrics::gauge!("buzz_redis_pool_waiting").set(rs.waiting as f64);
+                metrics::gauge!("nuxx_redis_pool_available").set(rs.available as f64);
+                metrics::gauge!("nuxx_redis_pool_size").set(rs.size as f64);
+                metrics::gauge!("nuxx_redis_pool_max").set(rs.max_size as f64);
+                metrics::gauge!("nuxx_redis_pool_waiting").set(rs.waiting as f64);
             }
         });
     }
@@ -1064,7 +1078,7 @@ async fn main() -> anyhow::Result<()> {
                 {
                     error!(error = %e, "Usage metrics tick failed — skipping");
                 }
-                metrics::gauge!("buzz_usage_poller_is_leader").set(if leader.is_some() {
+                metrics::gauge!("nuxx_usage_poller_is_leader").set(if leader.is_some() {
                     1.0
                 } else {
                     0.0
@@ -1103,29 +1117,29 @@ mod env_filter_tests {
     fn unset_enables_datastore_only_for_otel_filter() {
         let logs = tracing_subscriber::registry().with(log_env_filter(None));
         tracing::subscriber::with_default(logs, || {
-            assert!(!tracing::enabled!(target: "buzz_datastore", tracing::Level::INFO));
+            assert!(!tracing::enabled!(target: "nuxx_datastore", tracing::Level::INFO));
             assert!(tracing::enabled!(target: "nuxx_relay", tracing::Level::INFO));
         });
 
         let otel = tracing_subscriber::registry().with(otel_env_filter(None));
         tracing::subscriber::with_default(otel, || {
-            assert!(tracing::enabled!(target: "buzz_datastore", tracing::Level::INFO));
+            assert!(tracing::enabled!(target: "nuxx_datastore", tracing::Level::INFO));
         });
     }
 
     #[test]
     fn explicit_datastore_off_is_preserved_alone() {
         assert_eq!(
-            otel_env_filter(Some("buzz_datastore=off")).to_string(),
-            "buzz_datastore=off"
+            otel_env_filter(Some("nuxx_datastore=off")).to_string(),
+            "nuxx_datastore=off"
         );
     }
 
     #[test]
     fn explicit_datastore_debug_is_preserved_alone() {
         assert_eq!(
-            otel_env_filter(Some("buzz_datastore=debug")).to_string(),
-            "buzz_datastore=debug"
+            otel_env_filter(Some("nuxx_datastore=debug")).to_string(),
+            "nuxx_datastore=debug"
         );
     }
 
@@ -1179,8 +1193,8 @@ async fn run_periodic_until_cancelled<Tick, TickFuture>(
 ///
 /// ```text
 /// ┌─────────────────────────────────────────────────────────┐
-/// │  Listener 1: TCP BUZZ_BIND_ADDR:3000  (app router)   │
-/// │  Listener 2: UDS BUZZ_UDS_PATH        (app, optional)│
+/// │  Listener 1: TCP NUXX_BIND_ADDR:3000  (app router)   │
+/// │  Listener 2: UDS NUXX_UDS_PATH        (app, optional)│
 /// │  Listener 3: TCP 0.0.0.0:8080           (health only)  │
 /// │  Listener 4: TCP 0.0.0.0:9102           (metrics, via  │
 /// │              PrometheusBuilder — already bound)         │
@@ -1246,7 +1260,7 @@ async fn serve(
             }
             Ok(_) => {
                 return Err(anyhow::anyhow!(
-                    "BUZZ_UDS_PATH {uds_path} exists but is not a socket"
+                    "NUXX_UDS_PATH {uds_path} exists but is not a socket"
                 ));
             }
             Err(_) => {}
@@ -1283,7 +1297,7 @@ async fn serve(
 
     #[cfg(not(unix))]
     if config.uds_path.is_some() {
-        tracing::warn!("BUZZ_UDS_PATH set but UDS not supported on this platform");
+        tracing::warn!("NUXX_UDS_PATH set but UDS not supported on this platform");
     }
 
     // TCP-only path.
@@ -1334,7 +1348,7 @@ fn reminder_to_event(reminder: &nuxx_db::event::DueReminder) -> nostr::Event {
 
 /// Return the usage poll interval, with a floor that prevents a busy loop.
 fn usage_metrics_interval_secs() -> u64 {
-    std::env::var("BUZZ_USAGE_METRICS_INTERVAL_SECS")
+    std::env::var("NUXX_USAGE_METRICS_INTERVAL_SECS")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(300)
@@ -1343,7 +1357,7 @@ fn usage_metrics_interval_secs() -> u64 {
 
 /// Return a gauge lifetime that always outlives several usage-poller ticks.
 fn usage_metrics_idle_timeout_secs(interval_secs: u64) -> u64 {
-    let configured = std::env::var("BUZZ_USAGE_METRICS_IDLE_TIMEOUT_SECS")
+    let configured = std::env::var("NUXX_USAGE_METRICS_IDLE_TIMEOUT_SECS")
         .ok()
         .and_then(|value| value.parse().ok());
     idle_timeout_secs(configured, interval_secs)
@@ -1366,15 +1380,15 @@ impl InMemoryMetricKey {
     fn set(&self, value: f64) {
         match self {
             Self::WsConnections(community) => {
-                metrics::gauge!("buzz_community_ws_connections", "community" => community.clone())
+                metrics::gauge!("nuxx_community_ws_connections", "community" => community.clone())
                     .set(value);
             }
             Self::UsersOnline(community) => {
-                metrics::gauge!("buzz_community_users_online_pod", "community" => community.clone())
+                metrics::gauge!("nuxx_community_users_online_pod", "community" => community.clone())
                     .set(value);
             }
             Self::Subscriptions(community) => {
-                metrics::gauge!("buzz_community_subscriptions", "community" => community.clone())
+                metrics::gauge!("nuxx_community_subscriptions", "community" => community.clone())
                     .set(value);
             }
         }
@@ -1389,8 +1403,8 @@ impl InMemoryMetricKey {
 /// that generation, so this retains a steady gauge without a snapshot `set()`
 /// racing the lifecycle-relative increments and decrements.
 fn refresh_legacy_active_gauge_recency() {
-    metrics::gauge!("buzz_ws_connections_active").increment(0.0);
-    metrics::gauge!("buzz_subscriptions_active").increment(0.0);
+    metrics::gauge!("nuxx_ws_connections_active").increment(0.0);
+    metrics::gauge!("nuxx_subscriptions_active").increment(0.0);
 }
 
 /// Emit pod-local gauges and zero only label keys that disappeared since the
@@ -1408,9 +1422,9 @@ fn emit_in_memory_usage_metrics(
     let total_connections = connections.values().sum::<u64>();
     let total_subscriptions = subscriptions.values().sum::<u64>();
 
-    metrics::gauge!("buzz_total_ws_connections").set(total_connections as f64);
-    metrics::gauge!("buzz_total_users_online_pod").set(users_online.values().sum::<u64>() as f64);
-    metrics::gauge!("buzz_total_subscriptions").set(total_subscriptions as f64);
+    metrics::gauge!("nuxx_total_ws_connections").set(total_connections as f64);
+    metrics::gauge!("nuxx_total_users_online_pod").set(users_online.values().sum::<u64>() as f64);
+    metrics::gauge!("nuxx_total_subscriptions").set(total_subscriptions as f64);
     refresh_legacy_active_gauge_recency();
 
     let Some(host_map) = host_map else {
@@ -1599,7 +1613,7 @@ async fn emit_db_usage_metrics(
     // --- Determine which community IDs receive per-community series (K1) ---
     //
     // `active_set` is the subset of host_map IDs that get per-community gauges
-    // this tick. Fleet-wide totals (buzz_total_*) always emit regardless.
+    // this tick. Fleet-wide totals (nuxx_total_*) always emit regardless.
     let active_set: HashSet<Uuid> = host_map
         .keys()
         .filter(|id| emission_scope.allows(id))
@@ -1610,10 +1624,10 @@ async fn emit_db_usage_metrics(
 
     // --- A. Adoption stocks (DB-polled) ---
 
-    // buzz_communities_total (no tag — fleet-wide count)
-    metrics::gauge!("buzz_communities_total").set(community_total as f64);
+    // nuxx_communities_total (no tag — fleet-wide count)
+    metrics::gauge!("nuxx_communities_total").set(community_total as f64);
 
-    // buzz_community_users{community, type:human|agent}
+    // nuxx_community_users{community, type:human|agent}
     // Emit from host_map so communities that have zero users still get a 0
     // rather than keeping the last nonzero value until process restart.
     {
@@ -1622,22 +1636,22 @@ async fn emit_db_usage_metrics(
         let (total_human, total_agent): (i64, i64) = rows
             .values()
             .fold((0, 0), |(h, a), r| (h + r.human, a + r.agent));
-        metrics::gauge!("buzz_total_users", "type" => "human").set(total_human as f64);
-        metrics::gauge!("buzz_total_users", "type" => "agent").set(total_agent as f64);
+        metrics::gauge!("nuxx_total_users", "type" => "human").set(total_human as f64);
+        metrics::gauge!("nuxx_total_users", "type" => "agent").set(total_agent as f64);
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
             if !active_set.contains(&id) {
                 continue;
             }
             let (human, agent) = rows.get(&id).map(|r| (r.human, r.agent)).unwrap_or((0, 0));
-            metrics::gauge!("buzz_community_users", "community" => community.clone(), "type" => "human")
+            metrics::gauge!("nuxx_community_users", "community" => community.clone(), "type" => "human")
                 .set(human as f64);
-            metrics::gauge!("buzz_community_users", "community" => community.clone(), "type" => "agent")
+            metrics::gauge!("nuxx_community_users", "community" => community.clone(), "type" => "agent")
                 .set(agent as f64);
         }
     }
 
-    // buzz_community_channels{community, type}
+    // nuxx_community_channels{community, type}
     // Zero-fill across all (community, channel_type) pairs so a type that
     // drops to zero emits 0 rather than retaining its last nonzero value.
     {
@@ -1664,7 +1678,7 @@ async fn emit_db_usage_metrics(
                 .keys()
                 .map(|id| rows.get(&(*id, ct)).copied().unwrap_or(0))
                 .sum();
-            metrics::gauge!("buzz_total_channels", "type" => ct).set(total as f64);
+            metrics::gauge!("nuxx_total_channels", "type" => ct).set(total as f64);
         }
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
@@ -1674,7 +1688,7 @@ async fn emit_db_usage_metrics(
             for &ct in CHANNEL_TYPES {
                 let count = rows.get(&(id, ct)).copied().unwrap_or(0);
                 metrics::gauge!(
-                    "buzz_community_channels",
+                    "nuxx_community_channels",
                     "community" => community.clone(),
                     "type" => ct
                 )
@@ -1683,7 +1697,7 @@ async fn emit_db_usage_metrics(
         }
     }
 
-    // buzz_community_messages{community}
+    // nuxx_community_messages{community}
     // Emit 0 for communities with no messages so dashboards don't stale-read.
     {
         let rows: HashMap<Uuid, i64> = message_rows
@@ -1692,19 +1706,19 @@ async fn emit_db_usage_metrics(
             .collect();
         // Fleet total (always emitted).
         let total: i64 = rows.values().sum();
-        metrics::gauge!("buzz_total_messages").set(total as f64);
+        metrics::gauge!("nuxx_total_messages").set(total as f64);
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
             if !active_set.contains(&id) {
                 continue;
             }
             let count = rows.get(&id).copied().unwrap_or(0);
-            metrics::gauge!("buzz_community_messages", "community" => community.clone())
+            metrics::gauge!("nuxx_community_messages", "community" => community.clone())
                 .set(count as f64);
         }
     }
 
-    // buzz_community_relay_members{community, role}
+    // nuxx_community_relay_members{community, role}
     // Zero-fill across all (community, role) pairs; relay_members.role is a
     // CHECK constraint over {'owner', 'admin', 'member'}.
     {
@@ -1731,7 +1745,7 @@ async fn emit_db_usage_metrics(
                 .keys()
                 .map(|id| rows.get(&(*id, role)).copied().unwrap_or(0))
                 .sum();
-            metrics::gauge!("buzz_total_relay_members", "role" => role).set(total as f64);
+            metrics::gauge!("nuxx_total_relay_members", "role" => role).set(total as f64);
         }
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
@@ -1741,7 +1755,7 @@ async fn emit_db_usage_metrics(
             for &role in RELAY_ROLES {
                 let count = rows.get(&(id, role)).copied().unwrap_or(0);
                 metrics::gauge!(
-                    "buzz_community_relay_members",
+                    "nuxx_community_relay_members",
                     "community" => community.clone(),
                     "role" => role
                 )
@@ -1750,7 +1764,7 @@ async fn emit_db_usage_metrics(
         }
     }
 
-    // buzz_community_workflows{community, status}
+    // nuxx_community_workflows{community, status}
     // Zero-fill across all (community, status) pairs; workflow_status is a
     // DB enum: {'active', 'disabled', 'archived'}.
     {
@@ -1777,7 +1791,7 @@ async fn emit_db_usage_metrics(
                 .keys()
                 .map(|id| rows.get(&(*id, status)).copied().unwrap_or(0))
                 .sum();
-            metrics::gauge!("buzz_total_workflows", "status" => status).set(total as f64);
+            metrics::gauge!("nuxx_total_workflows", "status" => status).set(total as f64);
         }
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
@@ -1787,7 +1801,7 @@ async fn emit_db_usage_metrics(
             for &status in WORKFLOW_STATUSES {
                 let count = rows.get(&(id, status)).copied().unwrap_or(0);
                 metrics::gauge!(
-                    "buzz_community_workflows",
+                    "nuxx_community_workflows",
                     "community" => community.clone(),
                     "status" => status
                 )
@@ -1796,7 +1810,7 @@ async fn emit_db_usage_metrics(
         }
     }
 
-    // buzz_community_git_repos{community}
+    // nuxx_community_git_repos{community}
     // Emit 0 for communities with no repos.
     {
         let rows: HashMap<Uuid, i64> = git_repo_rows
@@ -1805,14 +1819,14 @@ async fn emit_db_usage_metrics(
             .collect();
         // Fleet total (always emitted).
         let total: i64 = rows.values().sum();
-        metrics::gauge!("buzz_total_git_repos").set(total as f64);
+        metrics::gauge!("nuxx_total_git_repos").set(total as f64);
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
             if !active_set.contains(&id) {
                 continue;
             }
             let count = rows.get(&id).copied().unwrap_or(0);
-            metrics::gauge!("buzz_community_git_repos", "community" => community.clone())
+            metrics::gauge!("nuxx_community_git_repos", "community" => community.clone())
                 .set(count as f64);
         }
     }
@@ -1833,11 +1847,11 @@ async fn emit_db_usage_metrics(
             rows.values().fold((0, 0, 0), |(h, a, u), r| {
                 (h + r.human, a + r.agent, u + r.unknown)
             });
-        metrics::gauge!("buzz_total_active_users", "window" => label, "type" => "human")
+        metrics::gauge!("nuxx_total_active_users", "window" => label, "type" => "human")
             .set(total_human as f64);
-        metrics::gauge!("buzz_total_active_users", "window" => label, "type" => "agent")
+        metrics::gauge!("nuxx_total_active_users", "window" => label, "type" => "agent")
             .set(total_agent as f64);
-        metrics::gauge!("buzz_total_active_users", "window" => label, "type" => "unknown")
+        metrics::gauge!("nuxx_total_active_users", "window" => label, "type" => "unknown")
             .set(total_unknown as f64);
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
@@ -1849,21 +1863,21 @@ async fn emit_db_usage_metrics(
                 .map(|r| (r.human, r.agent, r.unknown))
                 .unwrap_or((0, 0, 0));
             metrics::gauge!(
-                "buzz_community_active_users",
+                "nuxx_community_active_users",
                 "community" => community.clone(),
                 "window" => label,
                 "type" => "human"
             )
             .set(human as f64);
             metrics::gauge!(
-                "buzz_community_active_users",
+                "nuxx_community_active_users",
                 "community" => community.clone(),
                 "window" => label,
                 "type" => "agent"
             )
             .set(agent as f64);
             metrics::gauge!(
-                "buzz_community_active_users",
+                "nuxx_community_active_users",
                 "community" => community.clone(),
                 "window" => label,
                 "type" => "unknown"
@@ -1879,7 +1893,7 @@ async fn emit_db_usage_metrics(
             .collect();
         // Fleet total (always emitted).
         let total: i64 = rows.values().sum();
-        metrics::gauge!("buzz_total_active_channels", "window" => label).set(total as f64);
+        metrics::gauge!("nuxx_total_active_channels", "window" => label).set(total as f64);
         // Per-community series (gated by active_set).
         for (&id, community) in host_map {
             if !active_set.contains(&id) {
@@ -1887,7 +1901,7 @@ async fn emit_db_usage_metrics(
             }
             let count = rows.get(&id).copied().unwrap_or(0);
             metrics::gauge!(
-                "buzz_community_active_channels",
+                "nuxx_community_active_channels",
                 "community" => community.clone(),
                 "window" => label
             )
@@ -1908,7 +1922,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        buzz_auto_migrate_enabled, dropped_in_memory_keys, idle_timeout_secs,
+        dropped_in_memory_keys, idle_timeout_secs, nuxx_auto_migrate_enabled,
         refresh_legacy_active_gauge_recency, run_periodic_until_cancelled, EmissionScope,
         InMemoryMetricKey,
     };
@@ -1944,18 +1958,18 @@ mod tests {
     }
 
     #[test]
-    fn buzz_auto_migrate_is_opt_in() {
-        assert!(!buzz_auto_migrate_enabled(None));
-        assert!(!buzz_auto_migrate_enabled(Some("")));
-        assert!(!buzz_auto_migrate_enabled(Some("false")));
-        assert!(!buzz_auto_migrate_enabled(Some("0")));
-        assert!(!buzz_auto_migrate_enabled(Some("no")));
+    fn nuxx_auto_migrate_is_opt_in() {
+        assert!(!nuxx_auto_migrate_enabled(None));
+        assert!(!nuxx_auto_migrate_enabled(Some("")));
+        assert!(!nuxx_auto_migrate_enabled(Some("false")));
+        assert!(!nuxx_auto_migrate_enabled(Some("0")));
+        assert!(!nuxx_auto_migrate_enabled(Some("no")));
 
-        assert!(buzz_auto_migrate_enabled(Some("true")));
-        assert!(buzz_auto_migrate_enabled(Some("TRUE")));
-        assert!(buzz_auto_migrate_enabled(Some(" 1 ")));
-        assert!(buzz_auto_migrate_enabled(Some("yes")));
-        assert!(buzz_auto_migrate_enabled(Some("on")));
+        assert!(nuxx_auto_migrate_enabled(Some("true")));
+        assert!(nuxx_auto_migrate_enabled(Some("TRUE")));
+        assert!(nuxx_auto_migrate_enabled(Some(" 1 ")));
+        assert!(nuxx_auto_migrate_enabled(Some("yes")));
+        assert!(nuxx_auto_migrate_enabled(Some("on")));
     }
 
     #[test]
@@ -1986,8 +2000,8 @@ mod tests {
         let snapshotter = recorder.snapshotter();
 
         metrics::with_local_recorder(&recorder, || {
-            let connections = metrics::gauge!("buzz_ws_connections_active");
-            let subscriptions = metrics::gauge!("buzz_subscriptions_active");
+            let connections = metrics::gauge!("nuxx_ws_connections_active");
+            let subscriptions = metrics::gauge!("nuxx_subscriptions_active");
             connections.increment(1.0);
             subscriptions.increment(1.0);
 
@@ -2009,8 +2023,8 @@ mod tests {
             })
             .collect::<std::collections::HashMap<_, _>>();
 
-        assert_eq!(values.get("buzz_ws_connections_active"), Some(&0.0));
-        assert_eq!(values.get("buzz_subscriptions_active"), Some(&2.0));
+        assert_eq!(values.get("nuxx_ws_connections_active"), Some(&0.0));
+        assert_eq!(values.get("nuxx_subscriptions_active"), Some(&2.0));
     }
 
     #[test]

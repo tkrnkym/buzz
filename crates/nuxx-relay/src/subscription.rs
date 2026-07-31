@@ -80,7 +80,7 @@ impl SubscriptionRegistry {
             .entry(conn_id)
             .or_default()
             .insert(sub_id.clone(), (filters.clone(), community_id, channel_id));
-        metrics::gauge!("buzz_subscriptions_active").increment(1.0);
+        metrics::gauge!("nuxx_subscriptions_active").increment(1.0);
 
         if let Some(ch_id) = channel_id {
             match extract_kinds_from_filters(&filters) {
@@ -183,7 +183,7 @@ impl SubscriptionRegistry {
         self.remove_from_index(conn_id, sub_id, &filters, community_id, channel_id);
         drop(conn_subs);
 
-        metrics::gauge!("buzz_subscriptions_active").decrement(1.0);
+        metrics::gauge!("nuxx_subscriptions_active").decrement(1.0);
         Some(RemovedSubscription {
             community_id,
             channel_id,
@@ -202,7 +202,7 @@ impl SubscriptionRegistry {
                     channel_id: *channel_id,
                 });
             }
-            metrics::gauge!("buzz_subscriptions_active").decrement(count as f64);
+            metrics::gauge!("nuxx_subscriptions_active").decrement(count as f64);
         }
         removed
     }
@@ -418,7 +418,7 @@ impl SubscriptionRegistry {
 
     /// Snapshot the number of active subscriptions per community.
     ///
-    /// Used by the usage poller to emit `buzz_community_subscriptions{community}`.
+    /// Used by the usage poller to emit `nuxx_community_subscriptions{community}`.
     /// Snapshotting avoids gauge drift from mismatched inc/dec across communities.
     pub fn per_community_subscriptions(&self) -> std::collections::HashMap<CommunityId, u64> {
         let mut counts: std::collections::HashMap<CommunityId, u64> =

@@ -34,7 +34,7 @@
 //! sk = HKDF-SHA256(
 //!     ikm  = master key for this version,
 //!     salt = community id,
-//!     info = "buzz-custodial-v1" || issuer || 0x00 || subject || counter,
+//!     info = "nuxx-custodial-v1" || issuer || 0x00 || subject || counter,
 //! )
 //! ```
 //!
@@ -57,7 +57,7 @@ use crate::identity::hkdf;
 
 /// Domain separation label. Changing this re-derives every identity, so it is
 /// versioned and must not be edited in place.
-const DERIVATION_LABEL: &[u8] = b"buzz-custodial-v1";
+const DERIVATION_LABEL: &[u8] = b"nuxx-custodial-v1";
 
 /// A provider-issued identity, before it is mapped to a key.
 ///

@@ -155,7 +155,7 @@ fn emit_product_feedback_success(
 /// "error") — bounded, no cardinality risk.
 pub fn reject_with_transport(transport: &'static str, reason: &'static str) {
     metrics::counter!(
-        "buzz_events_rejected_total",
+        "nuxx_events_rejected_total",
         "transport" => transport,
         "reason" => reason
     )
@@ -1427,14 +1427,14 @@ pub async fn ingest_event(
     let result = ingest_event_inner(state, &tracer, tenant, event, auth).await;
 
     // Fleet-wide stored counter: kind + author_type only, no community tag
-    // (see the cardinality rationale on buzz_events_received_total —
+    // (see the cardinality rationale on nuxx_events_received_total —
     // author_type is a 2-value label so it merely doubles the kind series).
     // Emitted here rather than per-transport so HTTP bridge ingests count too.
     if let Ok(r) = &result {
         if r.accepted {
             let author_type = author_type_label(state, tenant, author_pubkey_bytes).await;
             metrics::counter!(
-                "buzz_events_stored_total",
+                "nuxx_events_stored_total",
                 "kind" => kind_label,
                 "author_type" => author_type
             )
@@ -2168,7 +2168,7 @@ async fn ingest_event_inner(
             }
             pre_created_channel = Some(client_uuid);
             metrics::counter!(
-                "buzz_channels_created_total",
+                "nuxx_channels_created_total",
                 "community" => tenant.host().to_owned(),
                 "type" => channel_type.to_string()
             )
@@ -3861,10 +3861,10 @@ mod tests {
             .snapshot()
             .into_vec()
             .into_iter()
-            .filter(|(key, ..)| key.key().name() == "buzz_events_rejected_total")
+            .filter(|(key, ..)| key.key().name() == "nuxx_events_rejected_total")
             .map(|(key, _, _, value)| {
                 let metrics_util::debugging::DebugValue::Counter(n) = value else {
-                    panic!("buzz_events_rejected_total must be a counter");
+                    panic!("nuxx_events_rejected_total must be a counter");
                 };
                 let labels: Vec<_> = key.key().labels().collect();
                 let transport = labels

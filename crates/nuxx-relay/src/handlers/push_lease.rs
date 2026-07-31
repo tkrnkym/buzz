@@ -498,11 +498,11 @@ pub async fn accept(
         author_hex: &author_hex,
         app_profiles: &[
             AppProfile {
-                id: "buzz-ios-production",
+                id: "nuxx-ios-production",
                 transport: "apns",
             },
             AppProfile {
-                id: "buzz-ios-sandbox",
+                id: "nuxx-ios-sandbox",
                 transport: "apns",
             },
         ],

@@ -541,7 +541,7 @@ pub struct PromptContext {
     /// the per-session core engram fetch is skipped and `core_sections`
     /// remains empty for every channel, so `format_prompt` renders no
     /// `[Agent Memory — core]` section. On by default; disabled via
-    /// `--no-memory` / `BUZZ_ACP_NO_MEMORY`.
+    /// `--no-memory` / `NUXX_ACP_NO_MEMORY`.
     pub memory_enabled: bool,
     /// Harness identity string for NIP-AM `harness` field. Derived from the
     /// configured `agent_command` at startup (e.g. `"goose"`, `"nuxx-agent"`).
@@ -1445,7 +1445,7 @@ pub async fn run_prompt_task(
     // happens when a session is invalidated and recreated (see
     // `SessionState::invalidate_channel`).
     //
-    // Operator opt-out: `--no-memory` / `BUZZ_ACP_NO_MEMORY` skips the fetch.
+    // Operator opt-out: `--no-memory` / `NUXX_ACP_NO_MEMORY` skips the fetch.
     if ctx.memory_enabled {
         if let (PromptSource::Channel(cid), Some(owner_pk)) =
             (&source, ctx.agent_owner_pubkey.as_ref())
@@ -5923,16 +5923,16 @@ mod tests {
         use std::sync::atomic::Ordering;
 
         let id = Uuid::new_v4();
-        let response = channel_metadata_response(id, &[["name", "buzz-dev"], ["t", "stream"]]);
+        let response = channel_metadata_response(id, &[["name", "nuxx-dev"], ["t", "stream"]]);
         let (resolver, requests, server) = counting_resolver(response).await;
 
         let (is_dm, title_channel) = resolve_new_session_channel_context(&resolver, id).await;
         assert!(!is_dm, "a stream channel is not a DM");
-        assert_eq!(title_channel.as_deref(), Some("buzz-dev"));
+        assert_eq!(title_channel.as_deref(), Some("nuxx-dev"));
         assert_eq!(requests.load(Ordering::SeqCst), 1);
 
         let (_, again) = resolve_new_session_channel_context(&resolver, id).await;
-        assert_eq!(again.as_deref(), Some("buzz-dev"));
+        assert_eq!(again.as_deref(), Some("nuxx-dev"));
         assert_eq!(
             requests.load(Ordering::SeqCst),
             1,

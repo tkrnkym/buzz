@@ -185,7 +185,7 @@ pub mod relay_members {
             {
                 Ok(true) => {
                     metrics::counter!(
-                        "buzz_users_created_total",
+                        "nuxx_users_created_total",
                         "community" => tenant.host().to_owned()
                     )
                     .increment(1);

@@ -326,7 +326,7 @@ fn acquire_git_permit(
         .try_acquire_owned()
         .map_err(|_| {
             metrics::counter!(
-                "buzz_git_semaphore_rejections_total",
+                "nuxx_git_semaphore_rejections_total",
                 "operation" => operation
             )
             .increment(1);
@@ -583,7 +583,7 @@ fn pkt_line(out: &mut Vec<u8>, payload: &[u8]) {
 /// ```text
 /// <pkt># service=git-upload-pack\n
 /// 0000
-/// <pkt><head-oid> HEAD\0<caps> symref=HEAD:<head-ref> object-format=<fmt> agent=buzz-git\n
+/// <pkt><head-oid> HEAD\0<caps> symref=HEAD:<head-ref> object-format=<fmt> agent=nuxx-git\n
 /// <pkt><oid> <refname>\n        # each ref, sorted ascending (BTreeMap order)
 /// 0000
 /// ```
@@ -607,7 +607,7 @@ fn build_upload_pack_advertisement(manifest: &super::manifest::Manifest) -> Vec<
         "multi_ack thin-pack side-band side-band-64k ofs-delta shallow \
          deepen-since deepen-not deepen-relative no-progress include-tag \
          multi_ack_detailed no-done symref=HEAD:{head} object-format={fmt} \
-         agent=buzz-git",
+         agent=nuxx-git",
         head = manifest.head,
         fmt = object_format,
     );
@@ -1065,18 +1065,18 @@ pub async fn receive_pack(
     );
     let hooks_dir = repo.path().join("hooks").display().to_string();
     let hook_env = vec![
-        ("BUZZ_HOOK_URL", hook_url),
+        ("NUXX_HOOK_URL", hook_url),
         (
-            "BUZZ_HOOK_SECRET",
+            "NUXX_HOOK_SECRET",
             state.config.git_hook_hmac_secret.clone(),
         ),
-        ("BUZZ_REPO_ID", repo_name.to_string()),
-        ("BUZZ_REPO_OWNER", params.owner.clone()),
+        ("NUXX_REPO_ID", repo_name.to_string()),
+        ("NUXX_REPO_OWNER", params.owner.clone()),
         (
-            "BUZZ_COMMUNITY_ID",
+            "NUXX_COMMUNITY_ID",
             auth.tenant.community().as_uuid().to_string(),
         ),
-        ("BUZZ_PUSHER_PUBKEY", pusher_hex.clone()),
+        ("NUXX_PUSHER_PUBKEY", pusher_hex.clone()),
         // Override any repo-local core.hooksPath setting; defense in
         // depth even though the hydrated workspace has no inherited
         // config.
@@ -1508,7 +1508,7 @@ where
         }
         if self.deadline.as_mut().poll(cx).is_ready() {
             self.finished = true;
-            metrics::counter!("buzz_git_upload_pack_timeouts_total").increment(1);
+            metrics::counter!("nuxx_git_upload_pack_timeouts_total").increment(1);
             warn!("git upload-pack stream timed out");
             return std::task::Poll::Ready(Some(Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
@@ -1533,9 +1533,9 @@ where
 
 impl<S> Drop for TimedByteStream<S> {
     fn drop(&mut self) {
-        metrics::histogram!("buzz_git_upload_pack_stream_seconds")
+        metrics::histogram!("nuxx_git_upload_pack_stream_seconds")
             .record(self.started_at.elapsed().as_secs_f64());
-        metrics::histogram!("buzz_git_upload_pack_stream_bytes").record(self.streamed_bytes as f64);
+        metrics::histogram!("nuxx_git_upload_pack_stream_bytes").record(self.streamed_bytes as f64);
     }
 }
 
@@ -2495,10 +2495,10 @@ mod sec005_read_gate_tests {
 
     // ── authorize_git_read matrix (requires Postgres) ────────────────────
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz"; // sadscan:disable np.postgres.1
 
     async fn setup_db() -> nuxx_db::Db {
-        let url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_string());
         let pool = sqlx::PgPool::connect(&url).await.expect("connect test DB");

@@ -40,5 +40,5 @@ nuxx-media = { workspace = true }
 nuxx-sdk = { workspace = true }
 
 [[bin]]
-name = "buzz-test-cli"
+name = "nuxx-test-cli"
 path = "src/main.rs"

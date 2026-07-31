@@ -15,7 +15,7 @@ use crate::config::DEFAULT_MAX_FRAME_BYTES;
 pub(crate) const SUPPORTED_NIPS: &[u32] = &[1, 2, 10, 11, 16, 17, 23, 25, 29, 33, 38, 42, 50, 56];
 
 /// NIP-43 (relay membership). Advertised only when the relay actually
-/// enforces membership (`BUZZ_REQUIRE_RELAY_MEMBERSHIP=true`) AND has a
+/// enforces membership (`NUXX_REQUIRE_RELAY_MEMBERSHIP=true`) AND has a
 /// stable signing key — both are required for kind 13534/8000/8001 events
 /// to be verifiable by clients.
 pub(crate) const NIP_RELAY_MEMBERSHIP: u32 = 43;
@@ -202,8 +202,8 @@ fn push_descriptor(
             "current": true
         }],
         "app_profiles": [
-            {"id": "buzz-ios-production", "transport": "apns"},
-            {"id": "buzz-ios-sandbox", "transport": "apns"}
+            {"id": "nuxx-ios-production", "transport": "apns"},
+            {"id": "nuxx-ios-sandbox", "transport": "apns"}
         ],
         "push_kinds": crate::handlers::push_lease::PUSH_KINDS,
         "urgent_kinds": crate::handlers::push_lease::URGENT_KINDS,
@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn build_advertises_buzz_repository_url() {
+    fn build_advertises_nuxx_repository_url() {
         let info = RelayInfo::build(None, None, false, DEFAULT_MAX_FRAME_BYTES, None);
         assert_eq!(info.software, "https://github.com/block/buzz");
     }
@@ -397,13 +397,13 @@ mod tests {
             None,
             false,
             DEFAULT_MAX_FRAME_BYTES,
-            Some("wss://pairing.buzz.xyz"),
+            Some("wss://pairing.nuxx.xyz"),
         );
         let json = serde_json::to_value(&info).expect("serialize");
         assert_eq!(
             json.get("pairing_relay_url")
                 .and_then(|value| value.as_str()),
-            Some("wss://pairing.buzz.xyz")
+            Some("wss://pairing.nuxx.xyz")
         );
 
         let info = RelayInfo::build(None, None, false, DEFAULT_MAX_FRAME_BYTES, None);

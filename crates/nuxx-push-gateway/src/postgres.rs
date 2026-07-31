@@ -63,8 +63,8 @@ fn ts(v: DateTime<Utc>) -> i64 {
 }
 fn profile(v: &str) -> Result<AppProfile, AuthorityError> {
     match v {
-        "buzz-ios-production" => Ok(AppProfile::BuzzIosProduction),
-        "buzz-ios-sandbox" => Ok(AppProfile::BuzzIosSandbox),
+        "nuxx-ios-production" => Ok(AppProfile::BuzzIosProduction),
+        "nuxx-ios-sandbox" => Ok(AppProfile::BuzzIosSandbox),
         _ => Err(AuthorityError::Unavailable),
     }
 }
@@ -409,12 +409,12 @@ mod tests {
     use super::*;
     use sqlx::{postgres::PgPoolOptions, AssertSqlSafe};
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
 
     #[tokio::test]
     #[ignore = "requires PostgreSQL with CREATEDB/CREATEROLE"]
     async fn readiness_requires_migrated_schema_dml_and_no_ddl() {
-        let admin_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let admin_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_owned());
         let admin = PgPoolOptions::new()
@@ -502,7 +502,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires PostgreSQL"]
     async fn reaper_deletes_active_child_of_retention_eligible_revoked_installation() {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_owned());
         let pool = PgPoolOptions::new()
@@ -593,7 +593,7 @@ mod tests {
     // exercises the real PK/UNIQUE replay fences that the memory store's single
     // mutex cannot. Returns (pool, schema) for teardown.
     async fn full_schema(max_connections: u32) -> (PgPool, String) {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_owned());
         let schema = format!("push_admit_{}", Uuid::new_v4().simple());
@@ -683,7 +683,7 @@ mod tests {
         let now = Utc::now();
         sqlx::query(
             "INSERT INTO push_gateway_installations(id,app_attest_key_id,app_attest_public_key,assertion_counter,app_profile,token_ciphertext,token_fingerprint,endpoint_epoch,expires_at)
-             VALUES ($1,$2,$3,0,'buzz-ios-production',$4,$5,1,$6)",
+             VALUES ($1,$2,$3,0,'nuxx-ios-production',$4,$5,1,$6)",
         )
         .bind(Uuid::from_u128(1))
         .bind(vec![1u8])
@@ -936,7 +936,7 @@ mod tests {
     }
 
     async fn drop_schema(schema: &str) {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_owned());
         let pool = PgPoolOptions::new()

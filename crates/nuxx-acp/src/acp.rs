@@ -466,7 +466,7 @@ impl AcpClient {
             // Callers MUST still call shutdown().await for guaranteed cleanup.
             .kill_on_drop(true);
 
-        // Per-persona env vars (e.g., GOOSE_PROVIDER, BUZZ_AGENT_PROVIDER).
+        // Per-persona env vars (e.g., GOOSE_PROVIDER, NUXX_AGENT_PROVIDER).
         // For most keys, operator precedence wins: skip injection if already set
         // in the parent environment.
         //
@@ -2401,11 +2401,11 @@ mod tests {
             args: vec![],
             env: vec![
                 EnvVar {
-                    name: "BUZZ_RELAY_URL".into(),
+                    name: "NUXX_RELAY_URL".into(),
                     value: "ws://localhost:3000".into(),
                 },
                 EnvVar {
-                    name: "BUZZ_PRIVATE_KEY".into(),
+                    name: "NUXX_PRIVATE_KEY".into(),
                     value: "nsec1abc".into(),
                 },
             ],
@@ -2422,7 +2422,7 @@ mod tests {
         assert_eq!(serialized["env"].as_array().unwrap().len(), 2);
         assert_eq!(
             serialized["env"][0]["name"].as_str(),
-            Some("BUZZ_RELAY_URL")
+            Some("NUXX_RELAY_URL")
         );
     }
 
@@ -3384,14 +3384,14 @@ mod tests {
             .expect("initialize should succeed");
 
         let resp = client
-            .session_new_full("/tmp", vec![], None, Some("Fizz · #buzz-dev"))
+            .session_new_full("/tmp", vec![], None, Some("Fizz · #nuxx-dev"))
             .await
             .expect("session_new_full should succeed");
 
         let received = &resp.raw["_receivedRequest"];
         assert_eq!(
             received["params"]["_meta"]["sessionTitle"].as_str(),
-            Some("Fizz · #buzz-dev"),
+            Some("Fizz · #nuxx-dev"),
             "title should ride in _meta.sessionTitle, out of band from the prompt"
         );
     }

@@ -12,7 +12,7 @@ name = "nuxx_cli"
 path = "src/lib.rs"
 
 [[bin]]
-name = "buzz"
+name = "nuxx"
 path = "src/main.rs"
 
 [dependencies]

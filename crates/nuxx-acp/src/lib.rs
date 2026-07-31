@@ -117,22 +117,22 @@ fn emit_runtime_lifecycle(
 /// Resolve the agent's owner pubkey at startup.
 ///
 /// Priority:
-/// 1. `BUZZ_AUTH_TAG` env var — NIP-OA attestation signed by the owner.
+/// 1. `NUXX_AUTH_TAG` env var — NIP-OA attestation signed by the owner.
 ///    Verified against the agent's own pubkey to extract the owner pubkey.
-/// 2. `--agent-owner` CLI flag / `BUZZ_ACP_AGENT_OWNER` env var.
+/// 2. `--agent-owner` CLI flag / `NUXX_ACP_AGENT_OWNER` env var.
 fn resolve_agent_owner(config: &Config) -> Option<String> {
-    // Try BUZZ_AUTH_TAG first (NIP-OA attestation).
-    if let Ok(auth_tag) = std::env::var("BUZZ_AUTH_TAG") {
+    // Try NUXX_AUTH_TAG first (NIP-OA attestation).
+    if let Ok(auth_tag) = std::env::var("NUXX_AUTH_TAG") {
         if !auth_tag.is_empty() {
             let agent_pk = config.keys.public_key();
             match nuxx_sdk::nip_oa::verify_auth_tag(&auth_tag, &agent_pk) {
                 Ok(owner_pk) => {
                     let owner_hex = owner_pk.to_hex().to_ascii_lowercase();
-                    tracing::info!("owner resolved from BUZZ_AUTH_TAG: {owner_hex}");
+                    tracing::info!("owner resolved from NUXX_AUTH_TAG: {owner_hex}");
                     return Some(owner_hex);
                 }
                 Err(e) => {
-                    tracing::warn!("BUZZ_AUTH_TAG verification failed: {e} — falling back");
+                    tracing::warn!("NUXX_AUTH_TAG verification failed: {e} — falling back");
                 }
             }
         }
@@ -1283,7 +1283,7 @@ async fn tokio_main() -> Result<()> {
     // ── Setup-mode early branch ───────────────────────────────────────────────
     //
     // When the desktop determines an agent is not ready (missing credentials,
-    // model, or provider), it spawns nuxx-acp with BUZZ_ACP_SETUP_PAYLOAD set.
+    // model, or provider), it spawns nuxx-acp with NUXX_ACP_SETUP_PAYLOAD set.
     // We enter the minimal setup-listener path and never start the agent pool.
     if let Some(payload) = setup_mode::SetupPayload::from_env()
         .map_err(|e| anyhow::anyhow!("setup payload error: {e}"))?
@@ -1332,8 +1332,8 @@ async fn tokio_main() -> Result<()> {
 
     let pubkey_hex = config.keys.public_key().to_hex();
 
-    // Parse BUZZ_AUTH_TAG into a nostr::Tag for NIP-OA relay membership delegation.
-    let relay_auth_tag: Option<nostr::Tag> = std::env::var("BUZZ_AUTH_TAG")
+    // Parse NUXX_AUTH_TAG into a nostr::Tag for NIP-OA relay membership delegation.
+    let relay_auth_tag: Option<nostr::Tag> = std::env::var("NUXX_AUTH_TAG")
         .ok()
         .filter(|s| !s.is_empty())
         .and_then(|s| nuxx_sdk::nip_oa::parse_auth_tag(&s).ok());
@@ -1362,7 +1362,7 @@ async fn tokio_main() -> Result<()> {
     let presence_publisher = relay.event_publisher();
     let presence_keys = config.keys.clone();
 
-    // Priority: BUZZ_AUTH_TAG (NIP-OA attestation) → --agent-owner flag.
+    // Priority: NUXX_AUTH_TAG (NIP-OA attestation) → --agent-owner flag.
     let startup_owner: Option<String> = resolve_agent_owner(&config);
     if let Some(ref owner) = startup_owner {
         tracing::info!("agent owner: {owner}");
@@ -1375,7 +1375,7 @@ async fn tokio_main() -> Result<()> {
             RespondTo::OwnerOnly => {
                 tracing::warn!(
                     "respond-to=owner-only but no owner is set — all events will be \
-                     dropped. Set BUZZ_AUTH_TAG or --agent-owner, or use --respond-to=anyone."
+                     dropped. Set NUXX_AUTH_TAG or --agent-owner, or use --respond-to=anyone."
                 );
             }
             RespondTo::Allowlist => {
@@ -1498,7 +1498,7 @@ async fn tokio_main() -> Result<()> {
         ));
     }
 
-    let runtime_start_nonce = std::env::var("BUZZ_MANAGED_AGENT_START_NONCE").unwrap_or_default();
+    let runtime_start_nonce = std::env::var("NUXX_MANAGED_AGENT_START_NONCE").unwrap_or_default();
     let dedup_mode = config.dedup_mode;
     let mut queue =
         EventQueue::new(dedup_mode).with_in_flight_deadline(config.max_turn_duration_secs);
@@ -1564,7 +1564,7 @@ async fn tokio_main() -> Result<()> {
     if !config.memory_enabled {
         tracing::info!(
             target: "engram::core",
-            "NIP-AE core memory injection disabled (re-enable by removing --no-memory / BUZZ_ACP_NO_MEMORY)"
+            "NIP-AE core memory injection disabled (re-enable by removing --no-memory / NUXX_ACP_NO_MEMORY)"
         );
     }
 
@@ -1901,18 +1901,18 @@ async fn tokio_main() -> Result<()> {
                     None
                 }
                 // Remaining branches don't touch pool — evaluated when pool is idle.
-                buzz_event = relay.next_event() => {
+                nuxx_event = relay.next_event() => {
                     let _ = result_rx; // end split borrow before relay handling
-                    match buzz_event {
-                        Some(buzz_event) => {
-                            let kind_u32 = buzz_event.event.kind.as_u16() as u32;
+                    match nuxx_event {
+                        Some(nuxx_event) => {
+                            let kind_u32 = nuxx_event.event.kind.as_u16() as u32;
 
                             if kind_u32 == KIND_MEMBER_ADDED_NOTIFICATION
                                 || kind_u32 == KIND_MEMBER_REMOVED_NOTIFICATION
                             {
-                                let ch = buzz_event.channel_id;
-                                let ts = buzz_event.event.created_at.as_secs();
-                                let eid = buzz_event.event.id.to_hex();
+                                let ch = nuxx_event.channel_id;
+                                let ts = nuxx_event.event.created_at.as_secs();
+                                let eid = nuxx_event.event.id.to_hex();
 
                                 // Two-layer membership dedup:
                                 //
@@ -2023,14 +2023,14 @@ async fn tokio_main() -> Result<()> {
                                 continue;
                             }
 
-                            if config.ignore_self && buzz_event.event.pubkey.to_hex() == pubkey_hex {
-                                tracing::debug!(channel_id = %buzz_event.channel_id, "dropping self-authored event");
+                            if config.ignore_self && nuxx_event.event.pubkey.to_hex() == pubkey_hex {
+                                tracing::debug!(channel_id = %nuxx_event.channel_id, "dropping self-authored event");
                                 continue;
                             }
 
                             // Check: kind:9, content "!shutdown", from owner, mentions THIS agent.
                             let is_shutdown = is_owner_control_command(
-                                &buzz_event.event,
+                                &nuxx_event.event,
                                 kind_u32,
                                 "!shutdown",
                                 &pubkey_hex,
@@ -2038,10 +2038,10 @@ async fn tokio_main() -> Result<()> {
                             if is_shutdown {
                                 let owner = owner_cache.get();
                                 if let Some(owner) = owner {
-                                    if buzz_event.event.pubkey.to_hex() == *owner {
+                                    if nuxx_event.event.pubkey.to_hex() == *owner {
                                         tracing::info!(
-                                            channel_id = %buzz_event.channel_id,
-                                            sender = %buzz_event.event.pubkey.to_hex(),
+                                            channel_id = %nuxx_event.channel_id,
+                                            sender = %nuxx_event.event.pubkey.to_hex(),
                                             "shutdown command from owner — exiting gracefully"
                                         );
                                         let _ = shutdown_tx.send(());
@@ -2061,22 +2061,22 @@ async fn tokio_main() -> Result<()> {
                             // --multiple-event-handling. It is explicit user
                             // intent, not an automatic policy decision.
                             let is_cancel = is_owner_control_command(
-                                &buzz_event.event,
+                                &nuxx_event.event,
                                 kind_u32,
                                 "!cancel",
                                 &pubkey_hex,
                             );
                             if is_cancel {
                                 if let Some(owner) = owner_cache.get() {
-                                    if buzz_event.event.pubkey.to_hex() == *owner {
+                                    if nuxx_event.event.pubkey.to_hex() == *owner {
                                         let fired = signal_in_flight_task(
                                             &mut pool,
-                                            buzz_event.channel_id,
+                                            nuxx_event.channel_id,
                                             ControlSignal::Cancel,
                                         );
                                         if !fired {
                                             tracing::warn!(
-                                                channel_id = %buzz_event.channel_id,
+                                                channel_id = %nuxx_event.channel_id,
                                                 "!cancel received but no in-flight task — no-op"
                                             );
                                         }
@@ -2099,28 +2099,28 @@ async fn tokio_main() -> Result<()> {
                             // session immediately. Queued future events remain
                             // queued and will create a fresh session on dispatch.
                             let is_rotate = is_owner_control_command(
-                                &buzz_event.event,
+                                &nuxx_event.event,
                                 kind_u32,
                                 "!rotate",
                                 &pubkey_hex,
                             );
                             if is_rotate {
                                 if let Some(owner) = owner_cache.get() {
-                                    if buzz_event.event.pubkey.to_hex() == *owner {
+                                    if nuxx_event.event.pubkey.to_hex() == *owner {
                                         let fired = signal_in_flight_task(
                                             &mut pool,
-                                            buzz_event.channel_id,
+                                            nuxx_event.channel_id,
                                             ControlSignal::Rotate,
                                         );
                                         if fired {
                                             tracing::info!(
-                                                channel_id = %buzz_event.channel_id,
+                                                channel_id = %nuxx_event.channel_id,
                                                 "!rotate received — cancelling in-flight turn and rotating session"
                                             );
                                         } else {
-                                            let invalidated = pool.invalidate_channel_sessions(buzz_event.channel_id);
+                                            let invalidated = pool.invalidate_channel_sessions(nuxx_event.channel_id);
                                             tracing::info!(
-                                                channel_id = %buzz_event.channel_id,
+                                                channel_id = %nuxx_event.channel_id,
                                                 invalidated,
                                                 "!rotate received — invalidated idle channel session(s)"
                                             );
@@ -2143,12 +2143,12 @@ async fn tokio_main() -> Result<()> {
                             // explicit pubkey list on top, for external people;
                             // it never revokes same-owner team bots.
                             {
-                                let author = buzz_event.event.pubkey.to_hex();
+                                let author = nuxx_event.event.pubkey.to_hex();
                                 // DM hardening: resolve channel type (fail-closed
                                 // to DM) so allowlist/anyone modes cannot be
                                 // exercised by non-owner authors inside DMs.
                                 let is_dm =
-                                    is_dm_channel(buzz_event.channel_id, &ctx.channel_info).await;
+                                    is_dm_channel(nuxx_event.channel_id, &ctx.channel_info).await;
                                 let allowed = author_allowed(
                                     &config.respond_to,
                                     &config.respond_to_allowlist,
@@ -2160,8 +2160,8 @@ async fn tokio_main() -> Result<()> {
                                 .await;
                                 if !allowed {
                                     tracing::debug!(
-                                        channel_id = %buzz_event.channel_id,
-                                        author = %buzz_event.event.pubkey.to_hex(),
+                                        channel_id = %nuxx_event.channel_id,
+                                        author = %nuxx_event.event.pubkey.to_hex(),
                                         mode = %config.respond_to,
                                         is_dm,
                                         "inbound author gate — dropping event"
@@ -2170,18 +2170,18 @@ async fn tokio_main() -> Result<()> {
                                 }
                             }
 
-                            let matched = filter::match_event(&buzz_event.event, buzz_event.channel_id, &rules, &pubkey_hex).await;
+                            let matched = filter::match_event(&nuxx_event.event, nuxx_event.channel_id, &rules, &pubkey_hex).await;
                             let prompt_tag = match matched {
                                 Some(m) => m.prompt_tag,
                                 None => {
-                                    tracing::debug!(channel_id = %buzz_event.channel_id, kind = buzz_event.event.kind.as_u16(), "event matched no rule — dropping");
+                                    tracing::debug!(channel_id = %nuxx_event.channel_id, kind = nuxx_event.event.kind.as_u16(), "event matched no rule — dropping");
                                     continue;
                                 }
                             };
                             // Capture author pubkey before queue.push() moves
-                            // buzz_event.event (needed for mode gate below).
-                            let author_hex = buzz_event.event.pubkey.to_hex();
-                            let event_id_hex = buzz_event.event.id.to_hex();
+                            // nuxx_event.event (needed for mode gate below).
+                            let author_hex = nuxx_event.event.pubkey.to_hex();
+                            let event_id_hex = nuxx_event.event.id.to_hex();
                             // Clone for the non-cancelling steer fork, which
                             // needs the event to render the steer body. The
                             // clone is unconditional because we don't know
@@ -2192,11 +2192,11 @@ async fn tokio_main() -> Result<()> {
                             // accepted event goes through `queue.push`
                             // first. `nostr::Event::clone` is cheap (Arc-
                             // backed payload) so the cost is negligible.
-                            let event_for_steer = buzz_event.event.clone();
+                            let event_for_steer = nuxx_event.event.clone();
                             let prompt_tag_for_steer = prompt_tag.clone();
                             let accepted = queue.push(QueuedEvent {
-                                channel_id: buzz_event.channel_id,
-                                event: buzz_event.event,
+                                channel_id: nuxx_event.channel_id,
+                                event: nuxx_event.event,
                                 received_at: std::time::Instant::now(),
                                 prompt_tag,
                             });
@@ -2215,7 +2215,7 @@ async fn tokio_main() -> Result<()> {
                             // Event is already queued. If mode requires it AND
                             // the channel has an in-flight task, fire cancel —
                             // OR take the non-cancelling (ACP steer) fork for Steer signals.
-                            if accepted && queue.is_channel_in_flight(buzz_event.channel_id) {
+                            if accepted && queue.is_channel_in_flight(nuxx_event.channel_id) {
                                 // Author eligibility (owner ∪ allowlist ∪ siblings)
                                 // is already enforced by the inbound author gate
                                 // above, so the mid-turn signal fires for every
@@ -2242,7 +2242,7 @@ async fn tokio_main() -> Result<()> {
                                         && try_native_steer(
                                             &mut pool,
                                             &mut queue,
-                                            buzz_event.channel_id,
+                                            nuxx_event.channel_id,
                                             event_for_steer,
                                             prompt_tag_for_steer,
                                             &steer_ack_tx,
@@ -2250,7 +2250,7 @@ async fn tokio_main() -> Result<()> {
                                     if !native_attempted {
                                         signal_in_flight_task(
                                             &mut pool,
-                                            buzz_event.channel_id,
+                                            nuxx_event.channel_id,
                                             signal,
                                         );
                                     }
@@ -4191,11 +4191,11 @@ fn build_mcp_servers(config: &Config) -> Vec<McpServer> {
         env: {
             let mut env = vec![
                 EnvVar {
-                    name: "BUZZ_RELAY_URL".into(),
+                    name: "NUXX_RELAY_URL".into(),
                     value: config.relay_url.clone(),
                 },
                 EnvVar {
-                    name: "BUZZ_PRIVATE_KEY".into(),
+                    name: "NUXX_PRIVATE_KEY".into(),
                     // bech32 encoding of a valid secret key is infallible.
                     // Panic here is correct: injecting a bogus secret would cause
                     // delayed, hard-to-diagnose agent failures downstream.
@@ -4206,12 +4206,12 @@ fn build_mcp_servers(config: &Config) -> Vec<McpServer> {
                         .expect("secret key bech32 encoding should never fail"),
                 },
             ];
-            // Forward BUZZ_AUTH_TAG (NIP-OA owner attestation credential)
+            // Forward NUXX_AUTH_TAG (NIP-OA owner attestation credential)
             // so the MCP server can attach it to every signed event.
-            if let Ok(auth_tag) = std::env::var("BUZZ_AUTH_TAG") {
+            if let Ok(auth_tag) = std::env::var("NUXX_AUTH_TAG") {
                 if !auth_tag.is_empty() {
                     env.push(EnvVar {
-                        name: "BUZZ_AUTH_TAG".into(),
+                        name: "NUXX_AUTH_TAG".into(),
                         value: auth_tag,
                     });
                 }
@@ -4220,10 +4220,10 @@ fn build_mcp_servers(config: &Config) -> Vec<McpServer> {
             // author name instead of the raw npub. Read from the process env
             // rather than Config: this is a pass-through of a contract owned
             // upstream, and absent simply means dev-mcp falls back to the npub.
-            if let Ok(display_name) = std::env::var("BUZZ_ACP_DISPLAY_NAME") {
+            if let Ok(display_name) = std::env::var("NUXX_ACP_DISPLAY_NAME") {
                 if !display_name.is_empty() {
                     env.push(EnvVar {
-                        name: "BUZZ_ACP_DISPLAY_NAME".into(),
+                        name: "NUXX_ACP_DISPLAY_NAME".into(),
                         value: display_name,
                     });
                 }
@@ -5048,28 +5048,28 @@ mod build_mcp_servers_tests {
 
         let names: Vec<&str> = server.env.iter().map(|e| e.name.as_str()).collect();
         assert!(
-            names.contains(&"BUZZ_RELAY_URL"),
-            "missing BUZZ_RELAY_URL; got {names:?}"
+            names.contains(&"NUXX_RELAY_URL"),
+            "missing NUXX_RELAY_URL; got {names:?}"
         );
         assert!(
-            names.contains(&"BUZZ_PRIVATE_KEY"),
-            "missing BUZZ_PRIVATE_KEY; got {names:?}"
+            names.contains(&"NUXX_PRIVATE_KEY"),
+            "missing NUXX_PRIVATE_KEY; got {names:?}"
         );
     }
 
     #[test]
     fn session_new_mcp_server_forwards_nuxx_auth_tag() {
         let _guard = ENV_LOCK.lock().unwrap();
-        std::env::set_var("BUZZ_AUTH_TAG", "test-attestation-tag");
+        std::env::set_var("NUXX_AUTH_TAG", "test-attestation-tag");
         let config = test_config();
         let servers = build_mcp_servers(&config);
-        std::env::remove_var("BUZZ_AUTH_TAG");
+        std::env::remove_var("NUXX_AUTH_TAG");
 
         let server = &servers[0];
-        let auth_tag_env = server.env.iter().find(|e| e.name == "BUZZ_AUTH_TAG");
+        let auth_tag_env = server.env.iter().find(|e| e.name == "NUXX_AUTH_TAG");
         assert!(
             auth_tag_env.is_some(),
-            "BUZZ_AUTH_TAG should be forwarded when set"
+            "NUXX_AUTH_TAG should be forwarded when set"
         );
         assert_eq!(auth_tag_env.unwrap().value, "test-attestation-tag");
     }
@@ -5077,28 +5077,28 @@ mod build_mcp_servers_tests {
     #[test]
     fn session_new_mcp_server_skips_empty_nuxx_auth_tag() {
         let _guard = ENV_LOCK.lock().unwrap();
-        std::env::set_var("BUZZ_AUTH_TAG", "");
+        std::env::set_var("NUXX_AUTH_TAG", "");
         let config = test_config();
         let servers = build_mcp_servers(&config);
-        std::env::remove_var("BUZZ_AUTH_TAG");
+        std::env::remove_var("NUXX_AUTH_TAG");
 
         let server = &servers[0];
-        let has_auth_tag = server.env.iter().any(|e| e.name == "BUZZ_AUTH_TAG");
-        assert!(!has_auth_tag, "empty BUZZ_AUTH_TAG should not be forwarded");
+        let has_auth_tag = server.env.iter().any(|e| e.name == "NUXX_AUTH_TAG");
+        assert!(!has_auth_tag, "empty NUXX_AUTH_TAG should not be forwarded");
     }
 
     #[test]
     fn test_display_name_set_is_forwarded_to_mcp_server() {
         let _guard = ENV_LOCK.lock().unwrap();
-        std::env::set_var("BUZZ_ACP_DISPLAY_NAME", "Duncan");
+        std::env::set_var("NUXX_ACP_DISPLAY_NAME", "Duncan");
         let config = test_config();
         let servers = build_mcp_servers(&config);
-        std::env::remove_var("BUZZ_ACP_DISPLAY_NAME");
+        std::env::remove_var("NUXX_ACP_DISPLAY_NAME");
 
         let entry = servers[0]
             .env
             .iter()
-            .find(|e| e.name == "BUZZ_ACP_DISPLAY_NAME");
+            .find(|e| e.name == "NUXX_ACP_DISPLAY_NAME");
         assert_eq!(
             entry.map(|e| e.value.as_str()),
             Some("Duncan"),
@@ -5109,7 +5109,7 @@ mod build_mcp_servers_tests {
     #[test]
     fn test_display_name_unset_omits_the_key_entirely() {
         let _guard = ENV_LOCK.lock().unwrap();
-        std::env::remove_var("BUZZ_ACP_DISPLAY_NAME");
+        std::env::remove_var("NUXX_ACP_DISPLAY_NAME");
         let config = test_config();
         let servers = build_mcp_servers(&config);
 
@@ -5119,7 +5119,7 @@ mod build_mcp_servers_tests {
             !servers[0]
                 .env
                 .iter()
-                .any(|e| e.name == "BUZZ_ACP_DISPLAY_NAME"),
+                .any(|e| e.name == "NUXX_ACP_DISPLAY_NAME"),
             "unset display name should not add the key"
         );
     }
@@ -5127,16 +5127,16 @@ mod build_mcp_servers_tests {
     #[test]
     fn test_display_name_empty_omits_the_key_entirely() {
         let _guard = ENV_LOCK.lock().unwrap();
-        std::env::set_var("BUZZ_ACP_DISPLAY_NAME", "");
+        std::env::set_var("NUXX_ACP_DISPLAY_NAME", "");
         let config = test_config();
         let servers = build_mcp_servers(&config);
-        std::env::remove_var("BUZZ_ACP_DISPLAY_NAME");
+        std::env::remove_var("NUXX_ACP_DISPLAY_NAME");
 
         assert!(
             !servers[0]
                 .env
                 .iter()
-                .any(|e| e.name == "BUZZ_ACP_DISPLAY_NAME"),
+                .any(|e| e.name == "NUXX_ACP_DISPLAY_NAME"),
             "empty display name should not be forwarded"
         );
     }

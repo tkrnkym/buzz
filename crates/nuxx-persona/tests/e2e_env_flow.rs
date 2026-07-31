@@ -2,7 +2,7 @@
 //!
 //! These tests exercise the full pack-resolve pipeline and verify that:
 //! - Goose personas emit GOOSE_PROVIDER, GOOSE_MODEL, GOOSE_TEMPERATURE
-//! - Buzz-agent personas emit BUZZ_AGENT_MODEL, BUZZ_AGENT_PROVIDER
+//! - Buzz-agent personas emit NUXX_AGENT_MODEL, NUXX_AGENT_PROVIDER
 //! - The import filter strips derived provider/model keys but preserves knobs
 //! - Multi-runtime packs produce correct per-persona env var prefixes
 //! - Models without a provider prefix emit only the model key (no provider)
@@ -15,8 +15,8 @@ use nuxx_persona::resolve::resolve_pack;
 const DERIVED_PROVIDER_MODEL_ENV_KEYS: &[&str] = &[
     "GOOSE_MODEL",
     "GOOSE_PROVIDER",
-    "BUZZ_AGENT_MODEL",
-    "BUZZ_AGENT_PROVIDER",
+    "NUXX_AGENT_MODEL",
+    "NUXX_AGENT_PROVIDER",
 ];
 
 fn filter_derived(env_vars: Vec<(String, String)>) -> BTreeMap<String, String> {
@@ -134,14 +134,14 @@ You are a test bot.
         .collect();
 
     assert_eq!(
-        env.get("BUZZ_AGENT_MODEL"),
+        env.get("NUXX_AGENT_MODEL"),
         Some(&"gpt-4o"),
-        "should emit BUZZ_AGENT_MODEL=gpt-4o"
+        "should emit NUXX_AGENT_MODEL=gpt-4o"
     );
     assert_eq!(
-        env.get("BUZZ_AGENT_PROVIDER"),
+        env.get("NUXX_AGENT_PROVIDER"),
         Some(&"openai"),
-        "should emit BUZZ_AGENT_PROVIDER=openai"
+        "should emit NUXX_AGENT_PROVIDER=openai"
     );
 
     // Must NOT contain GOOSE_* keys
@@ -229,7 +229,7 @@ fn full_pipeline_two_runtimes_different_env_vars() {
   "version": "1.0.0",
   "personas": [
     "agents/goose-bot.persona.md",
-    "agents/buzz-bot.persona.md"
+    "agents/nuxx-bot.persona.md"
   ],
   "defaults": {}
 }"#,
@@ -252,9 +252,9 @@ You are a goose bot.
 
     // Buzz-agent persona
     fs::write(
-        root.join("agents/buzz-bot.persona.md"),
+        root.join("agents/nuxx-bot.persona.md"),
         r#"---
-name: "buzz-bot"
+name: "nuxx-bot"
 display_name: "Buzz Bot"
 description: "A nuxx-agent runtime bot"
 runtime: "nuxx-agent"
@@ -276,8 +276,8 @@ You are a buzz bot.
     let buzz = pack
         .personas
         .iter()
-        .find(|p| p.name == "buzz-bot")
-        .expect("buzz-bot should exist");
+        .find(|p| p.name == "nuxx-bot")
+        .expect("nuxx-bot should exist");
 
     // Goose persona gets GOOSE_* env vars
     let goose_env: std::collections::HashMap<_, _> = goose
@@ -291,28 +291,28 @@ You are a buzz bot.
         Some(&"claude-sonnet-4-20250514")
     );
     assert!(
-        !goose_env.contains_key("BUZZ_AGENT_MODEL"),
-        "goose persona must not emit BUZZ_AGENT_MODEL"
+        !goose_env.contains_key("NUXX_AGENT_MODEL"),
+        "goose persona must not emit NUXX_AGENT_MODEL"
     );
     assert!(
-        !goose_env.contains_key("BUZZ_AGENT_PROVIDER"),
-        "goose persona must not emit BUZZ_AGENT_PROVIDER"
+        !goose_env.contains_key("NUXX_AGENT_PROVIDER"),
+        "goose persona must not emit NUXX_AGENT_PROVIDER"
     );
 
-    // Buzz-agent persona gets BUZZ_AGENT_* env vars
-    let buzz_env: std::collections::HashMap<_, _> = buzz
+    // Buzz-agent persona gets NUXX_AGENT_* env vars
+    let nuxx_env: std::collections::HashMap<_, _> = buzz
         .runtime_env_vars
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    assert_eq!(buzz_env.get("BUZZ_AGENT_MODEL"), Some(&"gpt-4o"));
-    assert_eq!(buzz_env.get("BUZZ_AGENT_PROVIDER"), Some(&"openai"));
+    assert_eq!(nuxx_env.get("NUXX_AGENT_MODEL"), Some(&"gpt-4o"));
+    assert_eq!(nuxx_env.get("NUXX_AGENT_PROVIDER"), Some(&"openai"));
     assert!(
-        !buzz_env.contains_key("GOOSE_MODEL"),
+        !nuxx_env.contains_key("GOOSE_MODEL"),
         "nuxx-agent persona must not emit GOOSE_MODEL"
     );
     assert!(
-        !buzz_env.contains_key("GOOSE_PROVIDER"),
+        !nuxx_env.contains_key("GOOSE_PROVIDER"),
         "nuxx-agent persona must not emit GOOSE_PROVIDER"
     );
 }

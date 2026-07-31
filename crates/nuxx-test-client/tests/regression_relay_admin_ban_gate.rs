@@ -11,7 +11,7 @@
 //!
 //! Requires a running relay and its Postgres. Ignored by default:
 //!   REPRO_RELAY_HTTP=http://localhost:3999 REPRO_HOST=localhost:3999 \
-//!   DATABASE_URL=postgres://buzz:buzz_dev@localhost:5432/nuxx_relay_admin_regression \
+//!   DATABASE_URL=postgres://buzz:nuxx_dev@localhost:5432/nuxx_relay_admin_regression \
 //!   cargo test -p nuxx-test-client --test regression_relay_admin_ban_gate \
 //!     -- --ignored --nocapture
 

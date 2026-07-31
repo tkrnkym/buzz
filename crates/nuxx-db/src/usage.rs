@@ -361,7 +361,7 @@ mod tests {
     use nuxx_core::CommunityId;
     use sqlx::PgPool;
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
 
     async fn get_pool() -> PgPool {
         PgPool::connect(TEST_DB_URL)

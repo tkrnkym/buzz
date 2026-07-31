@@ -469,14 +469,14 @@ impl AgentHarness {
     async fn spawn_provider(provider: &str, base_url: &str, model: &str) -> Self {
         let bin = env!("CARGO_BIN_EXE_nuxx-agent");
         let mut cmd = tokio::process::Command::new(bin);
-        cmd.env("BUZZ_AGENT_PROVIDER", provider)
+        cmd.env("NUXX_AGENT_PROVIDER", provider)
             .env("DATABRICKS_HOST", base_url)
             .env("DATABRICKS_MODEL", model)
             .env("DATABRICKS_TOKEN", "test-bearer")
-            .env("BUZZ_AGENT_LLM_TIMEOUT_SECS", "5")
-            .env("BUZZ_AGENT_TOOL_TIMEOUT_SECS", "5")
-            .env("BUZZ_AGENT_MAX_ROUNDS", "2")
-            .env("BUZZ_AGENT_MCP_INIT_TIMEOUT_SECS", "2")
+            .env("NUXX_AGENT_LLM_TIMEOUT_SECS", "5")
+            .env("NUXX_AGENT_TOOL_TIMEOUT_SECS", "5")
+            .env("NUXX_AGENT_MAX_ROUNDS", "2")
+            .env("NUXX_AGENT_MCP_INIT_TIMEOUT_SECS", "2")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

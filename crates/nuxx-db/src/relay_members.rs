@@ -380,7 +380,7 @@ pub const MAX_COMMUNITIES_PER_OWNER: i64 = 3;
 
 /// Effective per-owner community limit for this deployment.
 ///
-/// Reads `BUZZ_MAX_COMMUNITIES_PER_OWNER` once (cached for the process
+/// Reads `NUXX_MAX_COMMUNITIES_PER_OWNER` once (cached for the process
 /// lifetime); a missing, unparsable, or non-positive value falls back to
 /// [`MAX_COMMUNITIES_PER_OWNER`]. Lets multi-tenant operators raise the cap
 /// without a source change while keeping the stock default for everyone else.
@@ -388,7 +388,7 @@ pub fn max_communities_per_owner() -> i64 {
     static LIMIT: std::sync::OnceLock<i64> = std::sync::OnceLock::new();
     *LIMIT.get_or_init(|| {
         effective_owner_limit(
-            std::env::var("BUZZ_MAX_COMMUNITIES_PER_OWNER")
+            std::env::var("NUXX_MAX_COMMUNITIES_PER_OWNER")
                 .ok()
                 .as_deref(),
         )
@@ -610,10 +610,10 @@ mod tests {
     use super::*;
     use uuid::Uuid;
 
-    const TEST_DB_URL: &str = "postgres://buzz:buzz_dev@localhost:5432/buzz";
+    const TEST_DB_URL: &str = "postgres://buzz:nuxx_dev@localhost:5432/buzz";
 
     async fn setup_pool() -> PgPool {
-        let database_url = std::env::var("BUZZ_TEST_DATABASE_URL")
+        let database_url = std::env::var("NUXX_TEST_DATABASE_URL")
             .or_else(|_| std::env::var("DATABASE_URL"))
             .unwrap_or_else(|_| TEST_DB_URL.to_owned());
         PgPool::connect(&database_url)

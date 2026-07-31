@@ -25,7 +25,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Duration;
 
 /// Default capacity of the event channel from background task to harness.
-/// Override with `BUZZ_ACP_EVENT_BUFFER` env var at startup.
+/// Override with `NUXX_ACP_EVENT_BUFFER` env var at startup.
 const EVENT_CHANNEL_CAPACITY_DEFAULT: usize = 256;
 /// Capacity of the command channel from harness to background task.
 const CMD_CHANNEL_CAPACITY: usize = 64;
@@ -33,7 +33,7 @@ const CMD_CHANNEL_CAPACITY: usize = 64;
 /// Read the event channel capacity from the environment, falling back to the
 /// compiled-in default. Parsed once at call-site (connect time).
 fn event_channel_capacity() -> usize {
-    std::env::var("BUZZ_ACP_EVENT_BUFFER")
+    std::env::var("NUXX_ACP_EVENT_BUFFER")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .map(|v| v.max(1)) // mpsc::channel panics on capacity 0
@@ -2099,7 +2099,7 @@ async fn handle_ws_message(
                             return true;
                         }
                         let ts = event.created_at.as_secs();
-                        let buzz_event = BuzzEvent {
+                        let nuxx_event = BuzzEvent {
                             channel_id: channel_uuid,
                             event: *event,
                         };
@@ -2112,7 +2112,7 @@ async fn handle_ws_message(
                                 "event channel at ≥80% capacity — backpressure imminent"
                             );
                         }
-                        match event_tx.try_send(Some(buzz_event)) {
+                        match event_tx.try_send(Some(nuxx_event)) {
                             Ok(()) => {
                                 state.membership_last_seen =
                                     Some(state.membership_last_seen.unwrap_or(0).max(ts));
@@ -2140,7 +2140,7 @@ async fn handle_ws_message(
                         let ts = event.created_at.as_secs();
                         let event_id_hex = event.id.to_hex();
                         if state.record_event(channel_id, &event) {
-                            let buzz_event = BuzzEvent {
+                            let nuxx_event = BuzzEvent {
                                 channel_id,
                                 event: *event,
                             };
@@ -2154,7 +2154,7 @@ async fn handle_ws_message(
                                     "event channel at ≥80% capacity — backpressure imminent"
                                 );
                             }
-                            match event_tx.try_send(Some(buzz_event)) {
+                            match event_tx.try_send(Some(nuxx_event)) {
                                 Ok(()) => {}
                                 Err(mpsc::error::TrySendError::Full(_)) => {
                                     // Remove from dedup set so the replayed event
