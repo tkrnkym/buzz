@@ -3611,7 +3611,7 @@ mod agent_draft_prompt_tests {
     #[test]
     fn shared_base_prompt_teaches_portable_agent_drafts() {
         let prompt = include_str!("base_prompt.md");
-        assert!(prompt.contains("buzz agents draft-create"));
+        assert!(prompt.contains("nuxx agents draft-create"));
         assert!(prompt.contains("ask for at most two things"));
         assert!(prompt.contains("what it should do day-to-day"));
         assert!(prompt.contains("owner saves it"));
@@ -3623,7 +3623,7 @@ mod agent_draft_prompt_tests {
         let prompt = include_str!("base_prompt.md");
         assert!(prompt.contains("pass real newline bytes through stdin"));
         assert!(prompt.contains("single-quoted shell strings preserve `\\n` literally"));
-        assert!(prompt.contains("buzz messages send ... --content -"));
+        assert!(prompt.contains("nuxx messages send ... --content -"));
     }
 
     #[test]
@@ -3638,7 +3638,7 @@ mod agent_draft_prompt_tests {
         assert!(prompt.contains("no follow-up verification command is needed"));
         assert!(prompt.contains("stops before sending"));
         assert!(prompt
-            .contains("add them explicitly with `buzz channels add-member` only when authorized"));
+            .contains("add them explicitly with `nuxx channels add-member` only when authorized"));
         assert!(prompt.contains("never changes membership automatically"));
     }
 }
@@ -3654,10 +3654,10 @@ fn default_heartbeat_prompt() -> String {
             high-priority requests addressed to you.\n\
          2. Run `buzz feed get --types mentions` to check for unanswered @mentions.\n\
          3. If you find actionable items, address them using the appropriate CLI commands\n\
-            (e.g., `buzz workflows approve --token <UUID>`, `buzz messages send`,\n\
-            `buzz messages send --reply-to <event-id>`).\n\
+            (e.g., `nuxx workflows approve --token <UUID>`, `nuxx messages send`,\n\
+            `nuxx messages send --reply-to <event-id>`).\n\
          4. If there are no pending actions or mentions, end your turn immediately.\n\n\
-         Do not run `buzz channels list` or `buzz messages search` unless you have a specific reason.\n\
+         Do not run `nuxx channels list` or `nuxx messages search` unless you have a specific reason.\n\
          Do not invent work — only act on items surfaced by the feed commands."
     )
 }

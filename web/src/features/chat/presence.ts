@@ -6,7 +6,7 @@
  *
  * **Presence (kind 20001).** Current status lives in Redis, not in the event log.
  * The relay synthesizes it for a `POST /query` whose filters name kind 20001 *and*
- * explicit authors (`synthesize_presence` in `crates/buzz-relay/src/api/
+ * explicit authors (`synthesize_presence` in `crates/nuxx-relay/src/api/
  * bridge.rs`) — a WebSocket REQ gets nothing, because there is nothing stored to
  * return. Live changes do fan out over the socket, so the working shape is an
  * HTTP snapshot for initial state plus a subscription for deltas.

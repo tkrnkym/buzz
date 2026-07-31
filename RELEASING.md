@@ -52,7 +52,7 @@ or mobile GitHub Release.
 ### Relay
 
 1. **`just release-relay`** runs locally on `main`, creates or updates a
-   `relay-release/<version>` PR, bumps `crates/buzz-relay/Cargo.toml`,
+   `relay-release/<version>` PR, bumps `crates/nuxx-relay/Cargo.toml`,
    regenerates `Cargo.lock`, and updates the relay changelog.
 2. **Merge the PR.** `auto-tag-on-release-pr-merge` pushes
    `relay-v<version>`.
@@ -107,7 +107,7 @@ release data. It is not a release ledger for this flow.
 | Lane | Release version authority |
 |------|---------------------------|
 | Desktop | `desktop/package.json` and synchronized desktop manifests |
-| Relay | `crates/buzz-relay/Cargo.toml` |
+| Relay | `crates/nuxx-relay/Cargo.toml` |
 | Mobile | Exact `mobile-vX.Y.Z-rc.N` remote tag |
 
 `just bump-desktop-version <version>` updates the desktop manifests and

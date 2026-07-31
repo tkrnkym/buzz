@@ -4,7 +4,7 @@
 # =============================================================================
 # Usage: ./scripts/dev-setup.sh
 #
-# Starts Docker services, waits for healthy, runs migrations, installs desktop
+# Starts Docker services, waits for healthy, runs migrations, installs web
 # deps, and prints next steps.
 # =============================================================================
 set -euo pipefail
@@ -57,14 +57,14 @@ load_env() {
     DATABASE_URL="postgres://nuxx:nuxx_dev@localhost:5432/nuxx"
   fi
   if [[ "${PGUSER:-}" == "sprout" ]]; then PGUSER="buzz"; fi
-  if [[ "${PGPASSWORD:-}" == "sprout_dev" ]]; then PGPASSWORD="buzz_dev"; fi
+  if [[ "${PGPASSWORD:-}" == "sprout_dev" ]]; then PGPASSWORD="nuxx_dev"; fi
   if [[ "${PGDATABASE:-}" == "sprout" ]]; then PGDATABASE="buzz"; fi
 
   export DATABASE_URL="${DATABASE_URL:-postgres://nuxx:nuxx_dev@localhost:5432/nuxx}"
   export PGHOST="${PGHOST:-localhost}"
   export PGPORT="${PGPORT:-5432}"
   export PGUSER="${PGUSER:-buzz}"
-  export PGPASSWORD="${PGPASSWORD:-buzz_dev}"
+  export PGPASSWORD="${PGPASSWORD:-nuxx_dev}"
   export PGDATABASE="${PGDATABASE:-buzz}"
   export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
 }
@@ -86,7 +86,7 @@ fail_if_local_redis_blocks_compose() {
   if ! command -v lsof >/dev/null 2>&1; then
     return
   fi
-  if docker ps --format '{{.Names}}' | grep -qx 'buzz-redis'; then
+  if docker ps --format '{{.Names}}' | grep -qx 'nuxx-redis'; then
     return
   fi
   local redis_pids
@@ -99,7 +99,7 @@ fail_if_local_redis_blocks_compose() {
 }
 
 postgres_accepting_connections() {
-  docker exec buzz-postgres \
+  docker exec nuxx-postgres \
     pg_isready -h localhost -p 5432 -U "${PGUSER}" -d "${PGDATABASE}" \
     >/dev/null 2>&1
 }
@@ -128,26 +128,9 @@ until postgres_accepting_connections; do
   sleep 2
 done
 
-"${REPO_ROOT}/bin/cargo" run -p buzz-admin -- migrate
+"${REPO_ROOT}/bin/cargo" run -p nuxx-admin -- migrate
 "${REPO_ROOT}/scripts/seed-local-community.sh"
 success "Database migrations complete"
-
-# ---- Install desktop dependencies -------------------------------------------
-
-DESKTOP_DIR="${REPO_ROOT}/desktop"
-
-if [[ -d "${DESKTOP_DIR}" ]]; then
-  if command -v pnpm &>/dev/null; then
-    log "Installing desktop dependencies (pnpm install)..."
-    (cd "${DESKTOP_DIR}" && pnpm install)
-    success "Desktop dependencies installed"
-  else
-    warn "pnpm not found — skipping desktop dependency install."
-    warn "Run '. ./bin/activate-hermit' to get pnpm, then 'just desktop-install'."
-  fi
-else
-  warn "Desktop directory not found at ${DESKTOP_DIR} — skipping."
-fi
 
 # ---- Install web dependencies -----------------------------------------------
 
@@ -160,7 +143,7 @@ if [[ -d "${WEB_DIR}" ]]; then
     success "Web dependencies installed"
   else
     warn "pnpm not found — skipping web dependency install."
-    warn "Run '. ./bin/activate-hermit' to get pnpm, then 'just desktop-install'."
+    warn "Run '. ./bin/activate-hermit' to get pnpm, then 'just js-install'."
   fi
 else
   warn "Web directory not found at ${WEB_DIR} — skipping."

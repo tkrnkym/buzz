@@ -11,7 +11,7 @@
 --     with no tuple lock and no update; shared locks admit each other, so
 --     permanent-channel commits proceed concurrently.
 --   * Permanent->ephemeral (or TTL-change) transition (update_channel in
---     crates/buzz-db/src/channel.rs) takes the same key EXCLUSIVE before its
+--     crates/nuxx-db/src/channel.rs) takes the same key EXCLUSIVE before its
 --     UPDATE. Either the transition commits first and the event's read sees
 --     the TTL (and refreshes), or the event commits first and the
 --     transition's own deadline reset is later than anything the event would
@@ -19,7 +19,8 @@
 --   * Ephemeral channels still run the conditional UPDATE; their row updates
 --     serialize per channel, but only ephemeral channels pay that.
 -- Lock key domain 'buzz_channel_ttl:' is distinct from 'buzz_push_gate:'
--- (migration 0023) and the audit/lease lock families. Lock order note: the
+-- (migration 0023) and the audit/lease lock families. Superseded: migration
+-- 0029 renames both domains to their 'nuxx_' spellings. Lock order note: the
 -- deferred trigger acquires this key at COMMIT, after any push-gate shared
 -- lock taken during insert; no path acquires both domains exclusively.
 CREATE OR REPLACE FUNCTION refresh_channel_ttl_after_event_insert() RETURNS trigger

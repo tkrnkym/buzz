@@ -13,7 +13,7 @@ fi
 CACHE_DIR="${MESH_LLM_NATIVE_RUNTIME_CACHE_DIR:-$ROOT/.cache/mesh-llm-native-runtime}"
 OUT_DIR="${MESH_LLM_NATIVE_RUNTIME_OUT_DIR:-$ROOT/.cache/mesh-llm-native-runtime-artifacts}"
 
-metadata="$($ROOT/bin/cargo metadata --manifest-path "$ROOT/desktop/src-tauri/Cargo.toml" --features mesh-llm --format-version 1)"
+metadata="$($ROOT/bin/cargo metadata --manifest-path "$ROOT/crates/nuxx-relay/Cargo.toml" --features mesh-llm --format-version 1)"
 SDK_MANIFEST="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(p["manifest_path"] for p in data["packages"] if p["name"]=="mesh-llm-sdk"))' <<<"$metadata")"
 MESH_ROOT="$(cd "$(dirname "$SDK_MANIFEST")/../.." && pwd)"
 MESH_VERSION="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(p["version"] for p in data["packages"] if p["name"]=="mesh-llm-sdk"))' <<<"$metadata")"

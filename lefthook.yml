@@ -2,9 +2,9 @@
 # .github/workflows/ci.yml — keep the two in sync. Deliberate deviations:
 # - The `.github/workflows/ci.yml` path CI adds to its `rust`/`mobile` filters
 #   is omitted; a CI-workflow-only edit doesn't need a local test run.
-# - `desktop-check`/`desktop-test` don't trigger on `rust` changes, though CI's
-#   Desktop Core job does. Those commands are pure TS (biome + node:test) with
-#   no Rust dependency, so the extra trigger would be spurious locally.
+# - `web-checks` doesn't trigger on `rust` changes, though CI's Web job does.
+#   Those commands are pure TS (biome + vitest) with no Rust dependency, so the
+#   extra trigger would be spurious locally.
 # - Deletion-only surface changes do not trigger local hooks: lefthook 2.1.x
 #   drops deleted paths from push-file discovery (`extractFiles` existence
 #   check, repository.go). CI's dorny/paths-filter catches deletions.
@@ -18,15 +18,6 @@ pre-commit:
     rust-fmt:
       glob: ["crates/**", "examples/countdown-bot/**"]
       run: just fmt
-      stage_fixed: true
-    desktop-tauri-fmt:
-      glob: ["desktop/src-tauri/**"]
-      run: just desktop-tauri-fmt
-      stage_fixed: true
-    desktop-fix:
-      glob: ["desktop/**", "pnpm-lock.yaml"]
-      exclude: ["desktop/src-tauri/**"]
-      run: just desktop-fix
       stage_fixed: true
     web-fix:
       glob: ["web/**", "pnpm-lock.yaml"]
@@ -53,20 +44,9 @@ pre-push:
     rust-tests:
       glob: ["crates/**", "migrations/**", "schema/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", "scripts/run-tests.sh", "justfile"]
       run: just test-unit
-    desktop-check:
-      glob: ["desktop/**", "pnpm-lock.yaml"]
-      exclude: ["desktop/src-tauri/**"]
-      run: just desktop-check
-    desktop-test:
-      glob: ["desktop/**", "pnpm-lock.yaml"]
-      exclude: ["desktop/src-tauri/**"]
-      run: just desktop-test
-    desktop-tauri-checks:
-      # Keep local lint parity with Desktop Core CI for every path that can
-      # affect the Tauri crate or its path dependencies. Run clippy and tests
-      # serially so parallel pre-push hooks do not contend for Cargo's lock.
-      glob: ["desktop/src-tauri/**", "crates/**", "migrations/**", "schema/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", "scripts/run-tests.sh", "justfile"]
-      run: just desktop-tauri-clippy && just desktop-tauri-test
+    web-checks:
+      glob: ["web/**", "pnpm-lock.yaml"]
+      run: just web-check && just web-test
     mobile-test:
       glob: ["mobile/**"]
       run: just mobile-test

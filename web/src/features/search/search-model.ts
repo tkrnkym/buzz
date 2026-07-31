@@ -1,7 +1,7 @@
 /**
  * Message search over NIP-50.
  *
- * A `search` field on a `POST /query` filter is routed to `buzz-search`
+ * A `search` field on a `POST /query` filter is routed to `nuxx-search`
  * (Postgres full-text) instead of the event table, and the relay returns whole
  * signed events in relevance order — not excerpts. Ranking therefore comes from
  * the server and must be preserved: re-sorting the response by timestamp, the
@@ -127,7 +127,7 @@ export function toSearchHits(events: NostrEvent[]): SearchHit[] {
  * used as the anchor here.
  *
  * It is **not** reached because of stemming. The relay indexes and queries with
- * Postgres' `simple` dictionary (`migrations/0008_...`, `buzz-search/query.rs`),
+ * Postgres' `simple` dictionary (`migrations/0008_...`, `nuxx-search/query.rs`),
  * which lowercases and splits but does not stem — "deploy" does not match
  * "deployed". Do not add stemming-shaped behaviour to this function on the
  * assumption that the index has it.

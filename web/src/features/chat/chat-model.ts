@@ -123,7 +123,7 @@ export function toChannelList(events: NostrEvent[]): Channel[] {
 /**
  * Resolve the thread position of a message from its `e` tags.
  *
- * `buzz-sdk` writes `["e", root, "", "root"]` plus `["e", parent, "", "reply"]`
+ * `nuxx-sdk` writes `["e", root, "", "root"]` plus `["e", parent, "", "reply"]`
  * for a nested reply, and a single `["e", root, "", "reply"]` for a direct one —
  * so a lone marked `reply` tag is both root and parent.
  */
@@ -208,7 +208,7 @@ export interface HistoryCursor {
  * only express `until`, so it can only page ambiguously. The relay pairs the two
  * into a keyset — `created_at < until OR (created_at = until AND id > before_id)`
  * against `ORDER BY created_at DESC, id ASC` — which walks dense seconds exactly
- * once (`crates/buzz-db/src/event.rs`).
+ * once (`crates/nuxx-db/src/event.rs`).
  *
  * The relay rejects `before_id` without `until`, so the cursor is passed as one
  * value rather than two optional fields that could disagree.
@@ -259,7 +259,7 @@ export function chunkIds(
  * Reactions and NIP-09 deletions for the given message ids.
  *
  * Keyed by `#e`, not `#h`: a kind:7 reaction carries only an `e` tag (see
- * `buzz-sdk::build_reaction`), so it never reaches an `#h`-scoped subscription.
+ * `nuxx-sdk::build_reaction`), so it never reaches an `#h`-scoped subscription.
  * kind:5 is included because the NIP-09 form of a message deletion also omits
  * `h`.
  */
@@ -287,7 +287,7 @@ export function buildReactionWithdrawalFilter(
   };
 }
 
-/** Event template for a chat message, matching `buzz-sdk::build_message`. */
+/** Event template for a chat message, matching `nuxx-sdk::build_message`. */
 export function buildMessageTemplate(
   channelId: string,
   content: string,
@@ -300,7 +300,7 @@ export function buildMessageTemplate(
 }
 
 /**
- * Event template for a reply, matching `buzz-sdk::thread_tags`.
+ * Event template for a reply, matching `nuxx-sdk::thread_tags`.
  *
  * A direct reply carries one marked `reply` tag; a nested reply carries `root`
  * plus `reply`. Getting this wrong flattens or misparents the thread.
@@ -320,11 +320,11 @@ export function buildReplyTemplate(
   return { kind: KIND_STREAM_MESSAGE, tags, content };
 }
 
-/** Longest emoji a reaction may carry, per `buzz-sdk::build_reaction`. */
+/** Longest emoji a reaction may carry, per `nuxx-sdk::build_reaction`. */
 export const MAX_REACTION_EMOJI_LENGTH = 64;
 
 /**
- * Event template for a NIP-25 reaction, matching `buzz-sdk::build_reaction`.
+ * Event template for a NIP-25 reaction, matching `nuxx-sdk::build_reaction`.
  *
  * Deliberately no `h` tag — the SDK omits it, and adding one here would produce
  * events other Buzz clients do not.

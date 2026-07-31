@@ -1,7 +1,7 @@
 /**
  * Nostr event kinds used by the web client.
  *
- * `crates/buzz-core/src/kind.rs` is the source of truth. `pnpm check:kinds`
+ * `crates/nuxx-core/src/kind.rs` is the source of truth. `pnpm check:kinds`
  * asserts every constant here matches its `KIND_*` counterpart there, so a
  * relay-side renumbering cannot silently desynchronize the client.
  *
@@ -59,7 +59,7 @@ export const KIND_CHANNEL_ACTIVITY_SNAPSHOT = 39007;
 /**
  * Kinds that render as a row in a channel timeline.
  *
- * Both message kinds are included: `build_message` in `buzz-sdk` writes kind 9,
+ * Both message kinds are included: `build_message` in `nuxx-sdk` writes kind 9,
  * but 40002 exists in stored history and from other producers, so a reader that
  * filters on only one of them silently loses messages.
  */

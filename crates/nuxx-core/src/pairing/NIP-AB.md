@@ -672,7 +672,7 @@ Those behaviors remain normative in this document and in the Rust implementation
 Run the proof with:
 
 ```bash
-tamarin-prover --prove crates/buzz-core/src/pairing/NIP-AB.spthy
+tamarin-prover --prove crates/nuxx-core/src/pairing/NIP-AB.spthy
 ```
 
 ## Cryptographic Primitives

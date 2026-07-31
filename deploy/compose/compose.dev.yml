@@ -43,4 +43,4 @@ services:
 volumes:
   buzz-prometheus-data:
     labels:
-      com.buzz.volume: prometheus
+      com.nuxx.volume: prometheus

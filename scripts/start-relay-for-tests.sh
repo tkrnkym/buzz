@@ -82,9 +82,9 @@ wait_healthy() {
   return 1
 }
 
-wait_healthy "Postgres" "buzz-postgres"
-wait_healthy "Redis" "buzz-redis"
-wait_healthy "MinIO" "buzz-minio"
+wait_healthy "Postgres" "nuxx-postgres"
+wait_healthy "Redis" "nuxx-redis"
+wait_healthy "MinIO" "nuxx-minio"
 
 # ── Apply database schema ────────────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ log "Applying database schema..."
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=buzz
-export PGPASSWORD=buzz_dev
+export PGPASSWORD=nuxx_dev
 export PGDATABASE=buzz
 
 # Use the already-running docker postgres for desired-state planning instead of
@@ -101,10 +101,10 @@ export PGSCHEMA_PLAN_HOST=localhost
 export PGSCHEMA_PLAN_PORT=5432
 export PGSCHEMA_PLAN_DB=buzz
 export PGSCHEMA_PLAN_USER=buzz
-export PGSCHEMA_PLAN_PASSWORD=buzz_dev
+export PGSCHEMA_PLAN_PASSWORD=nuxx_dev
 
 ./bin/pgschema apply --file schema/schema.sql --auto-approve
-docker exec -i -e PGPASSWORD="${PGPASSWORD}" buzz-postgres \
+docker exec -i -e PGPASSWORD="${PGPASSWORD}" nuxx-postgres \
   psql -U "${PGUSER}" -d "${PGDATABASE}" -v ON_ERROR_STOP=1 < scripts/attach-schema-partitions.sql
 ok "Schema applied"
 
@@ -116,13 +116,13 @@ ok "Schema applied"
 # (ensure_configured_community has no callers) and fails closed on an unmapped
 # host, so without this row every e2e connection would 404 at host-binding.
 # The unique index is on lower(host), so ON CONFLICT must target that expression.
-# psql is not on PATH in the hermit env; postgres runs as the buzz-postgres
+# psql is not on PATH in the hermit env; postgres runs as the nuxx-postgres
 # docker container, so exec into it (same fallback as setup-desktop-test-data.sh).
 log "Seeding deployment community (host=localhost:3000)..."
 if command -v psql >/dev/null 2>&1; then
   seed_psql() { PGPASSWORD="${PGPASSWORD}" psql -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}" -qtA "$@"; }
 else
-  seed_psql() { docker exec -e PGPASSWORD="${PGPASSWORD}" buzz-postgres psql -U "${PGUSER}" -d "${PGDATABASE}" -qtA "$@"; }
+  seed_psql() { docker exec -e PGPASSWORD="${PGPASSWORD}" nuxx-postgres psql -U "${PGUSER}" -d "${PGDATABASE}" -qtA "$@"; }
 fi
 seed_psql -c "
 INSERT INTO communities (id, host)
@@ -135,7 +135,7 @@ ok "Community seeded"
 # ── Build relay ──────────────────────────────────────────────────────────────
 
 if [[ "${SKIP_BUILD}" == "true" ]]; then
-  for bin in buzz-relay git-credential-nostr; do
+  for bin in nuxx-relay git-credential-nostr; do
     if [[ ! -x "./target/${CARGO_PROFILE}/${bin}" ]]; then
       err "--no-build: ./target/${CARGO_PROFILE}/${bin} missing or not executable"
       exit 1
@@ -144,7 +144,7 @@ if [[ "${SKIP_BUILD}" == "true" ]]; then
   log "Skipping relay build (--no-build); using existing target/${CARGO_PROFILE}/ binaries"
 else
   log "Building relay (profile: ${CARGO_PROFILE})..."
-  cargo build --profile "${CARGO_PROFILE}" -p buzz-relay -p git-credential-nostr
+  cargo build --profile "${CARGO_PROFILE}" -p nuxx-relay -p git-credential-nostr
   ok "Relay built"
 fi
 
@@ -159,16 +159,16 @@ nohup env \
   BUZZ_REQUIRE_AUTH_TOKEN=false \
   BUZZ_RECONCILE_CHANNELS=true \
   BUZZ_GIT_PROBE_WRITERS=8 \
-  "./target/${CARGO_PROFILE}/buzz-relay" > /tmp/buzz-relay.log 2>&1 &
-echo $! > /tmp/buzz-relay.pid
+  "./target/${CARGO_PROFILE}/nuxx-relay" > /tmp/nuxx-relay.log 2>&1 &
+echo $! > /tmp/nuxx-relay.pid
 
 # ── Poll readiness ───────────────────────────────────────────────────────────
 
 log "Waiting for relay readiness..."
 for attempt in $(seq 1 60); do
-  if ! kill -0 "$(cat /tmp/buzz-relay.pid)" 2>/dev/null; then
+  if ! kill -0 "$(cat /tmp/nuxx-relay.pid)" 2>/dev/null; then
     err "Relay process died"
-    cat /tmp/buzz-relay.log
+    cat /tmp/nuxx-relay.log
     exit 1
   fi
   status_code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/_readiness || true)
@@ -181,5 +181,5 @@ for attempt in $(seq 1 60); do
 done
 
 err "Relay did not become ready within 60s"
-cat /tmp/buzz-relay.log
+cat /tmp/nuxx-relay.log
 exit 1

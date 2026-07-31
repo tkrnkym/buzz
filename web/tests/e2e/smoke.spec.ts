@@ -451,7 +451,7 @@ function mockRelay(
     for (const [channelId, at] of Object.entries(
       options.channelActivity ?? {},
     )) {
-      // Same rule as `shard_of` in buzz-core: the UUID's last bytes, mod the
+      // Same rule as `shard_of` in nuxx-core: the UUID's last bytes, mod the
       // shard count.
       const shard =
         Number.parseInt(channelId.replace(/-/g, "").slice(-8), 16) % 16;
@@ -885,7 +885,7 @@ test("replying publishes thread tags and shows the reply count", async ({
       (event as { tags: string[][] }).tags.some((tag) => tag[3] === "reply"),
   ) as { kind: number; tags: string[][] };
   expect(reply.kind).toBe(9);
-  // Root === parent for a direct reply, which buzz-sdk collapses to one tag.
+  // Root === parent for a direct reply, which nuxx-sdk collapses to one tag.
   expect(reply.tags).toContainEqual(["e", root.id, "", "reply"]);
   expect(reply.tags).toContainEqual(["h", CHANNEL_UUID]);
 });

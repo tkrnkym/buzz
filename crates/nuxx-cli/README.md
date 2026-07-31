@@ -5,7 +5,7 @@ Agent-first command-line interface for Buzz relay. JSON in, JSON out.
 ## Install
 
 ```bash
-cargo install --path crates/buzz-cli
+cargo install --path crates/nuxx-cli
 ```
 
 ## Authentication
@@ -17,7 +17,7 @@ cargo install --path crates/buzz-cli
 ```bash
 # Private key identity (NIP-98 signed requests)
 export BUZZ_PRIVATE_KEY="nsec1..."
-buzz channels list
+nuxx channels list
 ```
 
 ## Usage
@@ -29,53 +29,53 @@ All output is JSON on stdout. Errors are JSON on stderr. Exit codes: 0=ok, 1=use
 export BUZZ_RELAY_URL="https://relay.example.com"
 
 # Messages
-buzz messages send --channel <uuid> --content "Hello"
-buzz messages send --channel <uuid> --content "Reply" --reply-to <event-id> --broadcast
-buzz messages send --channel <uuid> --content - < message.md   # read body from stdin
-buzz messages get --channel <uuid> --limit 20
-buzz messages thread --channel <uuid> --event <event-id>
-buzz messages search --query "architecture"
-buzz messages search --author <pubkey|npub|name> --since <unix-ts>
-buzz messages edit --event <event-id> --content "Updated text"
-buzz messages delete --event <event-id>
+nuxx messages send --channel <uuid> --content "Hello"
+nuxx messages send --channel <uuid> --content "Reply" --reply-to <event-id> --broadcast
+nuxx messages send --channel <uuid> --content - < message.md   # read body from stdin
+nuxx messages get --channel <uuid> --limit 20
+nuxx messages thread --channel <uuid> --event <event-id>
+nuxx messages search --query "architecture"
+nuxx messages search --author <pubkey|npub|name> --since <unix-ts>
+nuxx messages edit --event <event-id> --content "Updated text"
+nuxx messages delete --event <event-id>
 
 # Diffs
-buzz messages send-diff --channel <uuid> --diff - --repo https://github.com/org/repo --commit abc123 < diff.patch
+nuxx messages send-diff --channel <uuid> --diff - --repo https://github.com/org/repo --commit abc123 < diff.patch
 
 # Channels
-buzz channels list
-buzz channels create --name "my-channel" --type stream --visibility open
-buzz channels join --channel <uuid>
-buzz channels topic --channel <uuid> --topic "New topic"
+nuxx channels list
+nuxx channels create --name "my-channel" --type stream --visibility open
+nuxx channels join --channel <uuid>
+nuxx channels topic --channel <uuid> --topic "New topic"
 
 # Reactions
-buzz reactions add --event <event-id> --emoji "👍"
-buzz reactions get --event <event-id>
+nuxx reactions add --event <event-id> --emoji "👍"
+nuxx reactions get --event <event-id>
 
 # Users & Presence
-buzz users get                          # your own profile
-buzz users get --pubkey <hex>           # single user
-buzz users get --pubkey <hex> --pubkey <hex>  # batch (max 200)
-buzz users set-presence --status online
-buzz users set-status --text "heads down on the CLI" --emoji "🚀"
-buzz users set-status --clear                 # remove your status
+nuxx users get                          # your own profile
+nuxx users get --pubkey <hex>           # single user
+nuxx users get --pubkey <hex> --pubkey <hex>  # batch (max 200)
+nuxx users set-presence --status online
+nuxx users set-status --text "heads down on the CLI" --emoji "🚀"
+nuxx users set-status --clear                 # remove your status
 
 # DMs
-buzz dms open --pubkey <hex>
-buzz dms list
+nuxx dms open --pubkey <hex>
+nuxx dms list
 
 # Workflows
-buzz workflows list --channel <uuid>
-buzz workflows trigger --workflow <uuid>
-buzz workflows approve --token <uuid>
-buzz workflows approve --token <uuid> --approved false --note "needs revision"
+nuxx workflows list --channel <uuid>
+nuxx workflows trigger --workflow <uuid>
+nuxx workflows approve --token <uuid>
+nuxx workflows approve --token <uuid> --approved false --note "needs revision"
 
 # Forum
-buzz messages vote --event <event-id> --direction up
+nuxx messages vote --event <event-id> --direction up
 
 # Canvas
-buzz canvas get --channel <uuid>
-buzz canvas set --channel <uuid> --content "# Welcome"
+nuxx canvas get --channel <uuid>
+nuxx canvas set --channel <uuid> --content "# Welcome"
 
 # Agent Memory (NIP-AE)
 buzz mem ls
@@ -85,12 +85,12 @@ buzz mem patch <slug> --base-hash <hex> < diff.patch  # or --no-base-hash
 buzz mem rm <slug>
 
 # Repository protection
-buzz repos protect list --id my-repo
-buzz repos protect set --id my-repo --ref refs/heads/main --push admin --no-force-push --no-delete
-buzz repos protect remove --id my-repo --ref refs/heads/main
+nuxx repos protect list --id my-repo
+nuxx repos protect set --id my-repo --ref refs/heads/main --push admin --no-force-push --no-delete
+nuxx repos protect remove --id my-repo --ref refs/heads/main
 
 # Pipe to jq
-buzz channels list | jq '.[].name'
+nuxx channels list | jq '.[].name'
 ```
 
 `protect set` replaces every existing rule for the exact ref pattern. Any

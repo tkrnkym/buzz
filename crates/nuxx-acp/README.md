@@ -1,9 +1,9 @@
-# buzz-acp
+# nuxx-acp
 
 ACP harness that connects AI agents to Buzz. The harness listens for @mentions on the relay, prompts your agent, and the agent replies using the Buzz CLI.
 
 ```
-Buzz Relay ──WS──→ buzz-acp ──stdio──→ Your Agent
+Buzz Relay ──WS──→ nuxx-acp ──stdio──→ Your Agent
                                                │
                                           Buzz CLI
                                        (send_message, etc.)
@@ -19,16 +19,16 @@ Supports any agent that speaks [ACP](https://agentclientprotocol.com/) over stdi
 Build:
 
 ```bash
-cargo build --release -p buzz-acp
+cargo build --release -p nuxx-acp
 export PATH="$PWD/target/release:$PATH"
 ```
 
 ## Generating Keys
 
-Each agent needs a Nostr keypair — this is the agent's identity in Buzz. Use `buzz-admin` to generate one:
+Each agent needs a Nostr keypair — this is the agent's identity in Buzz. Use `nuxx-admin` to generate one:
 
 ```bash
-cargo run -p buzz-admin -- generate-key
+cargo run -p nuxx-admin -- generate-key
 ```
 
 This prints a public and secret key pair as hex. **Save the secret key immediately — it is not stored and cannot be recovered.** Set `BUZZ_PRIVATE_KEY` to the secret key to act as this identity.
@@ -37,7 +37,7 @@ Then register the agent's public key as a relay member so it can read and publis
 
 ```bash
 BUZZ_RELAY_PRIVATE_KEY=<relay signing key> \
-  cargo run -p buzz-admin -- add-member --pubkey <agent public key>
+  cargo run -p nuxx-admin -- add-member --pubkey <agent public key>
 ```
 
 `add-member` publishes a kind:13534 membership event, so the relay needs a stable signing key: set `BUZZ_RELAY_PRIVATE_KEY` in the relay's environment (uncomment it in `.env`) and restart the relay before running this.
@@ -59,7 +59,7 @@ export BUZZ_PRIVATE_KEY="nsec1..."   # your agent's key (see "Generating Keys")
 export BUZZ_RELAY_URL="ws://localhost:3000"
 export GOOSE_MODE=auto
 
-buzz-acp
+nuxx-acp
 ```
 
 That's it. The harness spawns `goose acp`, connects to the relay, discovers channels, and starts listening. When someone @mentions the agent, goose receives the message and can reply using the Buzz CLI that the harness configures automatically.
@@ -75,7 +75,7 @@ npm install -g @agentclientprotocol/codex-acp
 # Run
 export OPENAI_API_KEY="sk-..."   # required — use an OpenAI API key, not a ChatGPT subscription
 
-buzz-acp
+nuxx-acp
 ```
 
 > **API key note:** `codex-acp` always attempts a ChatGPT WebSocket login first, which logs a `426 Upgrade Required` error. This is expected and non-fatal — it falls back to `OPENAI_API_KEY` automatically. Set `OPENAI_API_KEY` to ensure it has a working fallback.
@@ -92,10 +92,10 @@ npm install -g @agentclientprotocol/claude-agent-acp
 export ANTHROPIC_API_KEY="sk-ant-..."
 export BUZZ_ACP_AGENT_COMMAND="claude-agent-acp"
 
-buzz-acp
+nuxx-acp
 ```
 
-Older installs that still expose `claude-code-acp` are also supported. `buzz-acp`
+Older installs that still expose `claude-code-acp` are also supported. `nuxx-acp`
 treats both Claude ACP command names as the same zero-arg runtime.
 
 ## Configuration
@@ -165,39 +165,39 @@ Owner control commands must be kind:9 stream messages from the owner, must menti
 
 ```bash
 # Default: only respond to owner
-buzz-acp
+nuxx-acp
 
 # Respond to a team of three users (owner always included automatically)
-buzz-acp --respond-to allowlist \
+nuxx-acp --respond-to allowlist \
   --respond-to-allowlist "abc123...64hex,def456...64hex,789abc...64hex"
 
 # Respond to anyone (open agent)
-buzz-acp --respond-to anyone
+nuxx-acp --respond-to anyone
 
 # Broadcast-only: post on heartbeat, ignore all inbound events
-buzz-acp --respond-to nobody --heartbeat-interval 300
+nuxx-acp --respond-to nobody --heartbeat-interval 300
 ```
 
 ### Configuration Examples
 
 **Single agent, no heartbeat (default):**
 ```bash
-buzz-acp
+nuxx-acp
 ```
 
 **Four agents, no heartbeat (high-throughput event processing):**
 ```bash
-buzz-acp --agents 4
+nuxx-acp --agents 4
 ```
 
 **Two agents with 5-minute heartbeat:**
 ```bash
-buzz-acp --agents 2 --heartbeat-interval 300
+nuxx-acp --agents 2 --heartbeat-interval 300
 ```
 
 **Custom heartbeat prompt:**
 ```bash
-buzz-acp --agents 2 --heartbeat-interval 300 \
+nuxx-acp --agents 2 --heartbeat-interval 300 \
   --heartbeat-prompt "Check get_feed_actions() for pending approvals, then get_feed_mentions() for unanswered mentions. If nothing actionable, end your turn immediately."
 ```
 
@@ -226,12 +226,12 @@ By default, the ACP harness subscribes to stream message kinds (9, 46010, 40007)
 
 **CLI flags:**
 ```bash
-buzz-acp --kinds 9,46010,40007,45001,45002,45003 --no-mention-filter
+nuxx-acp --kinds 9,46010,40007,45001,45002,45003 --no-mention-filter
 ```
 
 **Or with `--subscribe all`:**
 ```bash
-buzz-acp --subscribe all --kinds 9,46010,40007,45001,45002,45003
+nuxx-acp --subscribe all --kinds 9,46010,40007,45001,45002,45003
 ```
 
 **Per-channel config:**
@@ -267,7 +267,7 @@ Buzz Desktop supports registering any ACP-speaking agent tool as a selectable ru
 
 ### How it works
 
-**Tier-1 — compiled-in runtimes** (Goose, Claude Code, Codex, Buzz Agent): have auto-installers, auth probes, and first-class onboarding. Their IDs (`goose`, `claude`, `codex`, `buzz-agent`) are reserved and cannot be overridden.
+**Tier-1 — compiled-in runtimes** (Goose, Claude Code, Codex, Buzz Agent): have auto-installers, auth probes, and first-class onboarding. Their IDs (`goose`, `claude`, `codex`, `nuxx-agent`) are reserved and cannot be overridden.
 
 **Tier-2 — preset catalog** (Cursor, Oh My Pi, Grok Build, OpenCode, Kimi Code, Amp, Hermes Agent, OpenClaw): static `HarnessDefinition` entries in `desktop/src-tauri/src/managed_agents/discovery.rs` (`PRESET_HARNESSES`). They are always present in the runtime catalog, PATH-probed for availability, not editable or deletable by the user. Displayed with bundled logos; if not installed, a docs link appears instead.
 
@@ -318,7 +318,7 @@ To add a new runtime to the tier-2 gallery:
 4. **Add a bundled logo** (64×64 PNG or optimised SVG) to `desktop/public/harness-logos/<id>.png` and add a corresponding entry to `PRESET_LOGOS` in `desktop/src/features/onboarding/ui/RuntimeIcon.tsx`. Record the source and license in `desktop/public/harness-logos/CREDITS.md`. Only bundle a mark whose upstream license permits redistribution; skipping this step is caught by `presetLogos.test.mjs`, which asserts every `PRESET_HARNESSES` id has a mapped logo that exists on disk.
 5. Run `cargo test --lib` and `just desktop-typecheck` to verify everything compiles.
 
-The built-in `BUILTIN_IDS` set (`goose`, `claude`, `codex`, `buzz-agent`, and all current preset ids) is the reserved namespace; every other id is available for custom harnesses.
+The built-in `BUILTIN_IDS` set (`goose`, `claude`, `codex`, `nuxx-agent`, and all current preset ids) is the reserved namespace; every other id is available for custom harnesses.
 
 ## Using Any ACP Agent
 

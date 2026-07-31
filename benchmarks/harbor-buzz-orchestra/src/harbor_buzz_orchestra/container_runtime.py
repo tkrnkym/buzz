@@ -3,7 +3,7 @@
 Each provisioned identity is a full ``buzz-acp`` → ``buzz-agent`` →
 ``buzz-dev-mcp`` process tree launched *inside* the task container — the same
 binaries and the same MCP toolset (shell, file tools, the ``buzz`` CLI on
-PATH) that the desktop app gives a Buzz agent. The harness stays outside:
+PATH) that a Buzz host gives an agent. The harness stays outside:
 it provisions, uploads the pinned binaries, posts the task as the trial
 user, and observes the channel until the orchestrator publishes DONE.
 """
@@ -348,7 +348,7 @@ class BuzzContainerRuntime:
         endpoint: EndpointLaunchConfig,
         remote_prompt: str,
     ) -> dict[str, str]:
-        """The desktop-launch environment: real acp/agent/dev-mcp wiring."""
+        """The agent-launch environment: real acp/agent/dev-mcp wiring."""
         return {
             **endpoint.env,
             "BUZZ_RELAY_URL": trial.relay_ws_url,

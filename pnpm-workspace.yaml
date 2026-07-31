@@ -1,5 +1,4 @@
 packages:
-  - "desktop"
   - "web"
   - "admin-web"
 allowBuilds:

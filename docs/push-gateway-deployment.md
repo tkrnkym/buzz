@@ -1,6 +1,6 @@
 # Buzz Push Gateway deployment
 
-`buzz-push-gateway` is the standalone public APNs last hop intended for `push.buzz.xyz`. Build it with `Dockerfile.push-gateway`; do not run it in the relay image or give relays APNs credentials.
+`nuxx-push-gateway` is the standalone public APNs last hop intended for `push.buzz.xyz`. Build it with `Dockerfile.push-gateway`; do not run it in the relay image or give relays APNs credentials.
 
 ## Network and health
 
@@ -36,7 +36,7 @@ The gateway stores APNs tokens encrypted in PostgreSQL. Database backups therefo
 
 ## PostgreSQL and replicas
 
-All replicas must share one PostgreSQL database. Delivery authority, replay admission, and endpoint quota reservation are transactional there, so replica count does not multiply the abuse ceiling. The gateway owns a scoped migration history under `crates/buzz-push-gateway/migrations`; it creates only the six `push_gateway_*` authority tables plus SQLx's migration-history table and never runs relay migrations.
+All replicas must share one PostgreSQL database. Delivery authority, replay admission, and endpoint quota reservation are transactional there, so replica count does not multiply the abuse ceiling. The gateway owns a scoped migration history under `crates/nuxx-push-gateway/migrations`; it creates only the six `push_gateway_*` authority tables plus SQLx's migration-history table and never runs relay migrations.
 
 The Helm chart runs a single pre-install/pre-upgrade migration Job using `migration.existingSecret`; that secret contains a DDL-capable `DATABASE_URL`. The URL MUST name a dedicated gateway database, not the relay database: SQLx stores its `_sqlx_migrations` history in `public`, so sharing a database would collide with another application's migration history. `migration.runtimeDatabaseRole` names an existing LOGIN role (the default is `buzz_push_gateway_runtime`) used by runtime `DATABASE_URL`. After scoped migrations, the Job revokes database `CREATE` from that role and schema `CREATE` from both `PUBLIC` and the role, then grants only database `CONNECT`, schema `USAGE`, and `SELECT, INSERT, UPDATE, DELETE` on the six gateway tables. The migration role must own the database/schema objects or otherwise be allowed to issue those grants; it is never provided to runtime replicas. Readiness rejects an empty/partial schema, missing DML, or a runtime role that retains database/schema `CREATE`. Helm waits for the migration hook before updating replicas, so rolling deployments never race unconditional startup migration. Readiness must be removed from load-balancer service endpoints before terminating a pod.
 
@@ -95,27 +95,27 @@ The chart defaults to the `main` image tag because `.github/workflows/docker.yml
 
 ```bash
 gh attestation verify \
-  oci://ghcr.io/block/buzz-push-gateway@sha256:<64-lowercase-hex> \
+  oci://ghcr.io/block/nuxx-push-gateway@sha256:<64-lowercase-hex> \
   --owner block
 ```
 
-Only after that command succeeds, set the exact digest as `image.digest`; the chart then renders `ghcr.io/block/buzz-push-gateway@sha256:...` and ignores the mutable tag. `values-production.yaml` is an intentionally invalid production-input contract: deployment CI must inject this verified `image.digest`, the provisioned Apple application identifier, an environment-owned Gateway parent reference, and the actual PostgreSQL network. Schema validation rejects the artifact when any remains empty; the render guard proves both rejection and a fully injected render.
+Only after that command succeeds, set the exact digest as `image.digest`; the chart then renders `ghcr.io/block/nuxx-push-gateway@sha256:...` and ignores the mutable tag. `values-production.yaml` is an intentionally invalid production-input contract: deployment CI must inject this verified `image.digest`, the provisioned Apple application identifier, an environment-owned Gateway parent reference, and the actual PostgreSQL network. Schema validation rejects the artifact when any remains empty; the render guard proves both rejection and a fully injected render.
 
 Network policy keeps APNs HTTPS and PostgreSQL egress in separate CIDR lists. APNs currently requires broad TCP/443 reachability; `networkPolicy.postgresEgressCidrs` must be narrowed to the production database network, and the DNS namespace/pod selectors must match the cluster DNS deployment. The sample private CIDR is not a claim about the production topology.
 
-Kubernetes does not restart pods when referenced Secret bytes change. AEAD or APNs credential rotation therefore requires an explicit rolling restart after the secret manager update (for example, `kubectl rollout restart deployment/<release>-buzz-push-gateway`) and readiness verification before removing predecessor keys. Service-account token automount is disabled.
+Kubernetes does not restart pods when referenced Secret bytes change. AEAD or APNs credential rotation therefore requires an explicit rolling restart after the secret manager update (for example, `kubectl rollout restart deployment/<release>-nuxx-push-gateway`) and readiness verification before removing predecessor keys. Service-account token automount is disabled.
 
 ## Gateway chart release
 
 The gateway chart has a collision-free release lane separate from the main
-`buzz` chart. To publish version `X.Y.Z`, update both `version` and `appVersion`
-in `deploy/charts/buzz-push-gateway/Chart.yaml`, validate the chart, and open a
+`nuxx` chart. To publish version `X.Y.Z`, update both `version` and `appVersion`
+in `deploy/charts/nuxx-push-gateway/Chart.yaml`, validate the chart, and open a
 same-repository PR whose branch is exactly `push-chart-release/X.Y.Z`:
 
 ```bash
-deploy/charts/buzz-push-gateway/tests/render.sh
+deploy/charts/nuxx-push-gateway/tests/render.sh
 git switch -c push-chart-release/X.Y.Z
-git add deploy/charts/buzz-push-gateway/Chart.yaml
+git add deploy/charts/nuxx-push-gateway/Chart.yaml
 git commit -m "release: push gateway chart X.Y.Z"
 git push -u origin push-chart-release/X.Y.Z
 ```
@@ -125,5 +125,5 @@ creates `push-chart-vX.Y.Z` and dispatches
 `.github/workflows/push-gateway-helm-chart.yml` with that immutable tag and bare
 version. The publisher verifies the checked-out commit is the tag target and the
 chart version equals `X.Y.Z` before pushing
-`oci://ghcr.io/block/buzz/charts/buzz-push-gateway`. A manually pushed
+`oci://ghcr.io/block/buzz/charts/nuxx-push-gateway`. A manually pushed
 `push-chart-vX.Y.Z` tag is the documented rescue path and runs the same checks.

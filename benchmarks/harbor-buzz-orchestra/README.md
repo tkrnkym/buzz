@@ -4,7 +4,7 @@ A stock-Harbor custom agent that runs a manifest-defined team through the real
 Buzz stack. Harbor sees one `BuzzOrchestraAgent`; behind that adapter, one
 orchestrator and N workers coordinate over the production relay/Postgres.
 Each agent runs *inside* the Harbor task container as the same
-`buzz-acp` → `buzz-agent` → `buzz-dev-mcp` process tree the desktop app
+`nuxx-acp` → `nuxx-agent` → `nuxx-dev-mcp` process tree the harness
 launches: the production MCP toolset (shell, file tools, todo) with the
 `buzz` CLI on the shell's PATH. No Harbor fork or patch is required.
 
@@ -74,15 +74,14 @@ schema, and defaults to leaderboard-eligible settings (Terminal-Bench 2.1,
 just benchmark                                   # full TB 2.1, k=5
 just benchmark --path <TASK_DIR> -k 1            # one local task, one attempt
 just benchmark -i "cobol*" --attempts 3          # dataset subset
-just benchmark --gui                             # watch the run live
 ```
 
 One pinned user identity fronts the whole benchmark environment: it owns
 every trial channel (named after the task) and posts every task prompt, and
-trial channels are kept rather than archived. `--gui` adds that user to the
-relay membership list and opens the Buzz desktop app logged in as them, so
-channels fill the sidebar as the run progresses — watch, don't type; a human
-message mid-trial would taint the run. `just benchmark-down` stops the stack.
+trial channels are kept rather than archived. The run prints that user's nsec,
+so you can sign into the web client as them and watch channels fill as the run
+progresses — watch, don't type; a human message mid-trial would taint the run.
+`just benchmark-down` stops the stack.
 
 Networking: the relay is host-header tenant-bound, so agents must dial its
 canonical address (`ws://localhost:3600`) even from inside a task container.

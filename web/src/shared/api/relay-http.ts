@@ -9,7 +9,7 @@
  *   rather than a stream to listen to.
  *
  * `POST /query` runs each filter independently and concurrently and honours each
- * filter's own `limit` (`query_events_authed` in `crates/buzz-relay/src/api/
+ * filter's own `limit` (`query_events_authed` in `crates/nuxx-relay/src/api/
  * bridge.rs`), so a single request can carry one question per channel and come
  * back with at most one event each.
  */

@@ -4823,19 +4823,18 @@ impl Db {
                         .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
             })
             && read_state_t_tag_count == 1;
-        // Both spellings. The `d` tag and the `k` tag value live inside *signed*
-        // kind:30003 events, so every mesh-status record written before the
-        // rename carries the old prefix permanently — it cannot be rewritten
-        // without invalidating the signature. Matching only the new spelling
-        // would leave those rows out of the supersede path silently.
+        // New spelling only, matching migration 0030's retention trigger. The
+        // `d` tag and the `k` tag value live inside *signed* kind:30003 events,
+        // so pre-rename records keep the old prefix permanently and are no
+        // longer recognized here — they stay out of the supersede path. Accepted
+        // deliberately: mesh status is a 45-second heartbeat, so that set drains
+        // as members republish. Both sides must narrow together; leaving one
+        // wide would purge rows the other still treats as live.
         let is_mesh_status = kind_i32 == nuxx_core::kind::KIND_BOOKMARK_SET as i32
-            && (d_tag.starts_with("nuxx-mesh-member-status:")
-                || d_tag.starts_with("buzz-mesh-member-status:"))
+            && d_tag.starts_with("nuxx-mesh-member-status:")
             && event.tags.iter().any(|tag| {
                 let parts = tag.as_slice();
-                parts.len() == 2
-                    && parts[0] == "k"
-                    && (parts[1] == "nuxx-mesh-status" || parts[1] == "buzz-mesh-status")
+                parts.len() == 2 && parts[0] == "k" && parts[1] == "nuxx-mesh-status"
             });
         let hard_delete_superseded = is_nip_rs || is_mesh_status;
 

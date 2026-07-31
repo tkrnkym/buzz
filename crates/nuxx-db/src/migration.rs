@@ -98,6 +98,8 @@ async fn reject_legacy_nip_rs_cardinality_ambiguity(pool: &PgPool) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::channel::CHANNEL_TTL_LOCK_NAMESPACE;
+    use crate::push::PUSH_GATE_LOCK_NAMESPACE;
     use std::collections::BTreeSet;
 
     const TEST_DB_URL: &str = "postgres://nuxx:nuxx_dev@localhost:5432/nuxx";
@@ -563,7 +565,7 @@ mod tests {
 
         // Bumped with every added migration on purpose: the count is a guard
         // that a migration file was not added without being noticed here.
-        assert_eq!(migrations.len(), 28);
+        assert_eq!(migrations.len(), 30);
         assert_eq!(migrations[0].version, 1);
         assert_eq!(&*migrations[0].description, "initial schema");
         assert!(migrations[0]
@@ -921,6 +923,70 @@ mod tests {
         assert!(heartbeat.contains("epoch"));
         assert!(heartbeat.contains("INSERT INTO replica_heartbeat (id) VALUES (1)"));
         assert!(heartbeat.contains("_operator_global_tables"));
+
+        // 0029 renames both advisory-lock key domains the events triggers hash
+        // into lock keys. Asserted against the Rust constants, not against
+        // literals: the trigger and the relay each take one side of these locks
+        // (shared on insert, exclusive on the transition), and when the two
+        // strings drifted apart the acquisitions stopped conflicting — a silent
+        // loss of the total order 0023's and 0024's proofs rely on.
+        assert_eq!(migrations[28].version, 29);
+        let lock_rename = migrations[28].sql.as_str();
+        assert!(lock_rename.contains("CREATE OR REPLACE FUNCTION enqueue_push_match_job"));
+        assert!(lock_rename
+            .contains("CREATE OR REPLACE FUNCTION refresh_channel_ttl_after_event_insert"));
+        assert!(
+            lock_rename.contains(&format!("'{}' || NEW.community_id::text", PUSH_GATE_LOCK_NAMESPACE)),
+            "push-gate trigger domain must equal PUSH_GATE_LOCK_NAMESPACE ({PUSH_GATE_LOCK_NAMESPACE})"
+        );
+        assert!(
+            lock_rename.contains(&format!(
+                "'{}' || NEW.community_id::text",
+                CHANNEL_TTL_LOCK_NAMESPACE
+            )),
+            "TTL trigger domain must equal CHANNEL_TTL_LOCK_NAMESPACE ({CHANNEL_TTL_LOCK_NAMESPACE})"
+        );
+        // Both bodies are otherwise verbatim copies: the TTL trigger keeps its
+        // best-effort EXCEPTION block and its deferred-trigger RETURN NULL, and
+        // neither reintroduces the FOR UPDATE that 0024 removed.
+        assert!(lock_rename.contains("EXCEPTION WHEN OTHERS THEN"));
+        assert!(lock_rename.contains("RETURN NULL"));
+        assert!(lock_rename.contains("pg_advisory_xact_lock_shared"));
+        assert!(!strip_sql_comments(lock_rename)
+            .to_lowercase()
+            .contains("for update"));
+
+        // 0030 narrows the mesh-status retention trigger to the new spelling and
+        // renames the function/trigger off `buzz`. The narrowing is the point, so
+        // assert the legacy predicate is gone from the executable body while the
+        // one-time purge of already-soft-deleted legacy rows is still there —
+        // dropping that purge would strand exactly the rows the trigger stops
+        // recognizing.
+        assert_eq!(migrations[29].version, 30);
+        let mesh_only = migrations[29].sql.as_str();
+        let mesh_body = strip_sql_comments(mesh_only);
+        assert!(mesh_body.contains("CREATE FUNCTION purge_soft_deleted_nuxx_mesh_status"));
+        assert!(mesh_body.contains("CREATE TRIGGER trg_events_purge_soft_deleted_nuxx_mesh_status"));
+        assert!(mesh_body
+            .contains("DROP TRIGGER IF EXISTS trg_events_purge_soft_deleted_buzz_mesh_status"));
+        assert!(mesh_body.contains("nuxx-mesh-member-status:%"));
+        // The purge (a DELETE) may still name the legacy prefix; the trigger
+        // predicate may not.
+        let predicate = &mesh_body[mesh_body.find("CREATE FUNCTION").unwrap()..];
+        assert!(!predicate.contains("buzz-mesh-member-status"));
+        assert!(!predicate.contains("buzz-mesh-status"));
+        assert!(mesh_body.contains("AFTER UPDATE OF deleted_at ON events"));
+        // 0019's partition-pruning clause and delete order must survive the
+        // recreate.
+        assert!(mesh_body.contains("created_at = NEW.created_at"));
+        assert!(
+            mesh_body
+                .find("DELETE FROM events\n        WHERE community_id")
+                .unwrap()
+                < mesh_body
+                    .find("DELETE FROM event_mentions\n        WHERE community_id")
+                    .unwrap()
+        );
     }
 
     #[test]

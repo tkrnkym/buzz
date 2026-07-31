@@ -1,7 +1,7 @@
 /**
  * Kind-constant sync guard.
  *
- * `crates/buzz-core/src/kind.rs` owns every Nostr event-kind integer in Buzz.
+ * `crates/nuxx-core/src/kind.rs` owns every Nostr event-kind integer in Buzz.
  * The web client re-declares the subset it needs as TypeScript constants, and a
  * mismatch is silent: the client keeps filtering on a number the relay no longer
  * routes, so the channel simply looks empty. This asserts every `KIND_*` in
@@ -20,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(projectRoot, "..");
 
-const RUST_KINDS = path.join(repoRoot, "crates/buzz-core/src/kind.rs");
+const RUST_KINDS = path.join(repoRoot, "crates/nuxx-core/src/kind.rs");
 const TS_KINDS = path.join(projectRoot, "src/shared/constants/kinds.ts");
 
 /** @returns {Map<string, number>} `KIND_FOO` → integer */
@@ -51,7 +51,7 @@ const ts = parseTsKinds(TS_KINDS);
 if (rust.size === 0) {
   console.error(
     `Kind check failed: parsed no KIND_* constants from ${RUST_KINDS}.\n` +
-      "The declaration format in buzz-core probably changed; update the parser " +
+      "The declaration format in nuxx-core probably changed; update the parser " +
       "in web/scripts/check-kinds.mjs rather than deleting the guard.",
   );
   process.exit(1);
@@ -67,12 +67,12 @@ if (ts.size === 0) {
 const problems = [];
 for (const [name, value] of ts) {
   if (!rust.has(name)) {
-    problems.push(`${name}: not defined in buzz-core (web has ${value})`);
+    problems.push(`${name}: not defined in nuxx-core (web has ${value})`);
     continue;
   }
   const rustValue = rust.get(name);
   if (rustValue !== value) {
-    problems.push(`${name}: buzz-core=${rustValue} web=${value}`);
+    problems.push(`${name}: nuxx-core=${rustValue} web=${value}`);
   }
 }
 
@@ -82,12 +82,12 @@ if (problems.length > 0) {
     console.error(`  ${problem}`);
   }
   console.error(
-    "\ncrates/buzz-core/src/kind.rs is the source of truth. Update " +
+    "\ncrates/nuxx-core/src/kind.rs is the source of truth. Update " +
       "web/src/shared/constants/kinds.ts to match it.",
   );
   process.exit(1);
 }
 
 console.log(
-  `Kind constants OK (${ts.size} web kinds verified against ${rust.size} in buzz-core).`,
+  `Kind constants OK (${ts.size} web kinds verified against ${rust.size} in nuxx-core).`,
 );

@@ -23,7 +23,7 @@ services:
 volumes:
   buzz-caddy-data:
     labels:
-      com.buzz.volume: caddy-data
+      com.nuxx.volume: caddy-data
   buzz-caddy-config:
     labels:
-      com.buzz.volume: caddy-config
+      com.nuxx.volume: caddy-config

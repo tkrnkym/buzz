@@ -2,10 +2,10 @@
 #
 # Public Buzz relay image — published as ghcr.io/block/buzz:<tag>.
 #
-# Builds the `buzz-relay` binary (Rust 1.95) and the `buzz-web` static bundle
+# Builds the `nuxx-relay` binary (Rust 1.95) and the `nuxx-web` static bundle
 # (pnpm + vite), then assembles them into a small debian-slim runtime with
 # `git` available (the relay shells out to git for repo hydrate / receive-pack
-# / upload-pack — see crates/buzz-relay/src/api/git).
+# / upload-pack — see crates/nuxx-relay/src/api/git).
 #
 # Multi-arch is handled by running this same Dockerfile on native amd64 and
 # native arm64 runners (see .github/workflows/docker.yml). The Dockerfile
@@ -64,19 +64,19 @@ RUN apt-get update \
 ENV CARGO_PROFILE_RELEASE_DEBUG=line-tables-only
 COPY --from=planner /build/recipe.json recipe.json
 # Cook the full workspace recipe — relay deps include workspace siblings, so
-# scoping to -p buzz-relay misses transitive deps and re-builds them later.
+# scoping to -p nuxx-relay misses transitive deps and re-builds them later.
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN cargo build --release --locked -p buzz-relay --bin buzz-relay \
-                                   -p buzz-admin --bin buzz-admin \
-                                   -p buzz-pair-relay --bin buzz-pair-relay
+RUN cargo build --release --locked -p nuxx-relay --bin nuxx-relay \
+                                   -p nuxx-admin --bin nuxx-admin \
+                                   -p nuxx-pair-relay --bin nuxx-pair-relay
 
 # Derive the normal release binaries from the same optimized ELF files as the
 # debug image so the two variants cannot drift at code-generation time.
 FROM builder AS stripped-binaries
-RUN strip target/release/buzz-relay \
-    && strip target/release/buzz-admin \
-    && strip target/release/buzz-pair-relay
+RUN strip target/release/nuxx-relay \
+    && strip target/release/nuxx-admin \
+    && strip target/release/nuxx-pair-relay
 
 # ─── Stage 4: web bundle (pnpm + vite) ──────────────────────────────────────
 # Independent of the Rust layers so a CSS change doesn't bust Rust cache and
@@ -113,7 +113,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches/ patches/
 COPY web/package.json web/
 COPY admin-web/package.json admin-web/
-RUN pnpm install --frozen-lockfile --filter buzz-web --filter buzz-admin-web
+RUN pnpm install --frozen-lockfile --filter nuxx-web --filter nuxx-admin-web
 COPY web/ web/
 COPY admin-web/ admin-web/
 RUN pnpm -C web build && pnpm -C admin-web build
@@ -160,19 +160,19 @@ RUN mkdir -p /data/git && chown buzz:buzz /data/git
 USER buzz:buzz
 WORKDIR /var/lib/buzz
 
-ENTRYPOINT ["/usr/local/bin/buzz-relay"]
+ENTRYPOINT ["/usr/local/bin/nuxx-relay"]
 
 # Optimized binaries with line-table debug information for native profiling.
 # Published under debug-* tags; runtime behavior otherwise matches the normal
 # image exactly.
 FROM runtime-base AS runtime-debug
-COPY --from=builder /build/target/release/buzz-relay /usr/local/bin/buzz-relay
-COPY --from=builder /build/target/release/buzz-admin /usr/local/bin/buzz-admin
-COPY --from=builder /build/target/release/buzz-pair-relay /usr/local/bin/buzz-pair-relay
+COPY --from=builder /build/target/release/nuxx-relay /usr/local/bin/nuxx-relay
+COPY --from=builder /build/target/release/nuxx-admin /usr/local/bin/nuxx-admin
+COPY --from=builder /build/target/release/nuxx-pair-relay /usr/local/bin/nuxx-pair-relay
 
 # Keep the stripped runtime as the final/default Dockerfile target so existing
 # `docker build .` callers and release tags retain their current behavior.
 FROM runtime-base AS runtime
-COPY --from=stripped-binaries /build/target/release/buzz-relay /usr/local/bin/buzz-relay
-COPY --from=stripped-binaries /build/target/release/buzz-admin /usr/local/bin/buzz-admin
-COPY --from=stripped-binaries /build/target/release/buzz-pair-relay /usr/local/bin/buzz-pair-relay
+COPY --from=stripped-binaries /build/target/release/nuxx-relay /usr/local/bin/nuxx-relay
+COPY --from=stripped-binaries /build/target/release/nuxx-admin /usr/local/bin/nuxx-admin
+COPY --from=stripped-binaries /build/target/release/nuxx-pair-relay /usr/local/bin/nuxx-pair-relay

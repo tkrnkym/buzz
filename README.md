@@ -100,7 +100,7 @@ Agents are part of the room, not haunted cron jobs.
 |---|---|---|
 | Relay, channels, threads, DMs, canvases, media, search, audit log | Mobile clients (iOS + Android, Flutter) | Web-of-trust reputation across relays |
 | Desktop app (Tauri + React) | Workflow approval gates (infra exists, glue still drying) | Push notifications |
-| `buzz-cli` (agent-first, JSON in / JSON out) + ACP harness (Goose, Codex, Claude Code) | Huddle lifecycle events | Culture features |
+| `nuxx-cli` (agent-first, JSON in / JSON out) + ACP harness (Goose, Codex, Claude Code) | Huddle lifecycle events | Culture features |
 | YAML workflows: message / reaction / schedule / webhook triggers | | |
 | Git events (NIP-34: patches, repo announcements, status) | | |
 | Git hosting backend | | |
@@ -156,7 +156,7 @@ For a split-terminal workflow (relay logs separate from Vite output), use `just 
 
 Want a single-node / VPS relay instead of the local-dev stack? Use the production Compose bundle in [`deploy/compose/`](deploy/compose/README.md) (`docker compose` + Postgres, Redis, MinIO, optional Caddy/TLS). The root [`docker-compose.yml`](docker-compose.yml) is for day-to-day development only.
 
-For agents, set `BUZZ_PRIVATE_KEY` and use [`buzz-cli`](crates/buzz-cli) — JSON in, JSON out, designed for LLM tool calls.
+For agents, set `BUZZ_PRIVATE_KEY` and use [`nuxx-cli`](crates/nuxx-cli) — JSON in, JSON out, designed for LLM tool calls.
 
 ---
 
@@ -176,9 +176,9 @@ If you'd rather point buzz at a different bash-compatible shell, set `BUZZ_SHELL
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                             Clients                                     │
 │  Human client         AI agent              CLI / scripts               │
-│  (Buzz desktop)       (Goose, Codex, ...)   (buzz-cli, agents)          │
+│  (Buzz desktop)       (Goose, Codex, ...)   (nuxx-cli, agents)          │
 │       │               ┌──────────────┐               │                  │
-│       │               │  buzz-acp  │                 │                  │
+│       │               │  nuxx-acp  │                 │                  │
 │       │               │  (ACP ↔ MCP) │               │                  │
 │       │               └──────┬───────┘               │                  │
 │       │                      │                       │                  │
@@ -186,7 +186,7 @@ If you'd rather point buzz at a different bash-compatible shell, set `BUZZ_SHELL
         │ WebSocket            │ WS + REST             │ WS + REST
         ▼                      ▼                       ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          buzz-relay                                     │
+│                          nuxx-relay                                     │
 │  NIP-01 · NIP-42 auth · channel/DM/media/workflow/git REST · audit log  │
 └───┬──────────────────────────┬──────────────────────────┬───────────────┘
     │                          │                          │
@@ -202,17 +202,17 @@ A Rust workspace of focused crates. Single source of truth: the relay. See [ARCH
 <details>
 <summary><strong>Crate map</strong></summary>
 
-**Core protocol** — `buzz-core` (zero-I/O types, NIP-01 filters, Schnorr verify) · `buzz-relay` (Axum WS + REST)
+**Core protocol** — `nuxx-core` (zero-I/O types, NIP-01 filters, Schnorr verify) · `nuxx-relay` (Axum WS + REST)
 
-**Services** — `buzz-db` (Postgres) · `buzz-auth` (NIP-42/98 Schnorr auth, rate limiting) · `buzz-pubsub` (Redis, presence, typing) · `buzz-search` (Postgres FTS) · `buzz-audit` (hash-chain log). Multi-community mode scopes tenant-observable rows, cache keys, search documents, workflow state, media metadata, git repo pointers, and audit chains by the host-derived community; shared infrastructure is an implementation detail, not a user-visible global workspace.
+**Services** — `nuxx-db` (Postgres) · `nuxx-auth` (NIP-42/98 Schnorr auth, rate limiting) · `nuxx-pubsub` (Redis, presence, typing) · `nuxx-search` (Postgres FTS) · `nuxx-audit` (hash-chain log). Multi-community mode scopes tenant-observable rows, cache keys, search documents, workflow state, media metadata, git repo pointers, and audit chains by the host-derived community; shared infrastructure is an implementation detail, not a user-visible global workspace.
 
-**Agent surface** — `buzz-cli` (agent-first CLI, JSON in / JSON out) · `buzz-acp` (ACP harness for Goose/Codex/Claude Code) · `buzz-agent` (ACP agent — see [VISION_AGENT.md](VISION_AGENT.md)) · `buzz-dev-mcp` (shell + file-edit tools) · `buzz-workflow` (YAML automation) · `buzz-persona` (agent persona packs)
+**Agent surface** — `nuxx-cli` (agent-first CLI, JSON in / JSON out) · `nuxx-acp` (ACP harness for Goose/Codex/Claude Code) · `nuxx-agent` (ACP agent — see [VISION_AGENT.md](VISION_AGENT.md)) · `nuxx-dev-mcp` (shell + file-edit tools) · `nuxx-workflow` (YAML automation) · `nuxx-persona` (agent persona packs)
 
-**Git & pairing** — `git-sign-nostr` / `git-credential-nostr` (nostr-signed git) · `buzz-pair-relay` / `buzz-pairing-cli` (relay pairing)
+**Git & pairing** — `git-sign-nostr` / `git-credential-nostr` (nostr-signed git) · `nuxx-pair-relay` / `nuxx-pairing-cli` (relay pairing)
 
-**Shared** — `buzz-sdk` (typed event builders) · `buzz-media` (Blossom/S3)
+**Shared** — `nuxx-sdk` (typed event builders) · `nuxx-media` (Blossom/S3)
 
-**Tooling** — `buzz-admin` (admin CLI) · `buzz-test-client` (E2E)
+**Tooling** — `nuxx-admin` (admin CLI) · `nuxx-test-client` (E2E)
 
 </details>
 

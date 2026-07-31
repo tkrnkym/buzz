@@ -25,16 +25,16 @@ The portable representation is a NIP-34 repo announcement (kind:30617) — stand
     ["clone", "https://repoa.myproject.com"],
     ["relays", "wss://myproject.com"],
     ["maintainers", "<co-maintainer-npub>"],
-    ["buzz-channel", "<channel-uuid>"],
+    ["nuxx-channel", "<channel-uuid>"],
     ["buzz-visibility", "listed"],
-    ["buzz-protect", "main", "push-allowed", "<alice-npub>", "<bob-npub>"],
-    ["buzz-protect", "main", "require-approval", "2"],
-    ["buzz-protect", "main", "no-force-push"]
+    ["nuxx-protect", "main", "push-allowed", "<alice-npub>", "<bob-npub>"],
+    ["nuxx-protect", "main", "require-approval", "2"],
+    ["nuxx-protect", "main", "no-force-push"]
   ]
 }
 ```
 
-Branch protections live in the same event — `buzz-protect` tags. The relay enforces them at the git transport layer. Only npubs listed in `push-allowed` can push to protected branches. Force pushes are blocked. Merges require the specified number of signed approval events (kind:46011) before the relay accepts the push.
+Branch protections live in the same event — `nuxx-protect` tags. The relay enforces them at the git transport layer. Only npubs listed in `push-allowed` can push to protected branches. Force pushes are blocked. Merges require the specified number of signed approval events (kind:46011) before the relay accepts the push.
 
 Agents inherit access from their owner via [NIP-OA](docs/nips/NIP-OA.md). The relay checks: does the push carry a valid NIP-OA auth tag, and is the owner pubkey in that tag listed in `push-allowed`? If yes, the push is accepted — the agent's own pubkey doesn't need to be in the list. Add a maintainer, and all their authorized agents can push. Remove the maintainer, and all their agents lose access instantly. Agents without NIP-OA attestation are treated as their own identity and must be listed explicitly.
 

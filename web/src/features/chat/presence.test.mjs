@@ -102,7 +102,7 @@ test("the typing filter is scoped to one channel", () => {
 test("a typing announcement carries thread tags when replying", () => {
   assert.deepEqual(buildTypingTemplate(CHANNEL).tags, [["h", CHANNEL]]);
 
-  // Direct reply: root === parent collapses to one marked tag, as in buzz-sdk.
+  // Direct reply: root === parent collapses to one marked tag, as in nuxx-sdk.
   assert.deepEqual(
     buildTypingTemplate(CHANNEL, { rootId: "r1", parentId: "r1" }).tags,
     [

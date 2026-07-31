@@ -44,7 +44,7 @@ else
   export PGHOST=localhost
   export PGPORT=5432
   export PGUSER=buzz
-  export PGPASSWORD=buzz_dev
+  export PGPASSWORD=nuxx_dev
   export PGDATABASE=buzz
   export REDIS_URL="redis://localhost:6379"
 fi
@@ -78,28 +78,28 @@ ensure_infra() {
 run_unit_tests() {
   section "Unit Tests (no infra required)"
 
-  run_test_step "buzz-core tests" \
-    cargo test -p buzz-core --lib -- --nocapture
+  run_test_step "nuxx-core tests" \
+    cargo test -p nuxx-core --lib -- --nocapture
 
-  run_test_step "buzz-auth unit tests" \
-    cargo test -p buzz-auth --lib -- --nocapture
+  run_test_step "nuxx-auth unit tests" \
+    cargo test -p nuxx-auth --lib -- --nocapture
 
-  # buzz-db migrator/lint unit tests (no infra): guard the embedded-migrator
+  # nuxx-db migrator/lint unit tests (no infra): guard the embedded-migrator
   # invariant (exactly the consolidated 0001; cutover/backfill stays an operator
   # script, not startup state) and the tenant-scoping lints. The Postgres-backed
-  # buzz-db tests are #[ignore]d; nothing here (or in integration mode below,
-  # which runs `cargo test -p buzz-db` without --ignored) runs them — they need a
+  # nuxx-db tests are #[ignore]d; nothing here (or in integration mode below,
+  # which runs `cargo test -p nuxx-db` without --ignored) runs them — they need a
   # separate isolated-DB gate, so --lib keeps this step infra-free.
-  run_test_step "buzz-db unit tests" \
-    cargo test -p buzz-db --lib -- --nocapture
+  run_test_step "nuxx-db unit tests" \
+    cargo test -p nuxx-db --lib -- --nocapture
 
   # Multi-tenant conformance gate: independent replay checker + golden
-  # fixtures (buzz-conformance). Pure in-process trace replay, no infra.
-  run_test_step "buzz-conformance tests" \
-    cargo test -p buzz-conformance -- --nocapture
+  # fixtures (nuxx-conformance). Pure in-process trace replay, no infra.
+  run_test_step "nuxx-conformance tests" \
+    cargo test -p nuxx-conformance -- --nocapture
 
-  run_test_step "buzz-push-gateway tests" \
-    cargo test -p buzz-push-gateway -- --nocapture
+  run_test_step "nuxx-push-gateway tests" \
+    cargo test -p nuxx-push-gateway -- --nocapture
 }
 
 # ---- DB / integration tests (infra required) --------------------------------
@@ -109,14 +109,14 @@ run_integration_tests() {
 
   ensure_infra
 
-  run_test_step "buzz-db tests" \
-    cargo test -p buzz-db -- --nocapture
+  run_test_step "nuxx-db tests" \
+    cargo test -p nuxx-db -- --nocapture
 
-  if find crates/buzz-auth/tests -maxdepth 1 -name '*.rs' -print -quit 2>/dev/null | grep -q .; then
-    run_test_step "buzz-auth integration tests" \
-      cargo test -p buzz-auth --test '*' -- --nocapture
+  if find crates/nuxx-auth/tests -maxdepth 1 -name '*.rs' -print -quit 2>/dev/null | grep -q .; then
+    run_test_step "nuxx-auth integration tests" \
+      cargo test -p nuxx-auth --test '*' -- --nocapture
   else
-    run_test_step "buzz-auth (no integration tests found)" true
+    run_test_step "nuxx-auth (no integration tests found)" true
   fi
 
   run_test_step "workspace integration tests" \

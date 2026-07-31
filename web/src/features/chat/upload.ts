@@ -5,7 +5,7 @@
  *
  * The relay requires the upload to be authorized for *that exact file*: the
  * request carries `X-SHA-256`, and the kind:24242 auth event must carry a
- * matching `x` tag (`crates/buzz-relay/src/api/media.rs`). The signature
+ * matching `x` tag (`crates/nuxx-relay/src/api/media.rs`). The signature
  * therefore cannot be produced until the file has been read and hashed, which
  * fixes the order — hash, then sign, then send — and rules out streaming the
  * body past a signer that has not yet seen it.

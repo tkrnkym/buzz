@@ -19,7 +19,7 @@
  *
  * - A NIP-46 remote signer (`bunker://` / `nostrconnect://`) — the natural fit
  *   for SSO, since the id_token authenticates a session with the signer service
- *   and no key material reaches the page. `crates/buzz-core/src/pairing/
+ *   and no key material reaches the page. `crates/nuxx-core/src/pairing/
  *   NIP-AB.md` already defines those payload types. Note that Buzz also needs
  *   `nip44_encrypt` / `nip44_decrypt` through the same channel: read state,
  *   channel sections, mutes, and reminders are all encrypted to self.

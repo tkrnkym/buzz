@@ -10,7 +10,7 @@
 #
 #   Topology (reuse this exact tuple for desktop parity runs):
 #     compose project : buzz-harness
-#     postgres        : localhost:5471  (db=buzz, user=buzz, pass=buzz_dev)
+#     postgres        : localhost:5471  (db=buzz, user=buzz, pass=nuxx_dev)
 #     redis           : localhost:6471
 #     minio           : localhost:9471 (console 9472)
 #     relay main      : localhost:3030   ← BUZZ_E2E_RELAY_URL=http://localhost:3030
@@ -85,7 +85,7 @@ wait_pg() {
 wait_pg
 
 # ── Schema + partitions ──────────────────────────────────────────────────────
-export PGPASSWORD=buzz_dev
+export PGPASSWORD=nuxx_dev
 psql_h() { docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}" exec -T postgres \
   psql -U buzz -d buzz -v ON_ERROR_STOP=1 "$@"; }
 
@@ -95,7 +95,7 @@ log "Resetting isolated database and applying schema..."
 # schema planning or test results.
 psql_h -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 export PGSCHEMA_PLAN_HOST=localhost PGSCHEMA_PLAN_PORT=${PG_PORT}
-export PGSCHEMA_PLAN_DB=buzz PGSCHEMA_PLAN_USER=buzz PGSCHEMA_PLAN_PASSWORD=buzz_dev
+export PGSCHEMA_PLAN_DB=buzz PGSCHEMA_PLAN_USER=buzz PGSCHEMA_PLAN_PASSWORD=nuxx_dev
 export PGHOST=localhost PGPORT=${PG_PORT} PGUSER=buzz PGDATABASE=buzz
 ./bin/pgschema apply --file schema/schema.sql --auto-approve
 psql_h < scripts/attach-schema-partitions.sql
@@ -106,11 +106,11 @@ ok "Schema applied"
 # the channel/member seed. It keys everything off a fixed COMMUNITY_ID and an
 # overridable host — point that host at OUR relay so the tenant binding matches,
 # and point its DB env at OUR isolated postgres. (psql is on PATH, so it uses
-# BUZZ_DB_HOST/PORT rather than the shared `buzz-postgres` container.)
+# BUZZ_DB_HOST/PORT rather than the shared `nuxx-postgres` container.)
 log "Seeding community (host=${COMMUNITY_HOST}), channels, and members..."
 BUZZ_COMMUNITY_HOST="${COMMUNITY_HOST}" \
   BUZZ_DB_HOST=localhost BUZZ_DB_PORT=${PG_PORT} BUZZ_DB_USER=buzz \
-  BUZZ_DB_PASS=buzz_dev BUZZ_DB_NAME=buzz \
+  BUZZ_DB_PASS=nuxx_dev BUZZ_DB_NAME=buzz \
   BUZZ_DB_DOCKER_CONTAINER="${PROJECT}-postgres-1" \
   ./scripts/setup-desktop-test-data.sh
 ok "Community + channels + members seeded"
@@ -123,7 +123,7 @@ if [[ -x "${HOME}/.cargo/bin/cargo" ]]; then
   export PATH="${HOME}/.cargo/bin:${PATH}"
 fi
 log "Building relay (profile=${CARGO_BUILD_PROFILE}, cargo=$(command -v cargo), $(cargo --version))..."
-cargo build --profile "${CARGO_BUILD_PROFILE}" -p buzz-relay
+cargo build --profile "${CARGO_BUILD_PROFILE}" -p nuxx-relay
 ok "Relay built"
 
 # ── Run relay (detached tmux session) ────────────────────────────────────────
@@ -141,19 +141,19 @@ if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${RELAY_MAIN}" -sTCP:LISTE
 fi
 log "Starting relay in tmux session '${TMUX_SESSION}' on :${RELAY_MAIN} (health :${RELAY_HEALTH}, metrics :${RELAY_METRICS})..."
 tmux new-session -d -s "${TMUX_SESSION}" "cd '${REPO_ROOT}' && env \
-  DATABASE_URL=postgres://buzz:buzz_dev@localhost:${PG_PORT}/buzz \
+  DATABASE_URL=postgres://nuxx:nuxx_dev@localhost:${PG_PORT}/buzz \
   REDIS_URL=redis://localhost:${REDIS_PORT} \
   RELAY_URL=ws://localhost:${RELAY_MAIN} \
   BUZZ_BIND_ADDR=0.0.0.0:${RELAY_MAIN} \
   BUZZ_HEALTH_PORT=${RELAY_HEALTH} \
   BUZZ_METRICS_PORT=${RELAY_METRICS} \
   BUZZ_S3_ENDPOINT=http://localhost:${MINIO_PORT} \
-  BUZZ_S3_ACCESS_KEY=buzz_dev \
-  BUZZ_S3_SECRET_KEY=buzz_dev_secret \
-  BUZZ_S3_BUCKET=buzz-media \
+  BUZZ_S3_ACCESS_KEY=nuxx_dev \
+  BUZZ_S3_SECRET_KEY=nuxx_dev_secret \
+  BUZZ_S3_BUCKET=nuxx-media \
   BUZZ_REQUIRE_AUTH_TOKEN=false \
   BUZZ_RECONCILE_CHANNELS=true \
-  './target/${CARGO_TARGET_PROFILE}/buzz-relay' > '${RELAY_LOG}' 2>&1"
+  './target/${CARGO_TARGET_PROFILE}/nuxx-relay' > '${RELAY_LOG}' 2>&1"
 
 # Wait for the main port to accept connections.
 for _ in $(seq 1 30); do

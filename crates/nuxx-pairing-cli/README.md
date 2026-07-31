@@ -1,17 +1,17 @@
 # buzz-pair
 
-CLI tool for testing the [NIP-AB device pairing protocol](../buzz-core/src/pairing/NIP-AB.md) end-to-end. Exercises the full protocol over a live Nostr relay — designed for interop testing and NIP submission, not production use.
+CLI tool for testing the [NIP-AB device pairing protocol](../nuxx-core/src/pairing/NIP-AB.md) end-to-end. Exercises the full protocol over a live Nostr relay — designed for interop testing and NIP submission, not production use.
 
 ## Quick Start
 
 ```bash
-cargo build --release -p buzz-pairing-cli
+cargo build --release -p nuxx-pairing-cli
 
 # Terminal 1 — source (holds the secret)
-./target/release/buzz-pair source --relay wss://relay.damus.io
+./target/release/nuxx-pair source --relay wss://relay.damus.io
 
 # Terminal 2 — target (receives the secret)
-./target/release/buzz-pair target --show-secret
+./target/release/nuxx-pair target --show-secret
 # paste the QR URI from terminal 1 when prompted
 ```
 
@@ -56,14 +56,14 @@ The CLI supports NIP-42 authentication, so it works with Buzz relays out of the 
 ### Prerequisites
 
 - Docker running (for Postgres, Redis, etc.)
-- Buzz relay built: `cargo build --release -p buzz-relay`
+- Buzz relay built: `cargo build --release -p nuxx-relay`
 
 ### Start the relay
 
 ```bash
 just setup                          # Docker services + schema
 cargo build --release --workspace
-screen -dmS relay bash -c "./target/release/buzz-relay 2>&1 | tee /tmp/buzz-relay.log"
+screen -dmS relay bash -c "./target/release/nuxx-relay 2>&1 | tee /tmp/nuxx-relay.log"
 sleep 3 && curl -s http://localhost:3000/health   # → "ok"
 ```
 
@@ -91,10 +91,10 @@ This spawns source and target as PTY-driven subprocesses, feeds the QR URI betwe
 
 ```bash
 # Terminal 1
-./target/release/buzz-pair source --relay ws://localhost:3000
+./target/release/nuxx-pair source --relay ws://localhost:3000
 
 # Terminal 2
-./target/release/buzz-pair target --show-secret
+./target/release/nuxx-pair target --show-secret
 # paste the nostrpair:// URI, confirm SAS on both sides
 ```
 

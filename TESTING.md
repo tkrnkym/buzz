@@ -9,11 +9,11 @@ just test               # unit + integration (starts Docker if needed)
 
 `just test` runs unit tests plus integration tests against Postgres and Redis
 (started automatically if not already running). Neither task runs the E2E suites in
-`buzz-test-client` — those are marked `#[ignore]` and require a running relay:
+`nuxx-test-client` — those are marked `#[ignore]` and require a running relay:
 
 ```bash
 # Start a relay first (see below), then:
-cargo test -p buzz-test-client -- --ignored
+cargo test -p nuxx-test-client -- --ignored
 ```
 
 ---
@@ -21,7 +21,7 @@ cargo test -p buzz-test-client -- --ignored
 ## Live Local Relay
 
 The fastest way to exercise the relay end-to-end is to build the release
-binaries once, run `buzz-relay`, and drive it with the `buzz` CLI. The
+binaries once, run `nuxx-relay`, and drive it with the `nuxx` CLI. The
 CLI signs every request with NIP-98, so you don't need `nak` or hand-rolled
 `curl`.
 
@@ -59,7 +59,7 @@ above).
 ### 2. Build the binaries
 
 ```bash
-cargo build --release -p buzz-relay -p buzz-cli -p buzz-admin
+cargo build --release -p nuxx-relay -p nuxx-cli -p nuxx-admin
 export PATH="$PWD/target/release:$PATH"
 ```
 
@@ -70,9 +70,9 @@ Rebuild after any code change — the steps below use the release binaries.
 In a separate terminal (it runs in the foreground):
 
 ```bash
-buzz-relay                     # release binary from step 2, serves ws://localhost:3000
+nuxx-relay                     # release binary from step 2, serves ws://localhost:3000
 # alternatives:
-# cargo run --release -p buzz-relay     # rebuild + run in release
+# cargo run --release -p nuxx-relay     # rebuild + run in release
 # just relay                            # DEBUG build — fast to launch on a hot cache,
 #                                       # but mismatched if step 2 left you on release.
 #                                       # Use `just relay-release` if you want the recipe.
@@ -98,13 +98,13 @@ vars table at the bottom if you need to lock it down.
 > them can collide. Use a separate terminal per role and export the right
 > vars in each:
 >
-> **In the relay terminal** (before launching `buzz-relay`):
+> **In the relay terminal** (before launching `nuxx-relay`):
 > ```bash
 > export BUZZ_BIND_ADDR=0.0.0.0:3030
 > export BUZZ_HEALTH_PORT=8088
 > export BUZZ_METRICS_PORT=9202
 > export RELAY_URL=ws://localhost:3030     # advertised in NIP-42 challenges
-> buzz-relay
+> nuxx-relay
 > ```
 >
 > **In your working / CLI terminal** (for steps 4+ and the ACP harness):
@@ -120,11 +120,11 @@ vars table at the bottom if you need to lock it down.
 > overrides — or the CLI will end up talking to Buzz Desktop's relay.
 
 > **Ignore `just setup`'s "Next steps" banner.** It still prints
-> `just relay` (a debug build). Use `buzz-relay` from step 2 here —
+> `just relay` (a debug build). Use `nuxx-relay` from step 2 here —
 > step 2 already built the release binary.
 
 When you're done, stop the relay (Ctrl-C in its terminal). If it's
-backgrounded or you lost the terminal: `pkill -f buzz-relay`. Leaving
+backgrounded or you lost the terminal: `pkill -f nuxx-relay`. Leaving
 it running will collide with the next reviewer who follows this doc on
 the same machine.
 
@@ -135,22 +135,22 @@ back. This is the minimum sequence an agent needs to verify a local relay.
 
 ```bash
 # Generate a keypair
-GEN=$(buzz-admin generate-key)
+GEN=$(nuxx-admin generate-key)
 export BUZZ_PRIVATE_KEY=$(echo "$GEN" | awk '/Secret key:/ {print $3}')
 PUBKEY=$(echo "$GEN"           | awk '/Public key:/ {print $3}')
 echo "pubkey: $PUBKEY"
 
 # Create a channel — the UUID is returned in the response
-CHANNEL=$(buzz channels create --name "smoke-$$" --type stream --visibility open | jq -r '.channel_id')
+CHANNEL=$(nuxx channels create --name "smoke-$$" --type stream --visibility open | jq -r '.channel_id')
 echo "channel: $CHANNEL"
 
 # Send a message and read it back
-SEND=$(buzz messages send --channel "$CHANNEL" --content "hello from smoke test")
+SEND=$(nuxx messages send --channel "$CHANNEL" --content "hello from smoke test")
 EVENT_ID=$(echo "$SEND" | jq -r '.event_id')
-buzz messages get --channel "$CHANNEL" --limit 5 | jq .
+nuxx messages get --channel "$CHANNEL" --limit 5 | jq .
 
 # Fetch the reply chain for a specific message (empty array on a leaf — that's fine)
-buzz messages thread --channel "$CHANNEL" --event "$EVENT_ID" | jq .
+nuxx messages thread --channel "$CHANNEL" --event "$EVENT_ID" | jq .
 ```
 
 A successful run prints `{"event_id":"…","accepted":true,"message":""}` for
@@ -160,10 +160,10 @@ for a leaf message — populated only after a reply comes in (see §5).
 ### 5. Going deeper
 
 For full coverage of every CLI command (54 subcommands across 12 groups),
-follow [`crates/buzz-cli/TESTING.md`](crates/buzz-cli/TESTING.md).
+follow [`crates/nuxx-cli/TESTING.md`](crates/nuxx-cli/TESTING.md).
 
 The relay's HTTP bridge accepts three endpoints — useful if you're testing
-a client other than `buzz-cli`:
+a client other than `nuxx-cli`:
 
 | Endpoint        | Purpose                            |
 |-----------------|------------------------------------|
@@ -173,14 +173,14 @@ a client other than `buzz-cli`:
 
 All three accept NIP-98 auth (recommended) or, in dev mode, an `X-Pubkey`
 header fallback. There is no REST API for fetching message threads — use
-`POST /query` with an `#e` filter, or `buzz messages thread`.
+`POST /query` with an `#e` filter, or `nuxx messages thread`.
 
 ---
 
 ## ACP Harness (optional, end-to-end with a real agent)
 
-`buzz-acp` connects an ACP-speaking agent (goose, codex, claude code,
-buzz-agent) to the relay. The harness listens for events, drives the
+`nuxx-acp` connects an ACP-speaking agent (goose, codex, claude code,
+nuxx-agent) to the relay. The harness listens for events, drives the
 agent over stdio, and the agent replies through MCP tools.
 
 Minimum recipe — assumes the relay from step 3 is running and the channel
@@ -189,24 +189,24 @@ from the sender identity (`BUZZ_ACP_RESPOND_TO=anyone` still skips events
 the agent signed itself).
 
 ```bash
-cargo build --release -p buzz-acp
+cargo build --release -p nuxx-acp
 export PATH="$PWD/target/release:$PATH"
 
 # 1. Save your sender identity from step 4 — you'll need it to @mention the agent
 SENDER_SK="$BUZZ_PRIVATE_KEY"
 
 # 2. Mint a fresh agent identity and capture its pubkey
-AGENT_GEN=$(buzz-admin generate-key)
+AGENT_GEN=$(nuxx-admin generate-key)
 AGENT_SK=$(echo "$AGENT_GEN" | awk '/Secret key:/ {print $3}')
 AGENT_PUBKEY=$(echo "$AGENT_GEN" | awk '/Public key:/ {print $3}')
 
 # 3. Add the agent as a member of $CHANNEL — still using the sender identity.
 #    Skip this and the agent boots to "discovered 0 channel(s) → agent will
 #    sit idle" and silently ignores every mention.
-buzz channels add-member --channel "$CHANNEL" --pubkey "$AGENT_PUBKEY" --role member
+nuxx channels add-member --channel "$CHANNEL" --pubkey "$AGENT_PUBKEY" --role member
 
 # 4. Switch to the agent identity and start it.
-#    buzz-acp wants ws:// (not http://). If you set BUZZ_RELAY_URL to an
+#    nuxx-acp wants ws:// (not http://). If you set BUZZ_RELAY_URL to an
 #    http:// URL in step 3, set the ws:// equivalent here — same host/port.
 export BUZZ_PRIVATE_KEY="$AGENT_SK"
 export BUZZ_RELAY_URL=ws://localhost:3000   # match step 3 (e.g. ws://localhost:3030 if overridden)
@@ -214,16 +214,16 @@ export BUZZ_ACP_RESPOND_TO=anyone           # default is owner-only; opens the g
 # NIP-AE core-memory prompt injection is on by default; set BUZZ_ACP_NO_MEMORY=true to opt out.
 export GOOSE_MODE=auto                        # must be 'auto' or goose hangs on prompts
 
-buzz-acp                                    # foreground; logs to stdout (run in a separate terminal)
+nuxx-acp                                    # foreground; logs to stdout (run in a separate terminal)
 
 # Optional: turn on per-turn tracing if the default log is too quiet.
-# RUST_LOG=buzz_acp=debug buzz-acp
+# RUST_LOG=buzz_acp=debug nuxx-acp
 ```
 
 > **Using a different ACP agent?** The default recipe assumes `goose` is on
 > `$PATH` and configured (`goose --version` should print). For codex / claude
-> code / buzz-agent, set `BUZZ_ACP_AGENT_COMMAND` and `BUZZ_ACP_AGENT_ARGS`
-> accordingly — see `crates/buzz-acp/README.md`. Without these, buzz-acp
+> code / nuxx-agent, set `BUZZ_ACP_AGENT_COMMAND` and `BUZZ_ACP_AGENT_ARGS`
+> accordingly — see `crates/nuxx-acp/README.md`. Without these, nuxx-acp
 > will fail to spawn the agent subprocess on startup.
 
 If you started the agent before adding it to the channel, just run the
@@ -232,11 +232,11 @@ subscribes without restart (`membership notification: subscribing to new channel
 
 The justfile also ships `just goose key="$AGENT_NSEC"` (foreground) and
 `just goose-bg key="$AGENT_NSEC"` (background screen session) which set the
-same env. See `crates/buzz-acp/README.md` for parallel agents, heartbeats,
+same env. See `crates/nuxx-acp/README.md` for parallel agents, heartbeats,
 respond-to gates, and forum subscriptions.
 
 To exercise deferred ACP startup, add `BUZZ_ACP_LAZY_POOL=true` before launching
-`buzz-acp`. The harness should connect, authenticate, subscribe, and publish
+`nuxx-acp`. The harness should connect, authenticate, subscribe, and publish
 online presence without starting the configured ACP child. The first accepted,
 flushable mention should start exactly one child and then dispatch the queued
 message. Automated coverage in `pool_lifecycle_state` pins single-wake,
@@ -248,16 +248,16 @@ from step 4 and @mention the agent:
 
 ```bash
 export BUZZ_PRIVATE_KEY=$SENDER_SK          # the key from step 4
-buzz messages send --channel "$CHANNEL" \
+nuxx messages send --channel "$CHANNEL" \
   --content "Hey agent, reply PONG only."
 
 # Wait 10–90s, then read the channel — the agent's reply is a kind:9 from
 # AGENT_PUBKEY. The current ACP build is quiet on stdout during a turn, so
-# `buzz messages get` is how you confirm it ran.
-buzz messages get --channel "$CHANNEL" --limit 5 | jq '.[] | {pubkey, content}'
+# `nuxx messages get` is how you confirm it ran.
+nuxx messages get --channel "$CHANNEL" --limit 5 | jq '.[] | {pubkey, content}'
 ```
 
-Replies are kind:9 in the same channel; `buzz messages thread --channel <id>
+Replies are kind:9 in the same channel; `nuxx messages thread --channel <id>
 --event <event_id>` fetches the reply chain for a specific mention.
 
 ---
@@ -300,12 +300,12 @@ CLI-side, only two matter for testing:
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `relay error 500` or `400: restricted: not a channel member` after a code change | Stale binary | Rebuild and re-export `PATH`; or `cargo run` directly |
-| `Address already in use` on relay start (os error 48 on macOS, 98 on Linux) | Another relay (or stale process) holding `:3000` / `:8080` / `:9102` (or your override ports) | The panic line names the failing port — read it first. Then `lsof -iTCP:3000,8080,9102 -sTCP:LISTEN` (or your override equivalents). Kill the offender (`pkill -f buzz-relay`) or use the port-override block in step 3. If you already overrode and *still* collide, a prior reviewer left a relay running on the same alt ports — kill it or pick fresh ports |
+| `Address already in use` on relay start (os error 48 on macOS, 98 on Linux) | Another relay (or stale process) holding `:3000` / `:8080` / `:9102` (or your override ports) | The panic line names the failing port — read it first. Then `lsof -iTCP:3000,8080,9102 -sTCP:LISTEN` (or your override equivalents). Kill the offender (`pkill -f nuxx-relay`) or use the port-override block in step 3. If you already overrode and *still* collide, a prior reviewer left a relay running on the same alt ports — kill it or pick fresh ports |
 | `auth_error: BUZZ_PRIVATE_KEY is required` | Env not exported into the CLI's shell | `export BUZZ_PRIVATE_KEY=...` (or pass `--private-key`) |
 | `auth_error: BUZZ_AUTH_TAG verification failed … signature verification failed` | A stale `BUZZ_AUTH_TAG` inherited from a parent shell. The local dev relay rejects it. | `unset BUZZ_AUTH_TAG` (see the scrub block in step 1) |
 | `auth-required: verification failed` on a closed relay | NIP-OA attestation needed | Set `BUZZ_AUTH_TAG` to the owner-issued JSON, or relax `BUZZ_REQUIRE_RELAY_MEMBERSHIP` |
 | `channels list` empty after `channels create` | The CLI doesn't echo the channel UUID; use the filter shown in step 4 | Or `POST /query` with `{"kinds":[39002]}` |
 | ACP agent ignores all events | `BUZZ_ACP_RESPOND_TO=owner-only` (default) with no owner configured | Set `BUZZ_ACP_RESPOND_TO=anyone` for testing |
-| ACP logs `discovered 0 channel(s)` / `no channel subscriptions resolved` | Agent identity isn't a member of any channel | `buzz channels add-member --channel "$CHANNEL" --pubkey "$AGENT_PUBKEY" --role member` from another identity |
+| ACP logs `discovered 0 channel(s)` / `no channel subscriptions resolved` | Agent identity isn't a member of any channel | `nuxx channels add-member --channel "$CHANNEL" --pubkey "$AGENT_PUBKEY" --role member` from another identity |
 | `GOOSE_MODE` warning, agent hangs | Not set | `export GOOSE_MODE=auto` |
 | Tests pass locally but CI fails | Forgot to run `just ci` | `just ci` runs the gate (fmt, clippy, unit tests, desktop/web builds) |

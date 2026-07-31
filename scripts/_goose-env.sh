@@ -10,10 +10,10 @@ _agents="$3"
 _heartbeat="$4"
 _prompt="${5:-}"
 
-cargo build --release -p buzz-acp -p buzz-cli
+cargo build --release -p nuxx-acp -p nuxx-cli
 
 env_args=(
-    BUZZ_RELAY_URL="$_relay"
+    NUXX_RELAY_URL="$_relay"
     BUZZ_PRIVATE_KEY="$_key"
     BUZZ_ACP_AGENT_COMMAND=goose
     BUZZ_ACP_AGENT_ARGS=acp

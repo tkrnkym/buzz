@@ -2577,13 +2577,15 @@ mod tests {
 
     // ---- effort-table fixture sync guard ----------------------------------------
     //
-    // Loads `effortTable.fixture.json` (the single source of truth shared with
-    // the TS test in `buzzAgentConfig.test.mjs`) and verifies that this Rust
-    // implementation produces the same valid-effort-value sets and default values
-    // as the TS `getProviderEffortConfig` function.
+    // Loads `fixtures/effortTable.fixture.json` and verifies that this Rust
+    // implementation produces the effort-value sets and defaults the fixture
+    // declares, so a new model family added to the match arms without the
+    // fixture (or the reverse) fails CI instead of diverging in production.
     //
-    // Drift (a new model family added to one side but not the other) fails CI here
-    // before it can silently diverge in production.
+    // The fixture used to live in the desktop client and be asserted from both
+    // languages; it moved here when that client was removed. It stays a data
+    // file rather than inline Rust so a second client can assert against the
+    // same table again — point the new implementation at this path.
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// Compute the valid effort values for a provider/model pair, mirroring
@@ -2703,8 +2705,7 @@ mod tests {
 
     #[test]
     fn effort_table_fixture_matches_rust_implementation() {
-        let fixture_json =
-            include_str!("../../../desktop/src/features/agents/ui/effortTable.fixture.json");
+        let fixture_json = include_str!("../fixtures/effortTable.fixture.json");
         let entries: Vec<FixtureEntry> =
             serde_json::from_str(fixture_json).expect("fixture must be valid JSON");
 

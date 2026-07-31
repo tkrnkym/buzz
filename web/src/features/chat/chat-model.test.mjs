@@ -144,7 +144,7 @@ test("toChannelList hides DMs and archived rooms and sorts by name", () => {
 });
 
 test("parseThreadRefs resolves a direct reply", () => {
-  // buzz-sdk emits a single marked `reply` tag when root === parent.
+  // nuxx-sdk emits a single marked `reply` tag when root === parent.
   assert.deepEqual(
     parseThreadRefs(event({ kind: 9, tags: [["e", "root-1", "", "reply"]] })),
     { rootId: "root-1", parentId: "root-1" },
@@ -222,7 +222,7 @@ test("filters always carry explicit kinds", () => {
   assert.deepEqual(list.kinds, [39000]);
 });
 
-test("buildMessageTemplate matches buzz-sdk build_message", () => {
+test("buildMessageTemplate matches nuxx-sdk build_message", () => {
   // kind 9 with an `h` tag carrying the channel UUID.
   assert.deepEqual(buildMessageTemplate("chan-1", "hi"), {
     kind: 9,
@@ -232,7 +232,7 @@ test("buildMessageTemplate matches buzz-sdk build_message", () => {
 });
 
 test("buildReplyTemplate emits one marked reply tag for a direct reply", () => {
-  // buzz-sdk collapses root === parent into a single `reply` tag.
+  // nuxx-sdk collapses root === parent into a single `reply` tag.
   assert.deepEqual(
     buildReplyTemplate("chan-1", "ack", {
       rootId: "root-1",
@@ -263,7 +263,7 @@ test("buildReplyTemplate emits root plus reply for a nested reply", () => {
   );
 });
 
-test("buildReactionTemplate matches buzz-sdk build_reaction", () => {
+test("buildReactionTemplate matches nuxx-sdk build_reaction", () => {
   // kind 7, one `e` tag, emoji as content — and deliberately no `h` tag, which
   // is why reactions are unreachable from an `#h` subscription.
   assert.deepEqual(buildReactionTemplate("msg-1", "👍"), {

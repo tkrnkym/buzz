@@ -867,7 +867,7 @@ BEGIN
     -- including internal paths that bypass live dispatch.
     IF NEW.kind IN (7, 9, 1059, 40007, 46010) THEN
         PERFORM pg_advisory_xact_lock_shared(
-            hashtextextended('buzz_push_gate:' || NEW.community_id::text, 0));
+            hashtextextended('nuxx_push_gate:' || NEW.community_id::text, 0));
         IF EXISTS (
             SELECT 1 FROM push_leases
             WHERE community_id = NEW.community_id
@@ -904,7 +904,7 @@ BEGIN
     IF NEW.channel_id IS NOT NULL AND NEW.kind <> 9007 THEN
         BEGIN
             PERFORM pg_advisory_xact_lock_shared(hashtextextended(
-                'buzz_channel_ttl:' || NEW.community_id::text || ':' || NEW.channel_id::text, 0));
+                'nuxx_channel_ttl:' || NEW.community_id::text || ':' || NEW.channel_id::text, 0));
 
             SELECT ttl_seconds INTO channel_ttl
             FROM channels

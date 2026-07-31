@@ -19,7 +19,7 @@ use crate::error::Result;
 /// a concurrent event insert either sees the committed lease or strictly
 /// precedes the activation (in which case no wake was owed). Distinct key
 /// domain from the audit lock and the lease address/author locks.
-const PUSH_GATE_LOCK_NAMESPACE: &str = "nuxx_push_gate:";
+pub(crate) const PUSH_GATE_LOCK_NAMESPACE: &str = "nuxx_push_gate:";
 
 async fn acquire_push_gate_lock(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,

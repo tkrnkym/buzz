@@ -347,6 +347,15 @@ pub async fn set_canvas(
 /// `nuxx_channel_ttl:`.
 const CHANNEL_MEMBERSHIP_LOCK_NAMESPACE: &str = "nuxx_channel_membership:";
 
+/// Key domain for the per-channel TTL lock. Shared with the
+/// `refresh_channel_ttl_after_event_insert` trigger, which takes the same key
+/// SHARED on event insert; this side takes it EXCLUSIVE before a TTL
+/// transition. A constant rather than an inline literal so
+/// `migration::tests` can assert the SQL and this side still agree — they
+/// silently drifted apart once, and different strings hash to different keys,
+/// so the acquisitions simply stop conflicting with no error to notice.
+pub(crate) const CHANNEL_TTL_LOCK_NAMESPACE: &str = "nuxx_channel_ttl:";
+
 /// Take the per-channel membership lock. MUST be the first statement in the
 /// transaction that then reads roles/owner counts and writes membership, so the
 /// whole check-then-write sequence is atomic against a concurrent one.
@@ -1238,7 +1247,7 @@ pub async fn update_channel(
         let mut tx = pool.begin().await?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
             .bind(format!(
-                "nuxx_channel_ttl:{}:{}",
+                "{CHANNEL_TTL_LOCK_NAMESPACE}{}:{}",
                 community_id.as_uuid(),
                 channel_id
             ))

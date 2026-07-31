@@ -132,7 +132,7 @@ extraVolumes:
 
 relay:
   command: [/opt/wrapper/wrapper]
-  args: [/usr/local/bin/buzz-relay]
+  args: [/usr/local/bin/nuxx-relay]
   extraVolumeMounts:
     - name: wrapper
       mountPath: /opt/wrapper
@@ -165,7 +165,7 @@ an Ingress or HTTPRoute for the pairing Service; route the public hostname to
 
 `replicaCount > 1` hard-requires Redis:
 
-- Redis (`redis.enabled=true`, `externalRedis.url`, or `REDIS_URL` in `existingSecret`) — for `buzz-pubsub` fan-out
+- Redis (`redis.enabled=true`, `externalRedis.url`, or `REDIS_URL` in `existingSecret`) — for `nuxx-pubsub` fan-out
 
 It does **not** require ReadWriteMany git storage. Git ref/object state is object-store-backed (each request hydrates an ephemeral repo from S3-compatible storage; writer serialization is the object-store pointer CAS — see `docs/git-on-object-storage.md`), and repo-name uniqueness lives in Postgres. Each replica can use its own `ReadWriteOnce` volume; no shared filesystem is needed.
 
@@ -199,7 +199,7 @@ default so long-lived WebSocket connections have time to drain.
 
 Schema migrations are embedded in the relay binary via `sqlx::migrate!` and run at startup, gated by `BUZZ_AUTO_MIGRATE` (default `true`). Multiple replicas race-safely behind a Postgres advisory lock. `helm upgrade` is the entire upgrade procedure.
 
-If you prefer decoupling migrations from serving, set `migrate.autoMigrate=false`. **In that mode the chart does not run migrations for you** — you own running `buzz-admin migrate` (separate Pod / one-shot Job) against the database before every `helm install` / `helm upgrade`. Readiness probes only verify DB connectivity, not schema freshness, so a pod will appear healthy against an unmigrated schema and fail under load. A pre-upgrade Helm Job for this is on the chart roadmap; the values knob `migrate.preUpgradeJob.enabled` is reserved.
+If you prefer decoupling migrations from serving, set `migrate.autoMigrate=false`. **In that mode the chart does not run migrations for you** — you own running `nuxx-admin migrate` (separate Pod / one-shot Job) against the database before every `helm install` / `helm upgrade`. Readiness probes only verify DB connectivity, not schema freshness, so a pod will appear healthy against an unmigrated schema and fail under load. A pre-upgrade Helm Job for this is on the chart roadmap; the values knob `migrate.preUpgradeJob.enabled` is reserved.
 
 ## Backups
 
@@ -207,7 +207,7 @@ Save these. Losing any of them is data loss. See NOTES.txt printed by `helm inst
 
 1. `BUZZ_RELAY_PRIVATE_KEY` — relay identity. Rotating it = new identity (federation peers will not recognize the relay).
 2. PostgreSQL database — the canonical event store.
-3. S3 bucket — media blobs (chart default bucket: `buzz-media`).
+3. S3 bucket — media blobs (chart default bucket: `nuxx-media`).
 4. Git PVC — repo on-disk state served by the relay's git endpoint.
 5. Owner private key — held by the operator, not by this chart. Restore by re-installing with the same `ownerPubkey`.
 

@@ -44,7 +44,7 @@ const TIMELINE_LIMIT = 100;
  * Read with a one-shot query rather than a live subscription: the relay stores
  * kind:39000 channel-scoped, so a global `{kinds:[39000]}` subscription receives
  * no fan-out (see `emit_group_discovery_events` in
- * `crates/buzz-relay/src/handlers/side_effects.rs`). Newly created channels
+ * `crates/nuxx-relay/src/handlers/side_effects.rs`). Newly created channels
  * therefore appear on refetch, not instantly — closing that gap needs a
  * relay-side change, not a client one.
  */

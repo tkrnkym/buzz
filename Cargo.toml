@@ -28,7 +28,6 @@ members = [
     "crates/nuxx-dev-mcp",
     "examples/countdown-bot",
 ]
-exclude = ["desktop/src-tauri"]
 resolver = "2"
 
 [workspace.package]

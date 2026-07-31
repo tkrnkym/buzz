@@ -16,7 +16,7 @@ fi
 export PGHOST="${PGHOST:-localhost}"
 export PGPORT="${PGPORT:-5432}"
 export PGUSER="${PGUSER:-buzz}"
-export PGPASSWORD="${PGPASSWORD:-buzz_dev}"
+export PGPASSWORD="${PGPASSWORD:-nuxx_dev}"
 export PGDATABASE="${PGDATABASE:-buzz}"
 
 if command -v psql >/dev/null 2>&1; then
@@ -24,13 +24,13 @@ if command -v psql >/dev/null 2>&1; then
     PGPASSWORD="${PGPASSWORD}" psql -h "${PGHOST}" -p "${PGPORT}" \
       -U "${PGUSER}" -d "${PGDATABASE}" "$@"
   }
-elif docker exec buzz-postgres psql --version >/dev/null 2>&1; then
+elif docker exec nuxx-postgres psql --version >/dev/null 2>&1; then
   run_psql() {
-    docker exec -i -e PGPASSWORD="${PGPASSWORD}" buzz-postgres \
+    docker exec -i -e PGPASSWORD="${PGPASSWORD}" nuxx-postgres \
       psql -U "${PGUSER}" -d "${PGDATABASE}" "$@"
   }
 else
-  echo "error: neither psql nor buzz-postgres docker psql is available" >&2
+  echo "error: neither psql nor nuxx-postgres docker psql is available" >&2
   exit 1
 fi
 
@@ -69,14 +69,14 @@ upload_fixture() {
   size="$(fixture_size "${path}")"
   sidecar="$(printf '{"dim":"%s","blurhash":"","thumb_url":"","ext":"%s","mime_type":"%s","size":%s,"uploaded_at":0}' \
     "${dimensions}" "${extension}" "${mime}" "${size}")"
-  docker exec -i buzz-minio mc pipe --quiet --attr "Content-Type=${mime}" \
-    "local/${BUZZ_S3_BUCKET:-buzz-media}/${hash}.${extension}" < "${path}"
-  printf '%s' "${sidecar}" | docker exec -i buzz-minio mc pipe --quiet \
+  docker exec -i nuxx-minio mc pipe --quiet --attr "Content-Type=${mime}" \
+    "local/${BUZZ_S3_BUCKET:-nuxx-media}/${hash}.${extension}" < "${path}"
+  printf '%s' "${sidecar}" | docker exec -i nuxx-minio mc pipe --quiet \
     --attr "Content-Type=application/json" \
-    "local/${BUZZ_S3_BUCKET:-buzz-media}/_meta/${community_id}/${hash}.json"
+    "local/${BUZZ_S3_BUCKET:-nuxx-media}/_meta/${community_id}/${hash}.json"
 }
 
-fixture_dir="$(mktemp -d "${TMPDIR:-/tmp}/buzz-admin-feedback.XXXXXX")"
+fixture_dir="$(mktemp -d "${TMPDIR:-/tmp}/nuxx-admin-feedback.XXXXXX")"
 search_image="${REPO_ROOT}/docs/assets/screenshots/media-comments.png"
 workspace_image="${REPO_ROOT}/docs/assets/screenshots/channel-thread.png"
 quality_image="${REPO_ROOT}/docs/assets/screenshots/channel-agents.png"
@@ -96,8 +96,8 @@ quality_image_hash="$(fixture_hash "${quality_image}")"
 composer_diagnostics_hash="$(fixture_hash "${composer_diagnostics}")"
 workspace_diagnostics_hash="$(fixture_hash "${workspace_diagnostics}")"
 
-if ! docker exec buzz-minio mc alias set local http://localhost:9000 \
-  "${BUZZ_S3_ACCESS_KEY:-buzz_dev}" "${BUZZ_S3_SECRET_KEY:-buzz_dev_secret}" >/dev/null; then
+if ! docker exec nuxx-minio mc alias set local http://localhost:9000 \
+  "${BUZZ_S3_ACCESS_KEY:-nuxx_dev}" "${BUZZ_S3_SECRET_KEY:-nuxx_dev_secret}" >/dev/null; then
   echo "error: local MinIO is unavailable; run just setup first" >&2
   exit 1
 fi

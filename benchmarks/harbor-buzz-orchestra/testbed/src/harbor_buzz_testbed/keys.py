@@ -49,7 +49,7 @@ def _bech32_polymod(values: list[int]) -> int:
 
 def encode_nsec(secret_key: str) -> str:
     """Encode a hex secret key as a NIP-19 bech32 ``nsec1…`` string —
-    the form the desktop GUI's key-import onboarding accepts."""
+    the form the web client's key-import sign-in accepts."""
     hrp = "nsec"
     data: list[int] = []
     accumulator = bits = 0

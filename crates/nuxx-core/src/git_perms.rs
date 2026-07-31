@@ -41,34 +41,30 @@ pub const GIT_NO_CHANNEL_BINDING_BODY: &str =
 
 /// Tag name a repo announcement uses to bind itself to a channel.
 ///
-/// Emitted on new events. [`LEGACY_CHANNEL_TAG`] is still accepted on read.
+/// The pre-rename spelling (`buzz-channel`) is no longer recognized. These tag
+/// names live inside *signed* kind:30617 events and cannot be rewritten —
+/// re-signing needs the author's key and editing invalidates the signature — so
+/// a repo announced before the rename is no longer bound to its channel and must
+/// be re-announced.
 pub const CHANNEL_TAG: &str = "nuxx-channel";
 
 /// Tag name carrying one ref-protection rule.
 ///
-/// Emitted on new events. [`LEGACY_PROTECT_TAG`] is still accepted on read.
+/// The pre-rename spelling (`buzz-protect`) is no longer recognized. As with
+/// [`CHANNEL_TAG`] the old tag cannot be rewritten in place, so a repo announced
+/// before the rename parses with **no protection rules** — force-push and delete
+/// protection stop applying to it until it is re-announced. That is a silent
+/// loosening, not an error, which is why it is called out here.
 pub const PROTECT_TAG: &str = "nuxx-protect";
 
-/// Pre-rename spelling of [`CHANNEL_TAG`].
-///
-/// These tag names live inside *signed* kind:30617 events, so they cannot be
-/// rewritten: re-signing is impossible without the author's key, and editing
-/// would invalidate the signature. Every repo announced before the rename
-/// carries the old spelling forever, so readers accept both permanently. This is
-/// not a deprecation window — dropping it would orphan those repositories.
-pub const LEGACY_CHANNEL_TAG: &str = "buzz-channel";
-
-/// Pre-rename spelling of [`PROTECT_TAG`]. See [`LEGACY_CHANNEL_TAG`].
-pub const LEGACY_PROTECT_TAG: &str = "buzz-protect";
-
-/// True when `name` is either spelling of the channel-binding tag.
+/// True when `name` is the channel-binding tag.
 pub fn is_channel_tag(name: &str) -> bool {
-    name == CHANNEL_TAG || name == LEGACY_CHANNEL_TAG
+    name == CHANNEL_TAG
 }
 
-/// True when `name` is either spelling of the protection-rule tag.
+/// True when `name` is the protection-rule tag.
 pub fn is_protect_tag(name: &str) -> bool {
-    name == PROTECT_TAG || name == LEGACY_PROTECT_TAG
+    name == PROTECT_TAG
 }
 
 /// Maximum number of `nuxx-protect` tags per repo.
@@ -658,32 +654,23 @@ pub fn evaluate_push(
 mod tests {
 
     #[test]
-    fn a_repo_announced_before_the_rename_still_parses() {
-        // These tag names live inside signed kind:30617 events. Re-signing is
-        // impossible without the author's key and editing would invalidate the
-        // signature, so every repo announced before the rename carries the old
-        // spelling forever. Dropping acceptance would orphan those repositories.
+    fn a_repo_announced_before_the_rename_loses_its_rules() {
+        // Pins the accepted cost of dropping the legacy spelling: a pre-rename
+        // announcement yields zero rules rather than an error, so protection
+        // silently stops applying until the repo is re-announced. If this ever
+        // starts erroring or starts parsing, that is a behavior change worth
+        // noticing here.
         let legacy = vec![vec![
-            LEGACY_PROTECT_TAG.to_string(),
+            "buzz-protect".to_string(),
             "refs/heads/main".to_string(),
             "no-force-push".to_string(),
         ]];
-        let parsed = parse_protection_tags(&legacy).expect("legacy tag parses");
-        assert_eq!(parsed.rules.len(), 1, "legacy protection rule must survive");
-    }
-
-    #[test]
-    fn both_spellings_yield_the_same_rules() {
-        let mk = |name: &str| {
-            vec![vec![
-                name.to_string(),
-                "refs/heads/main".to_string(),
-                "no-force-push".to_string(),
-            ]]
-        };
-        let current = parse_protection_tags(&mk(PROTECT_TAG)).unwrap();
-        let legacy = parse_protection_tags(&mk(LEGACY_PROTECT_TAG)).unwrap();
-        assert_eq!(current.rules, legacy.rules);
+        let parsed =
+            parse_protection_tags(&legacy).expect("unknown tags are skipped, not rejected");
+        assert!(
+            parsed.rules.is_empty(),
+            "pre-rename spelling must no longer produce rules"
+        );
     }
 
     #[test]
@@ -694,6 +681,8 @@ mod tests {
             "buzz",
             "x-nuxx-protect",
             "nuxx-protected",
+            "buzz-protect",
+            "buzz-channel",
         ] {
             assert!(!is_protect_tag(name), "{name:?} must not parse as protect");
             assert!(!is_channel_tag(name), "{name:?} must not parse as channel");
@@ -701,12 +690,12 @@ mod tests {
     }
 
     #[test]
-    fn each_tag_name_recognises_exactly_its_two_spellings() {
-        assert!(is_protect_tag(PROTECT_TAG) && is_protect_tag(LEGACY_PROTECT_TAG));
-        assert!(is_channel_tag(CHANNEL_TAG) && is_channel_tag(LEGACY_CHANNEL_TAG));
+    fn each_tag_name_recognises_exactly_itself() {
+        assert!(is_protect_tag(PROTECT_TAG));
+        assert!(is_channel_tag(CHANNEL_TAG));
         // Cross-contamination would bind a repo to a protection rule or vice versa.
-        assert!(!is_protect_tag(CHANNEL_TAG) && !is_protect_tag(LEGACY_CHANNEL_TAG));
-        assert!(!is_channel_tag(PROTECT_TAG) && !is_channel_tag(LEGACY_PROTECT_TAG));
+        assert!(!is_protect_tag(CHANNEL_TAG));
+        assert!(!is_channel_tag(PROTECT_TAG));
     }
     use super::*;
 

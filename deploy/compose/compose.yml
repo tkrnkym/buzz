@@ -124,19 +124,19 @@ services:
 volumes:
   buzz-postgres-data:
     labels:
-      com.buzz.volume: postgres
+      com.nuxx.volume: postgres
   buzz-redis-data:
     labels:
-      com.buzz.volume: redis
+      com.nuxx.volume: redis
   buzz-minio-data:
     labels:
-      com.buzz.volume: minio
+      com.nuxx.volume: minio
   buzz-git-data:
     labels:
-      com.buzz.volume: git
+      com.nuxx.volume: git
 
 networks:
   buzz-net:
     driver: bridge
     labels:
-      com.buzz.network: production
+      com.nuxx.network: production

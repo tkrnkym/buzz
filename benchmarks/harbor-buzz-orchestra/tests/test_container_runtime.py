@@ -248,7 +248,7 @@ async def test_forwarder_bridges_the_canonical_relay_address(tmp_path):
 
 
 @pytest.mark.parametrize(("configured", "expected"), [(None, "32"), (7, "7")])
-async def test_launch_wires_the_desktop_environment(tmp_path, configured, expected):
+async def test_launch_wires_the_agent_environment(tmp_path, configured, expected):
     manifest = write_manifest(tmp_path)
     agent_class = manifest.roster[0]
     if configured is not None:
