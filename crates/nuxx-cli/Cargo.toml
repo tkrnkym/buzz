@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Agent-first CLI for Buzz relay"
+description = "Agent-first CLI for Nuxx relay"
 
 [lib]
 name = "nuxx_cli"
@@ -16,7 +16,7 @@ name = "nuxx"
 path = "src/main.rs"
 
 [dependencies]
-# CLI argument parsing — derive macros + env var support (BUZZ_API_TOKEN auto-wired)
+# CLI argument parsing — derive macros + env var support (NUXX_API_TOKEN auto-wired)
 clap = { version = "4", features = ["derive", "env"] }
 
 # HTTP client — async REST calls to the relay
@@ -32,7 +32,7 @@ serde_json = { workspace = true }
 # Structured error types with exit code mapping
 thiserror = { workspace = true }
 
-# Nostr event signing — used in `buzz auth`, auto-mint, and signed event writes
+# Nostr event signing — used in `nuxx auth`, auto-mint, and signed event writes
 nostr = { workspace = true }
 
 # UUID parsing for validate_uuid + event building
@@ -77,7 +77,7 @@ dirs = "6"
 nuxx-ws-client = { path = "../nuxx-ws-client" }
 
 # Explicit rustls dep with ring provider — required to install the process-level
-# CryptoProvider at startup. Without this the standalone `buzz` binary panics when
+# CryptoProvider at startup. Without this the standalone `nuxx` binary panics when
 # a multi-package release build (nuxx-acp + nuxx-dev-mcp + nuxx-cli in one cargo
 # invocation) unifies both ring and aws-lc-rs features, leaving rustls unable to
 # auto-select a provider. See crates/nuxx-acp/Cargo.toml for the same dependency.

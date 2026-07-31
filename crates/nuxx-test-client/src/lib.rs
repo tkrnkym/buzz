@@ -1,7 +1,7 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
-//! Minimal NIP-01 WebSocket test client for the Buzz relay.
+//! Minimal NIP-01 WebSocket test client for the Nuxx relay.
 
 use std::time::Duration;
 
@@ -13,7 +13,7 @@ use tracing::debug;
 use nuxx_ws_client::NostrWsConnection;
 pub use nuxx_ws_client::{parse_relay_message, OkResponse, RelayMessage, WsClientError};
 
-/// Errors returned by [`BuzzTestClient`] operations.
+/// Errors returned by [`NuxxTestClient`] operations.
 #[derive(Debug, Error)]
 pub enum TestClientError {
     /// A WebSocket transport error occurred.
@@ -80,12 +80,12 @@ impl From<nostr::event::builder::Error> for TestClientError {
     }
 }
 
-/// WebSocket test client for integration testing against a running Buzz relay.
-pub struct BuzzTestClient {
+/// WebSocket test client for integration testing against a running Nuxx relay.
+pub struct NuxxTestClient {
     inner: NostrWsConnection,
 }
 
-impl BuzzTestClient {
+impl NuxxTestClient {
     /// Connects to the relay at `url` and performs NIP-42 authentication with `keys`.
     pub async fn connect(url: &str, keys: &Keys) -> Result<Self, TestClientError> {
         let mut client = Self::connect_unauthenticated(url).await?;

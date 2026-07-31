@@ -64,7 +64,7 @@ export class UploadError extends Error {}
 
 /** SHA-256 of the file, lowercase hex — the form both the header and tag use. */
 export async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
-  // `crypto.subtle` is only defined in a secure context. Buzz is served over
+  // `crypto.subtle` is only defined in a secure context. Nuxx is served over
   // https (or localhost in development), so this is available wherever the app
   // runs; a bare-http deployment would need a different digest path entirely.
   const digest = await crypto.subtle.digest("SHA-256", bytes);

@@ -1,8 +1,8 @@
-//! Send an @mention event to a Buzz channel targeting a specific pubkey.
+//! Send an @mention event to a Nuxx channel targeting a specific pubkey.
 //! Usage: mention <channel_uuid> <target_pubkey_hex> <message>
 
 use nostr::{EventBuilder, Keys, Kind, Tag};
-use nuxx_test_client::BuzzTestClient;
+use nuxx_test_client::NuxxTestClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let keys = Keys::generate();
     println!("Sender pubkey: {}", keys.public_key().to_hex());
 
-    let mut client = BuzzTestClient::connect(&url, &keys).await?;
+    let mut client = NuxxTestClient::connect(&url, &keys).await?;
 
     let h_tag = Tag::parse(["h", channel_id])?;
     let p_tag = Tag::parse(["p", target_pubkey])?;

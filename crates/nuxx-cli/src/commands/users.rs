@@ -1,4 +1,4 @@
-use crate::client::{normalize_write_response, BuzzClient};
+use crate::client::{normalize_write_response, NuxxClient};
 use crate::error::CliError;
 use crate::validate::validate_hex64;
 
@@ -10,7 +10,7 @@ use crate::validate::validate_hex64;
 /// - 1+ pubkeys → query those users' profiles
 /// - --name "foo" → NIP-50 search on kind:0, then client-side filter
 pub async fn cmd_get_users(
-    client: &BuzzClient,
+    client: &NuxxClient,
     pubkeys: &[String],
     name: Option<&str>,
     format: &crate::OutputFormat,
@@ -79,7 +79,7 @@ pub async fn cmd_get_users(
 /// Search for users by display name via NIP-50 full-text search on kind:0 profiles.
 /// Returns [] if the relay does not implement NIP-50 search.
 async fn search_by_name(
-    client: &BuzzClient,
+    client: &NuxxClient,
     query: &str,
     format: &crate::OutputFormat,
 ) -> Result<(), CliError> {
@@ -148,7 +148,7 @@ async fn search_by_name(
 }
 
 pub async fn cmd_set_profile(
-    client: &BuzzClient,
+    client: &NuxxClient,
     display_name: Option<&str>,
     avatar_url: Option<&str>,
     about: Option<&str>,
@@ -216,7 +216,7 @@ pub async fn cmd_set_profile(
 /// Fetch the current user's profile metadata via POST /query (kind:0).
 /// Returns the parsed content JSON object, or an empty object if no profile exists.
 async fn fetch_current_profile(
-    client: &BuzzClient,
+    client: &NuxxClient,
 ) -> Result<serde_json::Map<String, serde_json::Value>, CliError> {
     let my_pk = client.keys().public_key().to_hex();
     let filter = serde_json::json!({
@@ -244,7 +244,7 @@ async fn fetch_current_profile(
 }
 
 /// Get presence status for users — query kind:40902 presence snapshot events.
-pub async fn cmd_get_presence(client: &BuzzClient, pubkeys_csv: &str) -> Result<(), CliError> {
+pub async fn cmd_get_presence(client: &NuxxClient, pubkeys_csv: &str) -> Result<(), CliError> {
     let pubkeys: Vec<&str> = pubkeys_csv
         .split(',')
         .map(|s| s.trim())
@@ -295,7 +295,7 @@ fn presence_subject(event: &serde_json::Value) -> &str {
 /// Kind 20001 is ephemeral and only accepted via WebSocket connections. This
 /// method connects to the relay over WS, performs NIP-42 authentication, and
 /// publishes the event directly — bypassing the HTTP bridge.
-pub async fn cmd_set_presence(client: &BuzzClient, status: &str) -> Result<(), CliError> {
+pub async fn cmd_set_presence(client: &NuxxClient, status: &str) -> Result<(), CliError> {
     let builder = nuxx_sdk::build_presence_update(status).map_err(crate::validate::sdk_err)?;
     let event = client.sign_event(builder)?;
 
@@ -309,7 +309,7 @@ pub async fn cmd_set_presence(client: &BuzzClient, status: &str) -> Result<(), C
 /// Uses the `d:general` coordinate that the desktop client reads for the
 /// profile status line. A blank `text` with no `emoji` clears the status.
 pub async fn cmd_set_status(
-    client: &BuzzClient,
+    client: &NuxxClient,
     text: &str,
     emoji: Option<&str>,
 ) -> Result<(), CliError> {
@@ -322,7 +322,7 @@ pub async fn cmd_set_status(
 
 pub async fn dispatch(
     cmd: crate::UsersCmd,
-    client: &BuzzClient,
+    client: &NuxxClient,
     format: &crate::OutputFormat,
 ) -> Result<(), CliError> {
     use crate::UsersCmd;

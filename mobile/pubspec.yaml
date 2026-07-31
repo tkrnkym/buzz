@@ -1,5 +1,5 @@
-name: buzz
-description: Buzz mobile client
+name: nuxx
+description: Nuxx mobile client
 publish_to: 'none'
 version: 0.0.0+1
 
@@ -50,7 +50,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/buzz-icon.png
+    - assets/images/nuxx-icon.png
   fonts:
     - family: Inter
       fonts:

@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
-//! `nuxx-sdk` — typed Nostr event builders for Buzz operations.
+//! `nuxx-sdk` — typed Nostr event builders for Nuxx operations.
 //!
 //! # Mental Model
 //!

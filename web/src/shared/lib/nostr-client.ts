@@ -19,7 +19,7 @@ export interface NostrFilter {
   until?: number;
   limit?: number;
   /**
-   * Keyset cursor companion to `until` — a Buzz bridge extension, not NIP-01.
+   * Keyset cursor companion to `until` — a Nuxx bridge extension, not NIP-01.
    *
    * Only `POST /query` honours it; a WebSocket `REQ` parses filters through
    * `nostr::Filter`, which drops unknown fields, so sending it over the socket
@@ -81,7 +81,7 @@ export function queryEvents(
 
     ws.addEventListener("open", () => {
       // Wait briefly for an AUTH challenge before sending REQ.
-      // Buzz relays always send AUTH, but other relays may not.
+      // Nuxx relays always send AUTH, but other relays may not.
       unauthenticatedReqTimer = setTimeout(() => sendReq(), 100);
     });
 

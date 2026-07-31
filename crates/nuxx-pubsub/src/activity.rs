@@ -18,9 +18,9 @@
 //! Keys, all community-scoped:
 //!
 //! ```text
-//! buzz:{community}:activity:{shard}          HASH  channel_uuid -> unix_seconds
-//! buzz:{community}:activity:dirty            SET   shard indices awaiting rebuild
-//! buzz:{community}:activity:claim:{shard}    STR   coalescing claim, TTL = window
+//! nuxx:{community}:activity:{shard}          HASH  channel_uuid -> unix_seconds
+//! nuxx:{community}:activity:dirty            SET   shard indices awaiting rebuild
+//! nuxx:{community}:activity:claim:{shard}    STR   coalescing claim, TTL = window
 //! ```
 //!
 //! # Storage choice, and when to revisit it
@@ -216,7 +216,7 @@ mod tests {
         // Two communities must never share an activity shard: a leak here would
         // publish one tenant's channel ids to another's subscribers.
         let key = shard_key(&ctx(), 3);
-        assert!(key.starts_with("buzz:"));
+        assert!(key.starts_with("nuxx:"));
         assert!(key.contains(&CommunityId::from_uuid(Uuid::nil()).to_string()));
         assert!(key.ends_with(":activity:3"));
     }

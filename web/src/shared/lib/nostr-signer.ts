@@ -83,7 +83,7 @@ export function canEncryptToSelf(): boolean {
 /**
  * NIP-44 encrypt to self — the conversation partner is the signer's own key.
  *
- * Buzz stores personal state (read positions, channel sections, mutes) as
+ * Nuxx stores personal state (read positions, channel sections, mutes) as
  * kind:30078 events on the relay, encrypted this way so the relay operator holds
  * ciphertext rather than a record of what each person has read.
  */

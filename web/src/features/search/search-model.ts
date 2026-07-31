@@ -27,7 +27,7 @@
  * without spaces: a Japanese sentence becomes a *single* lexeme, so
  * `会議の資料を共有します` is one token and searching `資料` finds nothing.
  * Latin words embedded in such a run are equally unreachable
- * (`Buzzのdeployが完了` indexes as one token; `deploy` does not match).
+ * (`Nuxxのdeployが完了` indexes as one token; `deploy` does not match).
  *
  * Verified against Postgres 16, not inferred. Fixing it is a relay-side change —
  * a CJK-aware tokenizer (`pg_bigm`, PGroonga) or an n-gram index — so this

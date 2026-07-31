@@ -99,7 +99,7 @@ export function eventToChannel(event: NostrEvent): Channel | null {
     about: firstTag(event, "about") ?? null,
     topic: firstTag(event, "topic") ?? null,
     type: firstTag(event, "t") ?? "stream",
-    // NIP-29 marks restricted groups with a bare `private` tag; Buzz also emits
+    // NIP-29 marks restricted groups with a bare `private` tag; Nuxx also emits
     // an explicit `public` tag, so absence of `private` is the safe reading.
     isPrivate: hasTag(event, "private"),
     hidden: hasTag(event, "hidden"),
@@ -203,7 +203,7 @@ export interface HistoryCursor {
 /**
  * Filter for one page of older history.
  *
- * `before_id` is a Buzz bridge extension on `POST /query`, not vanilla NIP-01,
+ * `before_id` is a Nuxx bridge extension on `POST /query`, not vanilla NIP-01,
  * and it is the reason this read cannot go over the WebSocket: a WS `REQ` can
  * only express `until`, so it can only page ambiguously. The relay pairs the two
  * into a keyset — `created_at < until OR (created_at = until AND id > before_id)`
@@ -327,7 +327,7 @@ export const MAX_REACTION_EMOJI_LENGTH = 64;
  * Event template for a NIP-25 reaction, matching `nuxx-sdk::build_reaction`.
  *
  * Deliberately no `h` tag — the SDK omits it, and adding one here would produce
- * events other Buzz clients do not.
+ * events other Nuxx clients do not.
  */
 export function buildReactionTemplate(
   targetEventId: string,

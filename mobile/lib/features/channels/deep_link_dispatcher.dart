@@ -50,7 +50,7 @@ class _DeepLinkDispatcherState extends ConsumerState<DeepLinkDispatcher> {
   @override
   Widget build(BuildContext context) {
     // Re-evaluate dispatch when either a new link arrives or channels load.
-    ref.listen<BuzzDeepLink?>(pendingDeepLinkProvider, (_, link) {
+    ref.listen<NuxxDeepLink?>(pendingDeepLinkProvider, (_, link) {
       _maybeDispatch(link);
     });
     if (widget.dispatchMessageLinks) {
@@ -62,7 +62,7 @@ class _DeepLinkDispatcherState extends ConsumerState<DeepLinkDispatcher> {
     return widget.child;
   }
 
-  void _maybeDispatch(BuzzDeepLink? link) {
+  void _maybeDispatch(NuxxDeepLink? link) {
     if (link == null) return;
     if (link is InviteDeepLink) {
       _maybeDispatchInvite(link);

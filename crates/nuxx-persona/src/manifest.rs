@@ -1,7 +1,7 @@
 //! Pack manifest types and `plugin.json` parser.
 //!
 //! Every persona pack ships a `.plugin/plugin.json` that describes the pack
-//! (OPS metadata) and tells Buzz where to find personas, hooks, and MCP
+//! (OPS metadata) and tells Nuxx where to find personas, hooks, and MCP
 //! config.
 //!
 //! ```json
@@ -37,7 +37,7 @@ pub enum ManifestError {
 pub struct Engines {
     /// Semver range the Nuxx runtime must satisfy (e.g. `">=0.9.0"`).
     ///
-    /// Serialized as `nuxx`, with `buzz` accepted on read. This is a key in
+    /// Serialized as `nuxx`, with `nuxx` accepted on read. This is a key in
     /// author-written persona pack manifests, so packs published before the
     /// rename still declare `engines.buzz`; dropping the alias would make them
     /// fail to load. The alias predates the rename and only now does work.
@@ -131,7 +131,7 @@ pub struct PackManifest {
 /// Intentionally permissive (no `deny_unknown_fields`): `plugin.json` is an
 /// OPS superset and may carry fields from other tools (e.g. `ops_category`,
 /// `marketplace_tags`). Unknown fields are silently ignored here; the
-/// validator issues advisory warnings for Buzz-unknown keys.
+/// validator issues advisory warnings for Nuxx-unknown keys.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct RawManifest {
@@ -229,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    /// Uses the legacy `engines.buzz` key on purpose: packs published before the
+    /// Uses the legacy `engines.nuxx` key on purpose: packs published before the
     /// rename still declare it, and the alias on `Engines::nuxx` is what keeps
     /// them loading.
     fn parse_full_manifest() {

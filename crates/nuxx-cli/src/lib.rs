@@ -5,12 +5,12 @@ mod error;
 mod validate;
 
 use clap::{Parser, Subcommand};
-use client::BuzzClient;
+use client::NuxxClient;
 use error::CliError;
 use nostr::Keys;
 use uuid::Uuid;
 
-/// Run the Buzz CLI from raw arguments (including `argv[0]`).
+/// Run the Nuxx CLI from raw arguments (including `argv[0]`).
 ///
 /// Returns a process exit code (0 = success).
 ///
@@ -61,10 +61,10 @@ where
 
 #[derive(Parser)]
 #[command(
-    name = "buzz",
-    about = "Buzz CLI — interact with a Buzz relay",
+    name = "nuxx",
+    about = "Nuxx CLI — interact with a Nuxx relay",
     long_about = "\
-Buzz CLI — interact with a Buzz relay
+Nuxx CLI — interact with a Nuxx relay
 
 Configuration (flags override env vars):
   NUXX_RELAY_URL     Relay base URL        [default: http://localhost:3000]
@@ -258,7 +258,7 @@ impl RespondToArg {
 
 #[derive(Subcommand)]
 pub enum AgentsCmd {
-    /// Open a prefilled create-agent form in the owner's Buzz Desktop
+    /// Open a prefilled create-agent form in the owner's Nuxx Desktop
     DraftCreate {
         /// Current channel UUID; the new agent is added here after save
         #[arg(long)]
@@ -270,7 +270,7 @@ pub enum AgentsCmd {
         #[arg(long)]
         system_prompt: String,
     },
-    /// Open a prefilled edit-agent form in the owner's Buzz Desktop
+    /// Open a prefilled edit-agent form in the owner's Nuxx Desktop
     DraftUpdate {
         /// Current channel UUID
         #[arg(long)]
@@ -303,8 +303,8 @@ running under NUXX_AUTH_TAG signs as itself, so it can only ever satisfy \
 the self path (target == signer) — not the owner-of-agent path for another \
 identity.\n\n\
 Examples:\n  \
-buzz agents archive <PUBKEY> --reason retired\n  \
-buzz agents archive <PUBKEY> --reason bot-rebuilt --replaced-by <NEW_PUBKEY>"
+nuxx agents archive <PUBKEY> --reason retired\n  \
+nuxx agents archive <PUBKEY> --reason bot-rebuilt --replaced-by <NEW_PUBKEY>"
     )]
     Archive {
         /// Target identity pubkey (hex)
@@ -321,7 +321,7 @@ buzz agents archive <PUBKEY> --reason bot-rebuilt --replaced-by <NEW_PUBKEY>"
     },
     /// Submit a NIP-IA unarchive request for an identity (kind 9036)
     #[command(after_help = "Examples:\n  \
-buzz agents unarchive <PUBKEY> --reason returned")]
+nuxx agents unarchive <PUBKEY> --reason returned")]
     Unarchive {
         /// Target identity pubkey (hex)
         target_pubkey: String,
@@ -339,7 +339,7 @@ and NIP-70 `-` protection tag before trusting it. Any trust failure is a \
 nonzero-exit error, never a false-empty success — this command's whole \
 purpose is verification.\n\n\
 Examples:\n  \
-buzz agents archived"
+nuxx agents archived"
     )]
     Archived,
 }
@@ -348,10 +348,10 @@ buzz agents archived"
 pub enum MessagesCmd {
     /// Send a message to a channel
     #[command(
-        after_help = "Examples:\n  buzz messages send --channel <UUID> --content \"hello\"\n  buzz messages send --channel <UUID> --content \"@alice check this\"\n  echo \"hello from stdin\" | buzz messages send --channel <UUID> --content -"
+        after_help = "Examples:\n  nuxx messages send --channel <UUID> --content \"hello\"\n  nuxx messages send --channel <UUID> --content \"@alice check this\"\n  echo \"hello from stdin\" | nuxx messages send --channel <UUID> --content -"
     )]
     Send {
-        /// Channel UUID (from 'buzz channels list')
+        /// Channel UUID (from 'nuxx channels list')
         #[arg(long)]
         channel: String,
         /// Message text — supports @mentions and markdown. Use '-' to read from stdin.
@@ -438,7 +438,7 @@ pub enum MessagesCmd {
     },
     /// Retrieve messages from a channel
     #[command(
-        after_help = "Examples:\n  buzz messages get --channel <UUID>\n  buzz messages get --channel <UUID> --limit 50 --kinds 1,1984"
+        after_help = "Examples:\n  nuxx messages get --channel <UUID>\n  nuxx messages get --channel <UUID> --limit 50 --kinds 1,1984"
     )]
     Get {
         /// Channel UUID
@@ -474,7 +474,7 @@ pub enum MessagesCmd {
     },
     /// Full-text search across messages
     #[command(
-        after_help = "Examples:\n  buzz messages search --query checkout\n  buzz messages search --author npub1... --since 1783497600\n  buzz messages search --author Aaron --query checkout --limit 20"
+        after_help = "Examples:\n  nuxx messages search --query checkout\n  nuxx messages search --author npub1... --since 1783497600\n  nuxx messages search --author Aaron --query checkout --limit 20"
     )]
     Search {
         /// Search query string (optional when --author is given)
@@ -505,7 +505,7 @@ pub enum MessagesCmd {
 pub enum ChannelsCmd {
     /// List channels visible to the current identity
     #[command(
-        after_help = "Examples:\n  buzz channels list\n  buzz channels list --visibility open"
+        after_help = "Examples:\n  nuxx channels list\n  nuxx channels list --visibility open"
     )]
     List {
         /// Filter by visibility
@@ -526,7 +526,7 @@ pub enum ChannelsCmd {
     },
     /// Search channels by human-readable name
     #[command(
-        after_help = "Examples:\n  buzz channels search --query composer\n  buzz channels search --query nuxx-chat-composer --exact\n  buzz channels search --query design --include-archived"
+        after_help = "Examples:\n  nuxx channels search --query composer\n  nuxx channels search --query nuxx-chat-composer --exact\n  nuxx channels search --query design --include-archived"
     )]
     Search {
         /// Search query (case-insensitive substring of channel name)
@@ -544,7 +544,7 @@ pub enum ChannelsCmd {
     },
     /// Create a new channel
     #[command(
-        after_help = "Examples:\n  buzz channels create --name general --type stream --visibility open\n  buzz channels create --name design --type forum --visibility open --description \"Design discussions\"\n  buzz channels create --name standup --type stream --visibility open --ttl 3600  # ephemeral, archived after 1h idle\n  buzz channels create --name project-x --template \"Buzz Team\"  # type/visibility/canvas/roster from the template; explicit flags override"
+        after_help = "Examples:\n  nuxx channels create --name general --type stream --visibility open\n  nuxx channels create --name design --type forum --visibility open --description \"Design discussions\"\n  nuxx channels create --name standup --type stream --visibility open --ttl 3600  # ephemeral, archived after 1h idle\n  nuxx channels create --name project-x --template \"Nuxx Team\"  # type/visibility/canvas/roster from the template; explicit flags override"
     )]
     Create {
         /// Channel name
@@ -899,7 +899,7 @@ pub enum WorkflowsCmd {
     },
     /// Trigger a workflow run
     #[command(
-        after_help = "Examples:\n  buzz workflows trigger --workflow <UUID>\n  buzz workflows trigger --workflow <UUID> --inputs '{\"key\":\"value\"}'"
+        after_help = "Examples:\n  nuxx workflows trigger --workflow <UUID>\n  nuxx workflows trigger --workflow <UUID> --inputs '{\"key\":\"value\"}'"
     )]
     Trigger {
         /// Workflow UUID
@@ -920,7 +920,7 @@ pub enum WorkflowsCmd {
     },
     /// Approve or deny a workflow step
     #[command(
-        after_help = "Examples:\n  buzz workflows approve --token <UUID>\n  buzz workflows approve --token <UUID> --approved false --note \"needs revision\""
+        after_help = "Examples:\n  nuxx workflows approve --token <UUID>\n  nuxx workflows approve --token <UUID> --approved false --note \"needs revision\""
     )]
     Approve {
         /// The approval token UUID (from the approval request)
@@ -1037,7 +1037,7 @@ pub enum NotesCmd {
     /// title is carried forward when `--title` is omitted, and `--title ""`
     /// explicitly clears it.
     #[command(
-        after_help = "Examples:\n  echo '# Hello' | buzz notes set --name hello --title 'Hello' --content -\n  buzz notes set --name hello --tag onboarding --content - < draft.md"
+        after_help = "Examples:\n  echo '# Hello' | nuxx notes set --name hello --title 'Hello' --content -\n  nuxx notes set --name hello --tag onboarding --content - < draft.md"
     )]
     Set {
         /// Slug — becomes the `d` tag. `[a-z0-9._-]{1,80}`.
@@ -1131,7 +1131,7 @@ pub enum ReposCmd {
         relays: Vec<String>,
         /// Channel UUID to bind the repo to. The `nuxx-channel` tag is the
         /// git ACL: without it the relay 404s every clone/fetch/push until
-        /// the author runs `buzz repos bind` (issue #3527).
+        /// the author runs `nuxx repos bind` (issue #3527).
         #[arg(long)]
         channel: Option<String>,
     },
@@ -1228,7 +1228,7 @@ pub enum RepoPushRole {
 pub enum PatchesCmd {
     /// Send a git patch (NIP-34 kind:1617)
     #[command(
-        after_help = "Examples:\n  git format-patch -1 HEAD --stdout | buzz patches send --repo-owner <hex> --repo-id myrepo --patch-file - --root\n  buzz patches send --repo-owner <hex> --repo-id myrepo --patch-file 0001-fix.patch --reply-to <prev-patch-id>"
+        after_help = "Examples:\n  git format-patch -1 HEAD --stdout | nuxx patches send --repo-owner <hex> --repo-id myrepo --patch-file - --root\n  nuxx patches send --repo-owner <hex> --repo-id myrepo --patch-file 0001-fix.patch --reply-to <prev-patch-id>"
     )]
     Send {
         /// Repo owner pubkey (64-char hex)
@@ -1334,7 +1334,7 @@ pub enum PatchesCmd {
 pub enum PrCmd {
     /// Open a git pull request (NIP-34 kind:1618)
     #[command(
-        after_help = "Examples:\n  buzz pr open --repo-owner <hex> --repo-id myrepo --subject 'Fix bug' --body-file - --commit $(git rev-parse HEAD) --clone https://relay/git/owner/myrepo --branch-name fix-bug\n  buzz pr update --repo-owner <hex> --repo-id myrepo --pr <event> --pr-author <hex> --commit $(git rev-parse HEAD) --clone https://relay/git/owner/myrepo"
+        after_help = "Examples:\n  nuxx pr open --repo-owner <hex> --repo-id myrepo --subject 'Fix bug' --body-file - --commit $(git rev-parse HEAD) --clone https://relay/git/owner/myrepo --branch-name fix-bug\n  nuxx pr update --repo-owner <hex> --repo-id myrepo --pr <event> --pr-author <hex> --commit $(git rev-parse HEAD) --clone https://relay/git/owner/myrepo"
     )]
     Open {
         /// Repo owner pubkey (64-char hex)
@@ -1571,7 +1571,7 @@ pub enum MediaCmd {
     },
 }
 
-/// Subcommands for `buzz mem`.
+/// Subcommands for `nuxx mem`.
 #[derive(Subcommand)]
 pub enum MemCmd {
     /// List non-tombstoned memory entries
@@ -1627,8 +1627,8 @@ pub enum MemCmd {
         #[arg(long)]
         patch_file: Option<String>,
         /// sha256 hex digest (lowercase) of the value the patch was generated
-        /// against. Hashes the exact UTF-8 bytes returned by `buzz mem get`,
-        /// not normalized lines. Run `buzz mem hash <slug>` to capture this
+        /// against. Hashes the exact UTF-8 bytes returned by `nuxx mem get`,
+        /// not normalized lines. Run `nuxx mem hash <slug>` to capture this
         /// before editing.
         #[arg(long)]
         base_hash: Option<String>,
@@ -1654,7 +1654,7 @@ pub enum MemCmd {
     },
 }
 
-/// Subcommands for `buzz pack`.
+/// Subcommands for `nuxx pack`.
 #[derive(Subcommand)]
 pub enum PackCmd {
     /// Validate a persona pack directory
@@ -1679,7 +1679,7 @@ pub enum PackCmd {
 pub enum ModerationCmd {
     /// List reports in the moderation queue (newest first)
     #[command(
-        after_help = "Examples:\n  buzz moderation reports\n  buzz moderation reports --status open --limit 20"
+        after_help = "Examples:\n  nuxx moderation reports\n  nuxx moderation reports --status open --limit 20"
     )]
     Reports {
         /// Filter by status: open | resolved | dismissed | escalated (default: all)
@@ -1691,7 +1691,7 @@ pub enum ModerationCmd {
     },
     /// Resolve or dismiss a report (kind 9044)
     #[command(
-        after_help = "Examples:\n  buzz moderation resolve --report <REPORT_EVENT_ID> --status dismissed --action dismiss\n  buzz moderation resolve --report <REPORT_EVENT_ID> --status resolved --action ban --reason \"rule 3\""
+        after_help = "Examples:\n  nuxx moderation resolve --report <REPORT_EVENT_ID> --status dismissed --action dismiss\n  nuxx moderation resolve --report <REPORT_EVENT_ID> --status resolved --action ban --reason \"rule 3\""
     )]
     Resolve {
         /// Hex event id of the kind:1984 report being resolved
@@ -1709,7 +1709,7 @@ pub enum ModerationCmd {
     },
     /// Ban a member from the community (kind 9040)
     #[command(
-        after_help = "Examples:\n  buzz moderation ban --pubkey <HEX>\n  buzz moderation ban --pubkey <HEX> --expires-in 604800 --reason \"repeated spam\""
+        after_help = "Examples:\n  nuxx moderation ban --pubkey <HEX>\n  nuxx moderation ban --pubkey <HEX> --expires-in 604800 --reason \"repeated spam\""
     )]
     Ban {
         /// Target member pubkey (hex)
@@ -1733,7 +1733,7 @@ pub enum ModerationCmd {
     },
     /// Time out a member — a write-block, not a disconnect (kind 9042)
     #[command(
-        after_help = "Examples:\n  buzz moderation timeout --pubkey <HEX> --expires-in 3600\n  buzz moderation timeout --pubkey <HEX> --expires-at 1783500000 --reason \"cool off\""
+        after_help = "Examples:\n  nuxx moderation timeout --pubkey <HEX> --expires-in 3600\n  nuxx moderation timeout --pubkey <HEX> --expires-at 1783500000 --reason \"cool off\""
     )]
     Timeout {
         /// Target member pubkey (hex)
@@ -1800,7 +1800,7 @@ async fn run(cli: Cli) -> Result<(), CliError> {
         _ => (None, None),
     };
 
-    let client = BuzzClient::new(relay_url, keys, auth_tag, auth_tag_json)?;
+    let client = NuxxClient::new(relay_url, keys, auth_tag, auth_tag_json)?;
 
     match cli.command {
         Cmd::Agents(sub) => commands::agents::dispatch(sub, &client).await,
@@ -1841,7 +1841,7 @@ mod tests {
     #[test]
     fn set_status_clear_rejects_text_and_emoji() {
         for extra in [["--text", "busy"], ["--emoji", "🎶"]] {
-            let args = ["buzz", "users", "set-status", "--clear"]
+            let args = ["nuxx", "users", "set-status", "--clear"]
                 .into_iter()
                 .chain(extra);
             assert!(
@@ -1854,12 +1854,12 @@ mod tests {
 
     #[test]
     fn set_status_requires_text_or_clear() {
-        assert!(Cli::try_parse_from(["buzz", "users", "set-status"]).is_err());
+        assert!(Cli::try_parse_from(["nuxx", "users", "set-status"]).is_err());
         assert!(
-            Cli::try_parse_from(["buzz", "users", "set-status", "--emoji", "🎶"]).is_err(),
+            Cli::try_parse_from(["nuxx", "users", "set-status", "--emoji", "🎶"]).is_err(),
             "--emoji alone must not imply a status"
         );
-        assert!(Cli::try_parse_from(["buzz", "users", "set-status", "--clear"]).is_ok());
+        assert!(Cli::try_parse_from(["nuxx", "users", "set-status", "--clear"]).is_ok());
     }
 
     #[test]

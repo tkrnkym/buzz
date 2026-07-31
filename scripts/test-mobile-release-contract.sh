@@ -33,7 +33,7 @@ case "${1:-}:${2:-}" in
       exit 1
     fi
     if [[ "${GH_WORKFLOW_WRONG_URL:-}" == "1" ]]; then
-      printf '%s\n' 'https://github.com/attacker/buzz/actions/runs/999'
+      printf '%s\n' 'https://github.com/attacker/nuxx/actions/runs/999'
       exit 0
     fi
     if [[ "${GH_WORKFLOW_EXTRA_URL:-}" == "1" ]]; then
@@ -72,7 +72,7 @@ case "${1:-}:${2:-}" in
         "mobile-v${version}-rc.${expected}" "$sha"
     else
       git -C "$GH_WORKTREE" -c tag.gpgSign=false tag -a \
-        -m "Buzz Mobile $version release candidate $expected" \
+        -m "Nuxx Mobile $version release candidate $expected" \
         "mobile-v${version}-rc.${expected}" "$sha"
     fi
     git -C "$GH_WORKTREE" -c core.hooksPath=/dev/null push -q \

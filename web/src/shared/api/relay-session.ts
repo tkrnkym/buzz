@@ -11,7 +11,7 @@
  *   open → relay sends ["AUTH", challenge] → sign kind:22242 and reply
  *        → relay OKs the auth event → flush REQs and queued EVENTs
  *
- * Buzz relays always challenge, but the session tolerates relays that do not: if
+ * Nuxx relays always challenge, but the session tolerates relays that do not: if
  * no challenge arrives within a short grace window it proceeds unauthenticated,
  * so open relays still work.
  *
@@ -171,7 +171,7 @@ export class RelaySession {
     socket.onopen = () => {
       if (this.socket !== socket) return;
       this.setState("authenticating");
-      // Buzz always challenges; other relays may not. Don't stall forever.
+      // Nuxx always challenges; other relays may not. Don't stall forever.
       this.authGraceTimer = setTimeout(() => {
         this.authGraceTimer = null;
         if (this.socket === socket && this.state === "authenticating") {

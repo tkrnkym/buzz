@@ -14,8 +14,8 @@ library;
 import '../relay/relay_validation.dart';
 
 /// A parsed deep link supported by the app.
-sealed class BuzzDeepLink {
-  const BuzzDeepLink();
+sealed class NuxxDeepLink {
+  const NuxxDeepLink();
 }
 
 /// A parsed relay invite link.
@@ -23,7 +23,7 @@ sealed class BuzzDeepLink {
 /// Canonical share links are `https://<relay>/invite/<code>`. The custom
 /// `nuxx://join?relay=<ws(s)://relay>&code=<code>` form is only an installed-app
 /// handoff from the web landing page.
-class InviteDeepLink extends BuzzDeepLink {
+class InviteDeepLink extends NuxxDeepLink {
   /// Relay URL normalized to the websocket scheme used by the app.
   final String relayUrl;
 
@@ -65,7 +65,7 @@ bool isAcceptedLinkScheme(String scheme) =>
     scheme == linkScheme || scheme == legacyLinkScheme;
 
 /// A parsed `nuxx://message` deep link.
-class MessageDeepLink extends BuzzDeepLink {
+class MessageDeepLink extends NuxxDeepLink {
   /// Channel UUID from the `channel` query param.
   final String channelId;
 
@@ -229,6 +229,6 @@ InviteDeepLink? parseInviteDeepLink(Uri uri) {
   return null;
 }
 
-/// Parse any supported Buzz deep link.
-BuzzDeepLink? parseBuzzDeepLink(Uri uri) =>
+/// Parse any supported Nuxx deep link.
+NuxxDeepLink? parseNuxxDeepLink(Uri uri) =>
     parseInviteDeepLink(uri) ?? parseMessageDeepLink(uri);

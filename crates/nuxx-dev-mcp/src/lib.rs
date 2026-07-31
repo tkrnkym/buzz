@@ -39,7 +39,7 @@ impl DevMcp {
 
     #[tool(
         name = "shell",
-        description = "Run a shell command (bash by default; set `NUXX_SHELL` to use cmd, PowerShell, or another shell). Ephemeral process per call. Output tail-truncated to ~8KB for the LLM; full output (first 10MB) saved to artifact file. timeout_ms defaults to 120000 (2 min) if omitted; capped at 600000 (10 min). For long-running commands (git push with hooks, cargo build, test suites), use 300000+. On PATH: rg (prefer over grep; flags: -n -i -l -g <glob> -C <n> --files), tree (flags: -d <depth>; shows line counts), and buzz (Buzz relay CLI — run buzz --help for commands)."
+        description = "Run a shell command (bash by default; set `NUXX_SHELL` to use cmd, PowerShell, or another shell). Ephemeral process per call. Output tail-truncated to ~8KB for the LLM; full output (first 10MB) saved to artifact file. timeout_ms defaults to 120000 (2 min) if omitted; capped at 600000 (10 min). For long-running commands (git push with hooks, cargo build, test suites), use 300000+. On PATH: rg (prefer over grep; flags: -n -i -l -g <glob> -C <n> --files), tree (flags: -d <depth>; shows line counts), and nuxx (Nuxx relay CLI — run nuxx --help for commands)."
     )]
     async fn shell(
         &self,
@@ -165,8 +165,8 @@ async fn async_main(cmd: String) -> Result<(), Box<dyn std::error::Error>> {
     // repeated installation is harmless.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    // buzz CLI needs tokio (async HTTP client).
-    if cmd == "buzz" {
+    // nuxx CLI needs tokio (async HTTP client).
+    if cmd == "nuxx" {
         std::process::exit(nuxx_cli::run_from_args(std::env::args()).await);
     }
 

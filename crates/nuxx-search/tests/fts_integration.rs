@@ -166,7 +166,7 @@ async fn search_finds_event_in_same_community() {
         evt_id,
         pk,
         9,
-        "hello wonderland — buzz everyone",
+        "hello wonderland — nuxx everyone",
         None,
         1700000000,
     )

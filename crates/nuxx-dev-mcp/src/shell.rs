@@ -76,7 +76,7 @@ fn build_bootstrap(cwd: &Path, shell_hint: &str) -> String {
     let stack = detect_stack(cwd);
     let nuxx_hint =
         if std::env::var("NUXX_RELAY_URL").is_ok() && std::env::var("NUXX_PRIVATE_KEY").is_ok() {
-            "\nBuzz relay configured. Run `buzz --help` to see available commands.\n"
+            "\nNuxx relay configured. Run `nuxx --help` to see available commands.\n"
         } else {
             ""
         };
@@ -168,7 +168,7 @@ pub async fn run(
     cmd.current_dir(&workdir);
     cmd.env("PATH", &state.shim.path_env);
     // NOSTR_PRIVATE_KEY is already removed from this process's env (shim.rs).
-    // NUXX_PRIVATE_KEY is intentionally inherited — the buzz CLI needs it.
+    // NUXX_PRIVATE_KEY is intentionally inherited — the nuxx CLI needs it.
     for (k, v) in &state.shim.git_env {
         cmd.env(k, v);
     }
@@ -451,9 +451,9 @@ fn resolve_bash(path_env: &str) -> Result<(PathBuf, String), String> {
         "Git for Windows (Git Bash) is required but was not found. Checked \\
          NUXX_SHELL, GIT_BASH, bash.exe and git.exe on PATH, the standard Git install locations, \\
          and HKLM/HKCU\\\\SOFTWARE\\\\GitForWindows. Git's \"Cmd\" PATH option adds \\
-         Git\\\\cmd\\\\git.exe but not Git\\\\bin\\\\bash.exe; Buzz normally derives Git Bash from that git.exe. \\
+         Git\\\\cmd\\\\git.exe but not Git\\\\bin\\\\bash.exe; Nuxx normally derives Git Bash from that git.exe. \\
          Install it from https://git-scm.com/download/win and select \"Git from the command line \\
-         and also from 3rd-party software\", then relaunch Buzz. You can also set \\
+         and also from 3rd-party software\", then relaunch Nuxx. You can also set \\
          NUXX_SHELL to a shell executable."
             .into(),
     )

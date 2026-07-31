@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# start-relay-for-tests.sh — Start the Buzz relay and its backing services
+# start-relay-for-tests.sh — Start the Nuxx relay and its backing services
 # =============================================================================
 # Shared script for CI jobs that need a running relay. Starts docker compose
 # services, waits for health, applies the schema, builds the relay, starts it,
@@ -91,16 +91,16 @@ wait_healthy "MinIO" "nuxx-minio"
 log "Applying database schema..."
 export PGHOST=localhost
 export PGPORT=5432
-export PGUSER=buzz
+export PGUSER=nuxx
 export PGPASSWORD=nuxx_dev
-export PGDATABASE=buzz
+export PGDATABASE=nuxx
 
 # Use the already-running docker postgres for desired-state planning instead of
 # downloading an embedded Postgres from Maven Central (transient-fetch flake source).
 export PGSCHEMA_PLAN_HOST=localhost
 export PGSCHEMA_PLAN_PORT=5432
-export PGSCHEMA_PLAN_DB=buzz
-export PGSCHEMA_PLAN_USER=buzz
+export PGSCHEMA_PLAN_DB=nuxx
+export PGSCHEMA_PLAN_USER=nuxx
 export PGSCHEMA_PLAN_PASSWORD=nuxx_dev
 
 ./bin/pgschema apply --file schema/schema.sql --auto-approve
@@ -155,10 +155,10 @@ nohup env \
   DATABASE_URL=postgres://nuxx:nuxx_dev@localhost:5432/nuxx \
   REDIS_URL=redis://localhost:6379 \
   RELAY_URL=ws://localhost:3000 \
-  BUZZ_BIND_ADDR=0.0.0.0:3000 \
-  BUZZ_REQUIRE_AUTH_TOKEN=false \
-  BUZZ_RECONCILE_CHANNELS=true \
-  BUZZ_GIT_PROBE_WRITERS=8 \
+  NUXX_BIND_ADDR=0.0.0.0:3000 \
+  NUXX_REQUIRE_AUTH_TOKEN=false \
+  NUXX_RECONCILE_CHANNELS=true \
+  NUXX_GIT_PROBE_WRITERS=8 \
   "./target/${CARGO_PROFILE}/nuxx-relay" > /tmp/nuxx-relay.log 2>&1 &
 echo $! > /tmp/nuxx-relay.pid
 

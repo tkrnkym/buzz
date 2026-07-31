@@ -1,9 +1,9 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
-//! `nuxx-core` — zero-I/O foundation types for the Buzz relay.
+//! `nuxx-core` — zero-I/O foundation types for the Nuxx relay.
 //!
 //! Provides [`StoredEvent`], filter matching, kind constants, and event
-//! verification. All other Buzz crates depend on this one.
+//! verification. All other Nuxx crates depend on this one.
 
 /// Channel activity snapshots — shard model behind unread badges.
 pub mod activity;
@@ -14,7 +14,7 @@ pub mod channel;
 /// NIP-AE Agent Engrams — slug grammar, conversation key, d-tag derivation,
 /// body parse/serialize, envelope build/validate, head selection.
 pub mod engram;
-/// Backward compatibility for the pre-rename `BUZZ_*` environment variables.
+/// Backward compatibility for the pre-rename `NUXX_*` environment variables.
 pub mod env_compat;
 /// Relay-side error types.
 pub mod error;
@@ -26,7 +26,7 @@ pub mod filter;
 pub mod git_perms;
 /// Shared invite-link contract constants.
 pub mod invite;
-/// Buzz kind number registry — custom event type constants.
+/// Nuxx kind number registry — custom event type constants.
 pub mod kind;
 /// Network utilities — SSRF-safe IP classification.
 pub mod network;

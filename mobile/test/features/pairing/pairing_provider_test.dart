@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:buzz/features/pairing/pairing_provider.dart';
-import 'package:buzz/features/pairing/pairing_socket.dart';
-import 'package:buzz/shared/auth/auth.dart';
+import 'package:nuxx/features/pairing/pairing_provider.dart';
+import 'package:nuxx/features/pairing/pairing_socket.dart';
+import 'package:nuxx/shared/auth/auth.dart';
 
 /// Tests for [PairingNotifier]'s legacy `buzz://` payload parsing and
 /// SSRF-prevention validation.
@@ -62,7 +62,7 @@ void main() {
         const code =
             'nostrpair://62287897da61e3fa294b4570575f7db8bea147d6631150f2e4656714c645fb1e'
             '?secret=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'
-            '&relay=wss%3A%2F%2Fpairing.buzz.xyz&v=1';
+            '&relay=wss%3A%2F%2Fpairing.nuxx.xyz&v=1';
 
         await container.read(pairingProvider.notifier).pair(code);
 
@@ -88,7 +88,7 @@ void main() {
       expect(fakeAuth.lastCommunity, isNull);
     });
 
-    test('accepts buzz scheme prefix', () async {
+    test('accepts nuxx scheme prefix', () async {
       container = createContainer();
 
       final code = 'buzz://${_encodePairingCode()}';

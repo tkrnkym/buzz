@@ -242,29 +242,29 @@ jobs:
         # unmapped host (no retry, unlike the channel reconciler), so the
         # 'localhost:3000' community MUST exist before the relay starts — seeding
         # after boot leaves the scheduler dead. The relay migrates at boot via
-        # BUZZ_AUTO_MIGRATE, but that's too late for the pre-boot seed, so apply
+        # NUXX_AUTO_MIGRATE, but that's too late for the pre-boot seed, so apply
         # the schema here first (then drop AUTO_MIGRATE below). lower(host) is the
         # unique index → ON CONFLICT target. psql isn't on PATH in hermit → exec
         # into the nuxx-postgres container.
         env:
           PGHOST: localhost
           PGPORT: "5432"
-          PGUSER: buzz
+          PGUSER: nuxx
           PGPASSWORD: nuxx_dev
-          PGDATABASE: buzz
+          PGDATABASE: nuxx
           # Use the already-running docker postgres for desired-state planning instead of
           # downloading an embedded Postgres from Maven Central (transient-fetch flake source).
           PGSCHEMA_PLAN_HOST: localhost
           PGSCHEMA_PLAN_PORT: "5432"
-          PGSCHEMA_PLAN_DB: buzz
-          PGSCHEMA_PLAN_USER: buzz
+          PGSCHEMA_PLAN_DB: nuxx
+          PGSCHEMA_PLAN_USER: nuxx
           PGSCHEMA_PLAN_PASSWORD: nuxx_dev
         run: |
           ./bin/pgschema apply --file schema/schema.sql --auto-approve
           docker exec -i -e PGPASSWORD=nuxx_dev nuxx-postgres \
-            psql -U buzz -d buzz -v ON_ERROR_STOP=1 < scripts/attach-schema-partitions.sql
+            psql -U nuxx -d nuxx -v ON_ERROR_STOP=1 < scripts/attach-schema-partitions.sql
           docker exec -e PGPASSWORD=nuxx_dev nuxx-postgres \
-            psql -U buzz -d buzz -qtA -c "
+            psql -U nuxx -d nuxx -qtA -c "
           INSERT INTO communities (id, host)
           VALUES ('00000000-0000-4000-8000-00000000c0de', 'localhost:3000')
           ON CONFLICT (lower(host)) DO NOTHING
@@ -276,10 +276,10 @@ jobs:
             DATABASE_URL="postgres://nuxx:${NUXX_TEST_POSTGRES_PASSWORD}@localhost:5432/nuxx" \
             REDIS_URL=redis://localhost:6379 \
             RELAY_URL=ws://localhost:3000 \
-            BUZZ_BIND_ADDR=0.0.0.0:3000 \
-            BUZZ_REQUIRE_AUTH_TOKEN=false \
-            BUZZ_RECONCILE_CHANNELS=true \
-            BUZZ_GIT_PROBE_WRITERS=8 \
+            NUXX_BIND_ADDR=0.0.0.0:3000 \
+            NUXX_REQUIRE_AUTH_TOKEN=false \
+            NUXX_RECONCILE_CHANNELS=true \
+            NUXX_GIT_PROBE_WRITERS=8 \
             SPROUT_REMINDER_SCHEDULER_INTERVAL_SECS=1 \
             ./target/ci/nuxx-relay > /tmp/nuxx-relay.log 2>&1 &
           echo $! > /tmp/nuxx-relay.pid
@@ -624,7 +624,7 @@ jobs:
         # The Windows-only bash resolver lives in nuxx-dev-mcp; its unit tests
         # only gate if this crate is tested ON Windows.
         # Serial: windows_resolver_tests mutate process-global env
-        # (BUZZ_SHELL/GIT_BASH/SystemRoot) that SharedState::new reads.
+        # (NUXX_SHELL/GIT_BASH/SystemRoot) that SharedState::new reads.
         run: cargo test -p nuxx-dev-mcp --target $env:TARGET -- --test-threads=1
       # Smoke-test the new host-prereq contract: Git for Windows (which provides
       # bash) is available on the runner, a shell command round-trips, and bash

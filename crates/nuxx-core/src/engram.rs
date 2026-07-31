@@ -4,7 +4,7 @@
 //! not talk to relays or filesystems. Callers wire it to a transport and a
 //! key source.
 //!
-//! Shared by `nuxx-cli` (`buzz mem …`) and `nuxx-acp` (core injection
+//! Shared by `nuxx-cli` (`nuxx mem …`) and `nuxx-acp` (core injection
 //! at session creation).
 
 use hmac::digest::KeyInit;
@@ -592,7 +592,7 @@ pub fn monotonic_created_at(now: u64, prior_head: Option<u64>) -> u64 {
     }
 }
 
-/// Wire representation for `buzz mem ls`: one entry per non-tombstone
+/// Wire representation for `nuxx mem ls`: one entry per non-tombstone
 /// memory slug (`core` is excluded by the listing procedure).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Listing {

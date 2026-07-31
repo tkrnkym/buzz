@@ -1,12 +1,12 @@
-# Buzz Architecture
+# Nuxx Architecture
 
 ## 1. Executive Summary
 
-Buzz is a self-hosted team communication platform built on the Nostr protocol (NIP-01 wire format), where AI agents and humans are first-class equals. Every action — a chat message, a reaction, a workflow step, a canvas update, a huddle event — is a cryptographically signed Nostr event identified by a `kind` integer. Adding a new feature means defining a new kind number; existing clients see nothing and break nothing.
+Nuxx is a self-hosted team communication platform built on the Nostr protocol (NIP-01 wire format), where AI agents and humans are first-class equals. Every action — a chat message, a reaction, a workflow step, a canvas update, a huddle event — is a cryptographically signed Nostr event identified by a `kind` integer. Adding a new feature means defining a new kind number; existing clients see nothing and break nothing.
 
 The relay is the single source of truth. All reads and writes flow through it. There is no peer-to-peer event exchange, no gossip, no replication — just clients connecting to one relay over WebSocket, and the relay enforcing auth, verifying signatures, persisting events, fanning out to subscribers, indexing for search, and triggering automation.
 
-A Buzz **community** is the tenant-visible workspace selected by the request host.
+A Nuxx **community** is the tenant-visible workspace selected by the request host.
 The self-hosted default remains one host, one relay process, one implicit
 community. Multi-community deployments move that semantic boundary one level up:
 `req.community = resolve_host(connection.host)` is established before AUTH,
@@ -14,7 +14,7 @@ EVENT, REQ, REST, media, git, search, workflow, or pub/sub handling. Unknown
 hosts fail closed, and NIP-98/API-token stamps must agree with the host-derived
 community rather than overriding it.
 
-Buzz is a Rust monorepo, licensed Apache 2.0 under Block, Inc.
+Nuxx is a Rust monorepo, licensed Apache 2.0 under Block, Inc.
 
 ---
 
@@ -100,7 +100,7 @@ nuxx-test-client    (integration test harness + manual CLI)
 
 ## 2. The Protocol
 
-Buzz uses Nostr NIP-01 on the wire. Every action is a JSON event with six fields:
+Nuxx uses Nostr NIP-01 on the wire. Every action is a JSON event with six fields:
 
 ```json
 {
@@ -123,9 +123,9 @@ The `kind` integer is the only dispatch switch. The relay routes, stores, and fa
 | 10000–19999 | Replaceable events (NIP-16) |
 | 20000–29999 | Ephemeral events — not stored, not audited |
 | 30000–39999 | Parameterized replaceable events |
-| 40000–49999 | Buzz custom kinds |
+| 40000–49999 | Nuxx custom kinds |
 
-### Buzz Custom Kinds (selected)
+### Nuxx Custom Kinds (selected)
 
 | Kind | Name | Description |
 |------|------|-------------|
@@ -139,7 +139,7 @@ The `kind` integer is the only dispatch switch. The relay routes, stores, and fa
 | 46001–46012 | KIND_WORKFLOW_* | Workflow execution events |
 | 20001 | KIND_PRESENCE_UPDATE | Ephemeral presence heartbeat |
 
-`nuxx-core` defines all 81 kinds as `pub const KIND_*: u32` and exports `ALL_KINDS: &[u32]`. Kinds are `u32` (NIP-01 specifies unsigned integer; `u32` covers the full range). Buzz uses both standard Nostr kinds (e.g., kind 7 for reactions) and custom ranges (40000+).
+`nuxx-core` defines all 81 kinds as `pub const KIND_*: u32` and exports `ALL_KINDS: &[u32]`. Kinds are `u32` (NIP-01 specifies unsigned integer; `u32` covers the full range). Nuxx uses both standard Nostr kinds (e.g., kind 7 for reactions) and custom ranges (40000+).
 
 Note: `KIND_AUTH` (22242) is `pub const KIND_AUTH: u32` in `nuxx-core/src/kind.rs` and imported by `nuxx-relay/src/handlers/event.rs`. `KIND_CANVAS` (40100) is likewise `pub const KIND_CANVAS: u32` in `nuxx-core/src/kind.rs`.
 
@@ -241,7 +241,7 @@ Steps 10–12 are fire-and-forget. Search indexing is sent to a bounded worker q
 
 Step 9 (fan-out) explicitly **excludes** global subscriptions (no `channel_id` constraint) from channel-scoped events — global subscriptions do NOT receive events from private channels, regardless of filter match. This is a deliberate security boundary: only subscriptions scoped to an accessible `channel_id` receive those events.
 
-Workflow loop prevention: workflow execution kinds (46001–46012), relay-signed messages with `buzz:workflow` tag, and `KIND_GIFT_WRAP` are excluded from triggering workflows. All other stored events (including kind 9 stream messages) trigger workflow evaluation.
+Workflow loop prevention: workflow execution kinds (46001–46012), relay-signed messages with `nuxx:workflow` tag, and `KIND_GIFT_WRAP` are excluded from triggering workflows. All other stored events (including kind 9 stream messages) trigger workflow evaluation.
 
 ### Ephemeral Sub-Pipeline (kinds 20000–29999)
 
@@ -385,7 +385,7 @@ pub trait RateLimiter: Send + Sync { ... }
 **Security details:**
 - NIP-98 auth: Schnorr-signed `kind:27235` events with URL + method tags.
 - NIP-42 timestamp tolerance: ±60 seconds.
-- Dev-only key derivation: `SHA-256("buzz-test-key:{username}")` — gated behind `#[cfg(any(test, feature = "dev"))]`. The `dev` feature must not be enabled in production relay deployments.
+- Dev-only key derivation: `SHA-256("nuxx-test-key:{username}")` — gated behind `#[cfg(any(test, feature = "dev"))]`. The `dev` feature must not be enabled in production relay deployments.
 
 **Does NOT:** implement `RateLimiter` beyond a test stub (`AlwaysAllowRateLimiter`, gated behind `#[cfg(any(test, feature = "test-utils"))]`). No Redis-backed rate limiter exists anywhere in the codebase — rate limiting is not currently enforced. `RateLimitConfig` defines 4 tiers (human, agent-standard, agent-elevated, agent-platform) as a design target.
 
@@ -431,13 +431,13 @@ All database access. Uses `sqlx::query()` (runtime, not compile-time macros) —
 
 ### nuxx-pubsub — Redis Pub/Sub, Presence, Typing
 
-Manages Redis pub/sub fan-out, presence tracking, and typing indicators. In multi-community mode all tenant-visible keys are prefixed or otherwise partitioned by community (`buzz:{community}:...`) so channel fan-out, presence, typing, and cache invalidation cannot cross hosts.
+Manages Redis pub/sub fan-out, presence tracking, and typing indicators. In multi-community mode all tenant-visible keys are prefixed or otherwise partitioned by community (`nuxx:{community}:...`) so channel fan-out, presence, typing, and cache invalidation cannot cross hosts.
 
 **Architecture:**
 
 ```
-Publisher  → pool connection   → PUBLISH buzz:channel:{uuid}
-Subscriber → dedicated PubSub  → PSUBSCRIBE buzz:channel:*
+Publisher  → pool connection   → PUBLISH nuxx:channel:{uuid}
+Subscriber → dedicated PubSub  → PSUBSCRIBE nuxx:channel:*
                                   → broadcast::channel(4096)
 ```
 
@@ -447,13 +447,13 @@ The subscriber uses a **dedicated** `redis::aio::PubSub` connection — not from
 
 **Reconnection:** exponential backoff 1s → 30s (`backoff_secs * 2`). Backoff resets to 1s only after a clean stream end, not on each reconnect attempt.
 
-**Presence:** `SET buzz:presence:{pubkey_hex} {status} EX 90` — 90-second TTL (3× the 30-second heartbeat interval). Single missed heartbeat does not cause presence flap.
+**Presence:** `SET nuxx:presence:{pubkey_hex} {status} EX 90` — 90-second TTL (3× the 30-second heartbeat interval). Single missed heartbeat does not cause presence flap.
 
 **Typing indicators:**
 ```
-ZADD buzz:typing:{channel_id} {now_unix} {pubkey_hex}
-ZREMRANGEBYSCORE buzz:typing:{channel_id} -inf {now - 5.0}
-EXPIRE buzz:typing:{channel_id} 60
+ZADD nuxx:typing:{channel_id} {now_unix} {pubkey_hex}
+ZREMRANGEBYSCORE nuxx:typing:{channel_id} -inf {now - 5.0}
+EXPIRE nuxx:typing:{channel_id} 60
 ```
 5-second activity window. 60-second key TTL prevents orphaned empty sets.
 
@@ -643,12 +643,12 @@ pub enum AuthState { Pending { challenge: String }, Authenticated(AuthContext), 
 
 ### nuxx-acp — Agent Communication Protocol Harness
 
-Standalone binary that bridges Buzz relay events to AI agents via the [Agent Communication Protocol](https://agentclientprotocol.com/) (ACP).
+Standalone binary that bridges Nuxx relay events to AI agents via the [Agent Communication Protocol](https://agentclientprotocol.com/) (ACP).
 
 **Architecture:**
 
 ```
-Buzz Relay ──WS──→ nuxx-acp ──stdio (ACP/JSON-RPC)──→ Agent (goose/codex/claude)
+Nuxx Relay ──WS──→ nuxx-acp ──stdio (ACP/JSON-RPC)──→ Agent (goose/codex/claude)
 ```
 
 `nuxx-acp` spawns AI agent subprocesses (1–32, default 1), connects to the relay via WebSocket with NIP-42 auth, discovers channels via REST API, and queues `@mention` events per channel. At most one prompt is in-flight per channel. Queued events are batched into a single prompt sent via `session/prompt` over ACP.
@@ -693,7 +693,7 @@ The `nuxx-admin` binary is shipped in the relay Docker image (`/usr/local/bin/nu
 
 ### nuxx-test-client — Integration Test Harness
 
-**`BuzzTestClient`** wraps a WebSocket connection with a `VecDeque<RelayMessage>` buffer for message interleaving. Methods: `connect`, `connect_unauthenticated`, `authenticate`, `send_event`, `send_text_message`, `subscribe`, `close_subscription`, `recv_event`, `collect_until_eose`, `disconnect`.
+**`NuxxTestClient`** wraps a WebSocket connection with a `VecDeque<RelayMessage>` buffer for message interleaving. Methods: `connect`, `connect_unauthenticated`, `authenticate`, `send_event`, `send_text_message`, `subscribe`, `close_subscription`, `recv_event`, `collect_until_eose`, `disconnect`.
 
 **Test coverage:**
 
@@ -706,7 +706,7 @@ The `nuxx-admin` binary is shipped in the relay Docker image (`/usr/local/bin/nu
 
 All e2e tests are `#[ignore]` — require a running relay. Total: **134 e2e tests**.
 
-`src/main.rs` is a manual testing CLI (`buzz-test-cli`) with `--send`, `--subscribe`, `--channel`, `--url`, `--kind` flags.
+`src/main.rs` is a manual testing CLI (`nuxx-test-cli`) with `--send`, `--subscribe`, `--channel`, `--url`, `--kind` flags.
 
 Defines `parse_relay_message`, `OkResponse`, `RelayMessage` directly in `src/lib.rs`.
 
@@ -796,9 +796,9 @@ Docker Compose provides the full local development stack. All services include h
 
 | Pattern | Type | TTL | Purpose |
 |---------|------|-----|---------|
-| `buzz:channel:{uuid}` | Pub/Sub channel | — | Event fan-out (single-community form; shared multi-community Redis must use `buzz:{community}:channel:{uuid}` or equivalent) |
-| `buzz:presence:{pubkey_hex}` | String | 90s | Online/away status (single-community form; shared multi-community Redis must scope by community) |
-| `buzz:typing:{channel_uuid}` | Sorted Set | 60s | Active typers (5s window; shared multi-community Redis must scope by community) |
+| `nuxx:channel:{uuid}` | Pub/Sub channel | — | Event fan-out (single-community form; shared multi-community Redis must use `nuxx:{community}:channel:{uuid}` or equivalent) |
+| `nuxx:presence:{pubkey_hex}` | String | 90s | Online/away status (single-community form; shared multi-community Redis must scope by community) |
+| `nuxx:typing:{channel_uuid}` | Sorted Set | 60s | Active typers (5s window; shared multi-community Redis must scope by community) |
 
 ### Full-Text Search (Postgres FTS)
 

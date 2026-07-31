@@ -1,4 +1,4 @@
-import buzzAppIcon from "@/assets/app-icon@3x.png";
+import nuxxAppIcon from "@/assets/app-icon@3x.png";
 import { claimInviteInBrowser } from "@/features/invite/invite-api";
 import { hasNip07Provider } from "@/shared/lib/nostr-signer";
 import { relayWsUrl } from "@/shared/lib/relay-url";
@@ -137,7 +137,7 @@ export function InvitePage({ code }: { code: string }) {
             <img
               alt="channels.nuxx.ai"
               className="h-full w-full"
-              src={buzzAppIcon}
+              src={nuxxAppIcon}
             />
           </div>
           <h1 className="mt-4 text-2xl font-semibold tracking-tight text-black">
@@ -188,7 +188,7 @@ export function InvitePage({ code }: { code: string }) {
                 <a
                   href={`nuxx://join?relay=${encodeURIComponent(relay)}&code=${encodeURIComponent(code)}`}
                 >
-                  Accept invite in Buzz
+                  Accept invite in Nuxx
                 </a>
               </Button>
             ) : (
@@ -201,7 +201,7 @@ export function InvitePage({ code }: { code: string }) {
                 disabled={disabled}
                 onClick={openInvite}
               >
-                Accept invite in Buzz
+                Accept invite in Nuxx
               </Button>
             )}
             {browserJoinError ? (

@@ -6,7 +6,7 @@
 // `mobile/ios/Flutter/AppOverrides.xcconfig` containing
 // `BUNDLE_IDENTIFIER = your.app.id` (gitignored).
 BUNDLE_IDENTIFIER = ai.nuxx.mobile
-APP_DISPLAY_NAME = Buzz
+APP_DISPLAY_NAME = Nuxx
 
 // Worktree-aware debug identity (gitignored, written by
 // scripts/mobile-worktree-overrides.sh): a per-worktree bundle identifier

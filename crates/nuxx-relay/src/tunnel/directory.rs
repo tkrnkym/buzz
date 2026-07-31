@@ -457,7 +457,7 @@ struct SessionKeys {
 
 impl SessionKeys {
     fn new(community_id: CommunityId, session_id: Uuid) -> Self {
-        let base = format!("buzz:{}:tunnel:{}", community_id, session_id);
+        let base = format!("nuxx:{}:tunnel:{}", community_id, session_id);
         Self {
             lease: format!("{base}:lease"),
             generation: format!("{base}:generation"),
@@ -647,11 +647,11 @@ mod tests {
         let keys = SessionKeys::new(community(), session());
         assert_eq!(
             keys.lease,
-            format!("buzz:{}:tunnel:{}:lease", community(), session())
+            format!("nuxx:{}:tunnel:{}:lease", community(), session())
         );
         assert_eq!(
             keys.generation,
-            format!("buzz:{}:tunnel:{}:generation", community(), session())
+            format!("nuxx:{}:tunnel:{}:generation", community(), session())
         );
         assert_ne!(keys.lease, keys.generation);
     }

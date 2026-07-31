@@ -283,7 +283,7 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
-        private const val MEDIA_UPLOAD_CHANNEL = "buzz/media_upload"
+        private const val MEDIA_UPLOAD_CHANNEL = "nuxx/media_upload"
         private const val SANITIZE_IMAGE_FOR_UPLOAD_METHOD = "sanitizeImageForUpload"
         private const val TRANSCODE_IMAGE_TO_JPEG_METHOD = "transcodeImageToJpeg"
         private const val TRANSCODE_VIDEO_TO_MP4_METHOD = "transcodeVideoToMp4"

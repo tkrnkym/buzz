@@ -845,7 +845,7 @@ pub struct ThreadTags {
 ///
 /// NOTE: Only handles NIP-10 marker-based format (preferred). The deprecated
 /// positional format (no markers, `["e", id, relay_url]`) is not supported —
-/// Buzz always generates marker-based tags (see relay messages.rs:762-783).
+/// Nuxx always generates marker-based tags (see relay messages.rs:762-783).
 pub fn parse_thread_tags(event: &Event) -> ThreadTags {
     let mut root = None;
     let mut reply = None;
@@ -889,7 +889,7 @@ pub fn parse_thread_tags(event: &Event) -> ThreadTags {
 /// Extract a leading slash command from message content.
 ///
 /// ACP connectors (claude-agent-acp, codex-acp) detect slash commands by
-/// checking whether the **first** prompt content block starts with `/`. Buzz
+/// checking whether the **first** prompt content block starts with `/`. Nuxx
 /// users must @mention an agent to reach it, so the wire content is typically
 /// `"@Eva /goal ship it"`. This strips leading mention tokens — `@word`,
 /// multi-word display names from `known_names`, and NIP-27 `nostr:npub1…` /
@@ -917,7 +917,7 @@ pub fn extract_slash_command(content: &str, known_names: &[&str]) -> Option<Stri
         } else if let Some(after_at) = rest.strip_prefix('@') {
             // Known display names first (longest match wins, case-insensitive,
             // must end at whitespace or end-of-string), then a single-word
-            // token of the characters Buzz allows in plain @mentions.
+            // token of the characters Nuxx allows in plain @mentions.
             let name_len = names
                 .iter()
                 .find_map(|name| {
@@ -1149,7 +1149,7 @@ pub(crate) fn format_event_block(
 fn append_reply_instruction(s: &mut String, event_id: &str) {
     s.push_str(&format!(
         "\nIMPORTANT: For ordinary replies in this turn, use `--reply-to {event_id}` \
-         on `buzz messages send` so the conversation stays threaded. \
+         on `nuxx messages send` so the conversation stays threaded. \
          If the human explicitly asks for a channel-root, top-level, \
          or broadcast post, send that message without `--reply-to`. \
          If the requested destination is ambiguous, ask before sending."
@@ -1164,7 +1164,7 @@ fn append_reply_instruction(s: &mut String, event_id: &str) {
 fn append_new_thread_reply_instruction(s: &mut String, event_id: &str) {
     s.push_str(&format!(
         "\nIMPORTANT: This is a new top-level message. For ordinary replies in \
-         this turn, use `--reply-to {event_id}` on `buzz messages send` — the \
+         this turn, use `--reply-to {event_id}` on `nuxx messages send` — the \
          triggering message is the thread root. Do NOT reply into any other \
          (older) thread. If the human explicitly asks for a channel-root, \
          top-level, or broadcast post, send that message without `--reply-to`."
@@ -1250,13 +1250,13 @@ fn format_context_hints(
         // DM replies use thread command because /messages excludes thread replies.
         // DM non-replies use get for recent conversation.
         let ctx_hint = if has_conversation_context && is_reply {
-            "Thread context included below. Use `buzz messages thread --channel <UUID> --event <ID>` for full history if truncated."
+            "Thread context included below. Use `nuxx messages thread --channel <UUID> --event <ID>` for full history if truncated."
         } else if has_conversation_context {
-            "Conversation context included below. Use `buzz messages get --channel <UUID>` for full history if truncated."
+            "Conversation context included below. Use `nuxx messages get --channel <UUID>` for full history if truncated."
         } else if is_reply {
-            "Use `buzz messages thread --channel <UUID> --event <ID>` to fetch the reply chain."
+            "Use `nuxx messages thread --channel <UUID> --event <ID>` to fetch the reply chain."
         } else {
-            "Use `buzz messages get --channel <UUID>` for conversation context."
+            "Use `nuxx messages get --channel <UUID>` for conversation context."
         };
         let mut s = format!(
             "[Context]\n\
@@ -1279,9 +1279,9 @@ fn format_context_hints(
         s
     } else if let Some(ref root) = thread_tags.root_event_id {
         let ctx_hint = if has_conversation_context {
-            "Thread context included below. Use `buzz messages thread --channel <UUID> --event <ID>` for full history if truncated."
+            "Thread context included below. Use `nuxx messages thread --channel <UUID> --event <ID>` for full history if truncated."
         } else {
-            "Use `buzz messages thread --channel <UUID> --event <ID>` to fetch thread context."
+            "Use `nuxx messages thread --channel <UUID> --event <ID>` to fetch thread context."
         };
         let mut s = format!(
             "[Context]\n\
@@ -1304,7 +1304,7 @@ fn format_context_hints(
             "[Context]\n\
              Scope: channel\n\
              Channel: {channel_display}\n\
-             Hint: Use `buzz messages get --channel <UUID>` for recent messages if needed."
+             Hint: Use `nuxx messages get --channel <UUID>` for recent messages if needed."
         );
         if let Some(event_id) = reply_anchor {
             append_new_thread_reply_instruction(&mut s, event_id);
@@ -1391,7 +1391,7 @@ pub(crate) fn base_section(base_prompt: &str) -> String {
 /// 2. `[Agent Memory — core]` — if agent core memory is set
 /// 3. `[Context]` — scope, channel name, and contextual hints for the agent
 /// 4. `[Thread Context]` or `[Conversation Context]` — if fetched
-/// 5. `[Event]` / `[Buzz events]` — the triggering event(s)
+/// 5. `[Event]` / `[Nuxx events]` — the triggering event(s)
 ///
 /// Each section is returned as its own block rather than one joined string so
 /// the observer frame's size trimmer (`fit_observer_event_to_budget`) elides
@@ -1527,7 +1527,7 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
             )
         } else {
             format!(
-                "[Buzz event: {}]\n{}",
+                "[Nuxx event: {}]\n{}",
                 be.prompt_tag,
                 format_event_block(batch.channel_id, args.channel_info, be, args.profile_lookup)
             )
@@ -1540,7 +1540,7 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
                 batch.events.len()
             )
         } else {
-            format!("[Buzz events — {} events]", batch.events.len())
+            format!("[Nuxx events — {} events]", batch.events.len())
         };
         let mut s = header;
         for (i, be) in batch.events.iter().enumerate() {
@@ -1882,7 +1882,7 @@ mod tests {
         // Should contain [Context] section before the event.
         assert!(prompt.contains("[Context]"));
         assert!(prompt.contains("Scope: channel"));
-        assert!(prompt.contains("[Buzz event: @mention]\n"));
+        assert!(prompt.contains("[Nuxx event: @mention]\n"));
         assert!(prompt.contains(&format!("Channel: {}", ch)));
         assert!(prompt.contains(&format!("From: {}", npub)));
         assert!(prompt.contains("Content: Hello @agent"));
@@ -2202,7 +2202,7 @@ mod tests {
         let prompt = format_prompt(&batch, &FormatPromptArgs::default()).join("\n\n");
 
         assert!(prompt.contains("[Context]"));
-        assert!(prompt.contains("[Buzz events — 3 events]"));
+        assert!(prompt.contains("[Nuxx events — 3 events]"));
         assert!(prompt.contains("--- Event 1 (tag-a) ---"));
         assert!(prompt.contains("--- Event 2 (tag-b) ---"));
         assert!(prompt.contains("--- Event 3 (tag-c) ---"));
@@ -3401,8 +3401,8 @@ mod tests {
         );
         // Hint should point to the thread command, not get.
         assert!(
-            prompt.contains("buzz messages thread"),
-            "DM reply hint should mention `buzz messages thread`, got:\n{prompt}"
+            prompt.contains("nuxx messages thread"),
+            "DM reply hint should mention `nuxx messages thread`, got:\n{prompt}"
         );
         // Thread structural info should be present.
         assert!(
@@ -3443,12 +3443,12 @@ mod tests {
         .join("\n\n");
         assert!(prompt.contains("Scope: dm"));
         assert!(
-            prompt.contains("buzz messages get"),
-            "DM non-reply hint should mention `buzz messages get`"
+            prompt.contains("nuxx messages get"),
+            "DM non-reply hint should mention `nuxx messages get`"
         );
         assert!(
-            !prompt.contains("buzz messages thread"),
-            "DM non-reply should NOT mention `buzz messages thread`"
+            !prompt.contains("nuxx messages thread"),
+            "DM non-reply should NOT mention `nuxx messages thread`"
         );
     }
 
@@ -4074,7 +4074,7 @@ mod tests {
             "instruction should tell agents to honor explicit root/top-level requests"
         );
         assert!(
-            !prompt.contains("on EVERY `buzz messages send` call"),
+            !prompt.contains("on EVERY `nuxx messages send` call"),
             "instruction should not make reply-to absolute for every send"
         );
     }
@@ -4450,7 +4450,7 @@ mod tests {
 
     #[test]
     fn test_format_prompt_canvas_injected_for_legacy_agent() {
-        let canvas = "[Channel Canvas]\nCanvas revision (event ID): abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234\nLast modified: 2024-01-15T10:30:00+00:00\nFetch current content with: buzz canvas get --channel 00f1ccaf-1506-4dd7-9a0e-fa67e9e486ae";
+        let canvas = "[Channel Canvas]\nCanvas revision (event ID): abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234\nLast modified: 2024-01-15T10:30:00+00:00\nFetch current content with: nuxx canvas get --channel 00f1ccaf-1506-4dd7-9a0e-fa67e9e486ae";
         let ch = Uuid::new_v4();
         let batch = FlushBatch {
             channel_id: ch,
@@ -4479,7 +4479,7 @@ mod tests {
 
     #[test]
     fn test_format_prompt_canvas_omitted_for_modern_agent() {
-        let canvas = "[Channel Canvas]\nCanvas revision (event ID): abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234\nLast modified: 2024-01-15T10:30:00+00:00\nFetch current content with: buzz canvas get --channel 00f1ccaf-1506-4dd7-9a0e-fa67e9e486ae";
+        let canvas = "[Channel Canvas]\nCanvas revision (event ID): abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234\nLast modified: 2024-01-15T10:30:00+00:00\nFetch current content with: nuxx canvas get --channel 00f1ccaf-1506-4dd7-9a0e-fa67e9e486ae";
         let ch = Uuid::new_v4();
         let batch = FlushBatch {
             channel_id: ch,

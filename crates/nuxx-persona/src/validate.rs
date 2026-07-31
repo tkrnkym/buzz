@@ -1,4 +1,4 @@
-//! Pack validation (`buzz pack validate`).
+//! Pack validation (`nuxx pack validate`).
 //!
 //! Architecture: the validator delegates all structural checks to `load_pack()`.
 //! If loading succeeds, the pack is structurally valid by definition — no
@@ -579,7 +579,7 @@ mod tests {
                 "homepage": "https://example.com",
                 "repository": "https://github.com/example/pack",
                 "keywords": ["test"],
-                "engines": { "buzz": ">=0.9.0" }
+                "engines": { "nuxx": ">=0.9.0" }
             }"#,
         )
         .unwrap();

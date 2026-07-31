@@ -37,17 +37,17 @@ fn dispatch() -> Result<(), String> {
             }
         },
         // nuxx-dev-mcp also handles its own multicall names: rg, tree,
-        // buzz, git-credential-nostr, and git-sign-nostr.
+        // nuxx, git-credential-nostr, and git-sign-nostr.
         _ => nuxx_dev_mcp::run().map_err(|e| e.to_string()),
     }
 }
 
 fn print_usage() {
     println!(
-        "Sprig — all-in-one Buzz ACP harness, agent, and developer MCP\n\n\
+        "Sprig — all-in-one Nuxx ACP harness, agent, and developer MCP\n\n\
 Sprig is a multicall binary. Invoke it through one of the personality names:\n\n\
   nuxx-acp       ACP harness\n  nuxx-agent     ACP-compliant agent\n  nuxx-dev-mcp   Developer MCP server\n\n\
-Developer MCP helper names are also supported: rg, tree, buzz, git-credential-nostr, git-sign-nostr.\n\n\
+Developer MCP helper names are also supported: rg, tree, nuxx, git-credential-nostr, git-sign-nostr.\n\n\
 Installers can create links with:\n  ln -s sprig nuxx-acp\n  ln -s sprig nuxx-agent\n  ln -s sprig nuxx-dev-mcp"
     );
 }

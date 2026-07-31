@@ -1,6 +1,6 @@
-# Releasing Buzz
+# Releasing Nuxx
 
-Buzz has two independent release lanes. The relay uses a release PR; mobile uses
+Nuxx has two independent release lanes. The relay uses a release PR; mobile uses
 immutable release-candidate tags cut directly from remote `main`:
 
 | Lane | Entry point | Artifact |
@@ -59,11 +59,11 @@ Every push to `main` continues to publish the rolling relay `:main` and
    `scripts/mobile-release.sh candidate X.Y.Z`. The script resolves and fetches
    the exact current `origin/main` commit, derives the next number from exact
    remote tags for that marketing version, and publishes an annotated
-   `mobile-vX.Y.Z-rc.N` tag there through the dedicated `buzz-release-bot`
+   `mobile-vX.Y.Z-rc.N` tag there through the dedicated `nuxx-release-bot`
    GitHub App. It never uses the operator's checked-out commit and never moves
    an existing candidate.
 2. **Build the exact tag.** Enter the candidate tag as `mobile_ref` in the
-   private Buzz mobile Buildkite pipeline. OSS CI deliberately cannot trigger
+   private Nuxx mobile Buildkite pipeline. OSS CI deliberately cannot trigger
    that private pipeline. The tag supplies both source commit and release
    version. Flutter receives clean marketing version `X.Y.Z`; Buildkite's
    monotonically increasing build number supplies the platform build number.
@@ -117,7 +117,7 @@ Buildkite pipeline accepts only an exact candidate tag.
 ## Internal Releases
 
 For mobile, trigger the private
-[Release Mobile pipeline](https://buildkite.com/runway/buzz-mobile-releases) with
+[Release Mobile pipeline](https://buildkite.com/runway/nuxx-mobile-releases) with
 an exact RC tag for the platform build being cut.
 
 That pipeline lives in a Block-internal repository this fork cannot reach, so the
@@ -143,8 +143,8 @@ GitHub Release or a stable `mobile-vX.Y.Z` alias.
   the candidate workflow
 - Release tag ruleset [`14378754`](https://github.com/tkrnkym/buzz/rules/14378754)
   active for `mobile-v*`, with creation, update, deletion, and non-fast-forward
-  protections and `buzz-release-bot` as its sole always-bypass actor
-- The `buzz-release-bot` App credentials configured for GitHub Actions
+  protections and `nuxx-release-bot` as its sole always-bypass actor
+- The `nuxx-release-bot` App credentials configured for GitHub Actions
 
 Mobile candidate publication requires workflow-dispatch access and the existing
 release App because strict tag protection denies direct human creation. The App
@@ -183,7 +183,7 @@ increasing remote identities.
 
 ### A mobile candidate publication is rejected by repository rules
 
-Confirm `buzz-release-bot` remains the sole always-bypass actor for the active
+Confirm `nuxx-release-bot` remains the sole always-bypass actor for the active
 `mobile-v*` ruleset and that its Actions credentials are available. Do not grant
 direct human creation or weaken update or deletion protection. Existing
 candidate tags must remain immutable.

@@ -21,17 +21,17 @@ RUN cargo build --release --locked -p nuxx-push-gateway --bin nuxx-push-gateway 
     && strip target/release/nuxx-push-gateway
 
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
-LABEL org.opencontainers.image.title="Buzz Push Gateway" \
-      org.opencontainers.image.description="Capability-gated APNs last hop for Buzz" \
+LABEL org.opencontainers.image.title="Nuxx Push Gateway" \
+      org.opencontainers.image.description="Capability-gated APNs last hop for Nuxx" \
       org.opencontainers.image.source="https://github.com/tkrnkym/buzz" \
       org.opencontainers.image.licenses="Apache-2.0"
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1000 buzz \
-    && useradd --system --uid 1000 --gid 1000 --home-dir /var/lib/buzz --create-home --shell /usr/sbin/nologin buzz
+    && groupadd --system --gid 1000 nuxx \
+    && useradd --system --uid 1000 --gid 1000 --home-dir /var/lib/nuxx --create-home --shell /usr/sbin/nologin nuxx
 COPY --from=builder /build/target/release/nuxx-push-gateway /usr/local/bin/nuxx-push-gateway
 EXPOSE 8080 8081
-USER buzz:buzz
-WORKDIR /var/lib/buzz
+USER nuxx:nuxx
+WORKDIR /var/lib/nuxx
 ENTRYPOINT ["/usr/local/bin/nuxx-push-gateway"]

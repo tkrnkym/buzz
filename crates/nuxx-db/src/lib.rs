@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
-//! nuxx-db — Postgres event store for Buzz.
+//! nuxx-db — Postgres event store for Nuxx.
 //!
 //! ## Design invariants
 //! - AUTH events (kind 22242) are never stored — they carry bearer tokens.
@@ -33,7 +33,7 @@ pub mod migration;
 pub mod moderation;
 /// Monthly table partition management.
 pub mod partition;
-/// Buzz product-feedback sidecar persistence.
+/// Nuxx product-feedback sidecar persistence.
 pub mod product_feedback;
 /// Community-scoped push lease and durable wake-outbox persistence.
 pub mod push;
@@ -646,7 +646,7 @@ impl Db {
     ///
     /// The writer pool arms the commit-time `created_at` floor guard
     /// (migration 0021) on every connection by setting the
-    /// `buzz.created_at_floor` GUC — this is what makes the replica fence
+    /// `nuxx.created_at_floor` GUC — this is what makes the replica fence
     /// proof hold for every insert path that goes through this pool.
     pub async fn new(config: &DbConfig) -> Result<Self> {
         let pool = Self::connect_pool(config, &config.database_url, true).await?;
@@ -676,7 +676,7 @@ impl Db {
     /// Writer pools must arm it; replica pools are read-only so the trigger
     /// never fires there.
     ///
-    /// Both the `nuxx.` and the pre-rename `buzz.` spelling are set. A relay
+    /// Both the `nuxx.` and the pre-rename `nuxx.` spelling are set. A relay
     /// that set only the new name against a database still running the 0021
     /// function would have the guard silently degrade to a no-op — no error, no
     /// log, just below-fence rows becoming possible again. Setting both keeps
@@ -701,7 +701,7 @@ impl Db {
                         .await?;
                     // Transition-only, and load-bearing until every relay is on
                     // the new build: see the doc comment above.
-                    sqlx::query("SELECT set_config('buzz.created_at_floor', $1, false)")
+                    sqlx::query("SELECT set_config('nuxx.created_at_floor', $1, false)")
                         .bind(&floor)
                         .execute(conn)
                         .await?;
@@ -4755,7 +4755,7 @@ impl Db {
     /// The entire check → retire old payload → insert runs in a single transaction
     /// with an advisory lock to prevent concurrent-insert races. NIP-RS read-state
     /// coordinates hard-delete the superseded payload and preserve a compact
-    /// ordering watermark. Buzz mesh status coordinates also hard-delete their
+    /// ordering watermark. Nuxx mesh status coordinates also hard-delete their
     /// superseded heartbeat payload because only the live head has product
     /// value; other NIP-33 kinds retain soft-deleted history.
     ///
@@ -7719,7 +7719,7 @@ mod tests {
             format!("{}/{}", &base[..idx], wname)
         };
         // `Db::new` (not `from_pools`) so the WRITER pool arms the
-        // `buzz.created_at_floor` GUC — `spawn_fence_probe` verifies the
+        // `nuxx.created_at_floor` GUC — `spawn_fence_probe` verifies the
         // floor guard on a writer connection, and `create_scratch_db`'s
         // plain `PgPool::connect` never arms it. The reader is still the
         // lazy `connect_read_pool` pool this test is about.
@@ -8055,7 +8055,7 @@ mod tests {
                 let mut tx = pool.begin().await.expect("begin");
                 // Arm the guard for this transaction only (the relay's
                 // writer pool arms it per connection; tests are explicit).
-                sqlx::query("SELECT set_config('buzz.created_at_floor', $1, true)")
+                sqlx::query("SELECT set_config('nuxx.created_at_floor', $1, true)")
                     .bind(crate::replica_fence::CREATED_AT_FLOOR_SECS.to_string())
                     .execute(&mut *tx)
                     .await
@@ -8154,7 +8154,7 @@ mod tests {
         let cid = CommunityId::from_uuid(community);
 
         // Perci nit: assert the effective session value, not the intent.
-        let effective: String = sqlx::query_scalar("SHOW buzz.created_at_floor")
+        let effective: String = sqlx::query_scalar("SHOW nuxx.created_at_floor")
             .fetch_one(&db.pool)
             .await
             .expect("SHOW guard GUC");
@@ -8364,7 +8364,7 @@ mod tests {
             let pool = pool.clone();
             async move {
                 let mut tx = pool.begin().await.expect("begin");
-                sqlx::query("SELECT set_config('buzz.created_at_floor', $1, true)")
+                sqlx::query("SELECT set_config('nuxx.created_at_floor', $1, true)")
                     .bind(crate::replica_fence::CREATED_AT_FLOOR_SECS.to_string())
                     .execute(&mut *tx)
                     .await

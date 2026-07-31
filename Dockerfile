@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Public Buzz relay image — published as ghcr.io/tkrnkym/nuxx:<tag>.
+# Public Nuxx relay image — published as ghcr.io/tkrnkym/nuxx:<tag>.
 #
 # Builds the `nuxx-relay` binary (Rust 1.95) and the `nuxx-web` static bundle
 # (pnpm + vite), then assembles them into a small debian-slim runtime with
@@ -124,8 +124,8 @@ FROM debian:${DEBIAN_VERSION}-slim AS runtime-base
 # OCI annotations: required for GHCR to auto-link the image to this repo and
 # inherit its visibility. org.opencontainers.image.source is the load-bearing
 # one — without it GHCR keeps the image private even when the repo is public.
-LABEL org.opencontainers.image.title="Buzz" \
-      org.opencontainers.image.description="WebSocket relay server for the Buzz communications platform" \
+LABEL org.opencontainers.image.title="Nuxx" \
+      org.opencontainers.image.description="WebSocket relay server for the Nuxx communications platform" \
       org.opencontainers.image.source="https://github.com/tkrnkym/buzz" \
       org.opencontainers.image.url="https://github.com/tkrnkym/buzz" \
       org.opencontainers.image.documentation="https://github.com/tkrnkym/buzz#readme" \
@@ -138,27 +138,27 @@ RUN apt-get update \
         git \
         openssl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1000 buzz \
-    && useradd  --system --uid 1000 --gid 1000 --home-dir /var/lib/buzz \
-                --create-home --shell /usr/sbin/nologin buzz
+    && groupadd --system --gid 1000 nuxx \
+    && useradd  --system --uid 1000 --gid 1000 --home-dir /var/lib/nuxx \
+                --create-home --shell /usr/sbin/nologin nuxx
 
-COPY --from=web-builder /build/web/dist                 /srv/buzz/web
-COPY --from=web-builder /build/admin-web/dist           /srv/buzz/admin-web
+COPY --from=web-builder /build/web/dist                 /srv/nuxx/web
+COPY --from=web-builder /build/admin-web/dist           /srv/nuxx/admin-web
 
 # The invite landing page is always served from the bundled web UI. Repository
-# browser routes require the separate BUZZ_SERVE_GIT_WEB_GUI=true opt-in. The
-# admin bundle is inert until BUZZ_ADMIN_HOST is configured.
-ENV BUZZ_WEB_DIR=/srv/buzz/web \
-    BUZZ_ADMIN_WEB_DIR=/srv/buzz/admin-web
+# browser routes require the separate NUXX_SERVE_GIT_WEB_GUI=true opt-in. The
+# admin bundle is inert until NUXX_ADMIN_HOST is configured.
+ENV NUXX_WEB_DIR=/srv/nuxx/web \
+    NUXX_ADMIN_WEB_DIR=/srv/nuxx/admin-web
 
 # 3000: app (WS + REST)  ·  8080: /_liveness, /_readiness  ·  9102: /metrics
 EXPOSE 3000 8080 9102
 
-# deploy/compose mounts a volume here; pre-created so it inherits buzz:buzz.
-RUN mkdir -p /data/git && chown buzz:buzz /data/git
+# deploy/compose mounts a volume here; pre-created so it inherits nuxx:nuxx.
+RUN mkdir -p /data/git && chown nuxx:nuxx /data/git
 
-USER buzz:buzz
-WORKDIR /var/lib/buzz
+USER nuxx:nuxx
+WORKDIR /var/lib/nuxx
 
 ENTRYPOINT ["/usr/local/bin/nuxx-relay"]
 

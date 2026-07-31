@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::error::PubSubError;
 
-/// Redis key prefix for Buzz-scoped pub/sub topics and keys.
-pub const NUXX_PREFIX: &str = "buzz";
+/// Redis key prefix for Nuxx-scoped pub/sub topics and keys.
+pub const NUXX_PREFIX: &str = "nuxx";
 
 /// A tenant-local event routing scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -124,7 +124,7 @@ mod tests {
 
         assert_eq!(
             channel_key(&ctx, channel_id),
-            format!("buzz:{}:channel:{channel_id}", ctx.community())
+            format!("nuxx:{}:channel:{channel_id}", ctx.community())
         );
     }
 
@@ -132,7 +132,7 @@ mod tests {
     fn global_key_includes_community() {
         let ctx = ctx(0xaaaa, "a.example");
 
-        assert_eq!(global_key(&ctx), format!("buzz:{}:global", ctx.community()));
+        assert_eq!(global_key(&ctx), format!("nuxx:{}:global", ctx.community()));
     }
 
     #[test]
@@ -151,7 +151,7 @@ mod tests {
     fn parses_channel_topic() {
         let community_id = CommunityId::from_uuid(Uuid::from_u128(0xaaaa));
         let channel_id = Uuid::from_u128(0xbbbb);
-        let raw = format!("buzz:{community_id}:channel:{channel_id}");
+        let raw = format!("nuxx:{community_id}:channel:{channel_id}");
 
         assert_eq!(
             EventTopicKey::parse_redis_channel(&raw).unwrap(),
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn parses_global_topic() {
         let community_id = CommunityId::from_uuid(Uuid::from_u128(0xaaaa));
-        let raw = format!("buzz:{community_id}:global");
+        let raw = format!("nuxx:{community_id}:global");
 
         assert_eq!(
             EventTopicKey::parse_redis_channel(&raw).unwrap(),
@@ -180,13 +180,13 @@ mod tests {
     fn rejects_malformed_or_wrong_prefix_topics() {
         for raw in [
             "",
-            "not-buzz:00000000-0000-0000-0000-00000000aaaa:global",
-            "buzz:not-a-uuid:global",
-            "buzz:00000000-0000-0000-0000-00000000aaaa",
-            "buzz:00000000-0000-0000-0000-00000000aaaa:global:extra",
-            "buzz:00000000-0000-0000-0000-00000000aaaa:channel",
-            "buzz:00000000-0000-0000-0000-00000000aaaa:channel:not-a-uuid",
-            "buzz:00000000-0000-0000-0000-00000000aaaa:presence:abc",
+            "not-nuxx:00000000-0000-0000-0000-00000000aaaa:global",
+            "nuxx:not-a-uuid:global",
+            "nuxx:00000000-0000-0000-0000-00000000aaaa",
+            "nuxx:00000000-0000-0000-0000-00000000aaaa:global:extra",
+            "nuxx:00000000-0000-0000-0000-00000000aaaa:channel",
+            "nuxx:00000000-0000-0000-0000-00000000aaaa:channel:not-a-uuid",
+            "nuxx:00000000-0000-0000-0000-00000000aaaa:presence:abc",
         ] {
             assert!(
                 EventTopicKey::parse_redis_channel(raw).is_err(),

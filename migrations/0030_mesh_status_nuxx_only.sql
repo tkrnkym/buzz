@@ -1,8 +1,8 @@
 -- Complete the mesh-status rename: the retention trigger now matches only the
--- `nuxx-` spellings, and the function and trigger are renamed off `buzz` too.
+-- `nuxx-` spellings, and the function and trigger are renamed off `nuxx` too.
 --
--- 0028 deliberately matched BOTH spellings, because `buzz-mesh-member-status:`
--- (a NIP-33 `d` tag) and `buzz-mesh-status` (a `k` tag value) live inside
+-- 0028 deliberately matched BOTH spellings, because `nuxx-mesh-member-status:`
+-- (a NIP-33 `d` tag) and `nuxx-mesh-status` (a `k` tag value) live inside
 -- *signed* kind:30003 events and cannot be rewritten — re-signing needs the
 -- author's key and editing invalidates the signature. Narrowing to one spelling
 -- is therefore a deliberate trade, not a cleanup, and it is requested:

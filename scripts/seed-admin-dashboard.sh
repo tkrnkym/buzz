@@ -15,9 +15,9 @@ fi
 
 export PGHOST="${PGHOST:-localhost}"
 export PGPORT="${PGPORT:-5432}"
-export PGUSER="${PGUSER:-buzz}"
+export PGUSER="${PGUSER:-nuxx}"
 export PGPASSWORD="${PGPASSWORD:-nuxx_dev}"
-export PGDATABASE="${PGDATABASE:-buzz}"
+export PGDATABASE="${PGDATABASE:-nuxx}"
 
 if command -v psql >/dev/null 2>&1; then
   run_psql() {
@@ -70,10 +70,10 @@ upload_fixture() {
   sidecar="$(printf '{"dim":"%s","blurhash":"","thumb_url":"","ext":"%s","mime_type":"%s","size":%s,"uploaded_at":0}' \
     "${dimensions}" "${extension}" "${mime}" "${size}")"
   docker exec -i nuxx-minio mc pipe --quiet --attr "Content-Type=${mime}" \
-    "local/${BUZZ_S3_BUCKET:-nuxx-media}/${hash}.${extension}" < "${path}"
+    "local/${NUXX_S3_BUCKET:-nuxx-media}/${hash}.${extension}" < "${path}"
   printf '%s' "${sidecar}" | docker exec -i nuxx-minio mc pipe --quiet \
     --attr "Content-Type=application/json" \
-    "local/${BUZZ_S3_BUCKET:-nuxx-media}/_meta/${community_id}/${hash}.json"
+    "local/${NUXX_S3_BUCKET:-nuxx-media}/_meta/${community_id}/${hash}.json"
 }
 
 fixture_dir="$(mktemp -d "${TMPDIR:-/tmp}/nuxx-admin-feedback.XXXXXX")"
@@ -84,9 +84,9 @@ composer_diagnostics="${fixture_dir}/composer-diagnostics.txt"
 workspace_diagnostics="${fixture_dir}/workspace-diagnostics.txt"
 trap 'rm -f "${composer_diagnostics}" "${workspace_diagnostics}"; rmdir "${fixture_dir}"' EXIT
 
-printf '%s\n' "buzz feedback diagnostics" "area: composer" \
+printf '%s\n' "nuxx feedback diagnostics" "area: composer" \
   "event: resumed_from_sleep" "result: composer_unresponsive" > "${composer_diagnostics}"
-printf '%s\n' "buzz feedback diagnostics" "area: workspace-switching" \
+printf '%s\n' "nuxx feedback diagnostics" "area: workspace-switching" \
   "from: design" "to: engineering" \
   "result: previous_sidebar_visible_for_one_frame" > "${workspace_diagnostics}"
 
@@ -97,7 +97,7 @@ composer_diagnostics_hash="$(fixture_hash "${composer_diagnostics}")"
 workspace_diagnostics_hash="$(fixture_hash "${workspace_diagnostics}")"
 
 if ! docker exec nuxx-minio mc alias set local http://localhost:9000 \
-  "${BUZZ_S3_ACCESS_KEY:-nuxx_dev}" "${BUZZ_S3_SECRET_KEY:-nuxx_dev_secret}" >/dev/null; then
+  "${NUXX_S3_ACCESS_KEY:-nuxx_dev}" "${NUXX_S3_SECRET_KEY:-nuxx_dev_secret}" >/dev/null; then
   echo "error: local MinIO is unavailable; run just setup first" >&2
   exit 1
 fi

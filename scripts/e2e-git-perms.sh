@@ -2,7 +2,7 @@
 # =============================================================================
 # e2e-git-perms.sh — End-to-end test for git transport, permissions, and signing
 # =============================================================================
-# Two bots collaborate on a simple web page via the Buzz relay's git server.
+# Two bots collaborate on a simple web page via the Nuxx relay's git server.
 #
 # Prerequisites:
 #   - Docker services running (postgres, redis, minio)
@@ -331,12 +331,12 @@ if [[ -f .env ]]; then
     set +o allexport
 fi
 
-export BUZZ_GIT_REPO_PATH="${REPO_ROOT}/repos"
-export BUZZ_GIT_HOOK_HMAC_SECRET="${HMAC_SECRET}"
-export BUZZ_BIND_ADDR="${RELAY_HOST}:${RELAY_PORT}"
+export NUXX_GIT_REPO_PATH="${REPO_ROOT}/repos"
+export NUXX_GIT_HOOK_HMAC_SECRET="${HMAC_SECRET}"
+export NUXX_BIND_ADDR="${RELAY_HOST}:${RELAY_PORT}"
 export RELAY_URL="${RELAY_WS}"
-export RUST_LOG="buzz_relay=warn"
-export BUZZ_REQUIRE_AUTH_TOKEN=false
+export RUST_LOG="nuxx_relay=warn"
+export NUXX_REQUIRE_AUTH_TOKEN=false
 
 # Clean repos dir (isolated test state)
 rm -rf "${REPO_ROOT}/repos"
@@ -347,7 +347,7 @@ RELAY_PID=$!
 
 # Wait for relay to be ready (poll, not sleep)
 for i in $(seq 1 "$RELAY_STARTUP_TIMEOUT"); do
-    if curl -sf --max-time 2 "${RELAY_HTTP}/" -H "Accept: application/nostr+json" | grep -q "Buzz"; then
+    if curl -sf --max-time 2 "${RELAY_HTTP}/" -H "Accept: application/nostr+json" | grep -q "Nuxx"; then
         break
     fi
     if [[ $i -eq "$RELAY_STARTUP_TIMEOUT" ]]; then
@@ -448,7 +448,7 @@ cat > "$BOT1_DIR/index.html" << 'HTML'
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Buzz E2E Test Page</title>
+    <title>Nuxx E2E Test Page</title>
     <style>
         body { font-family: system-ui; max-width: 800px; margin: 0 auto; padding: 2rem; }
         h1 { color: #2d5016; }
@@ -456,8 +456,8 @@ cat > "$BOT1_DIR/index.html" << 'HTML'
     </style>
 </head>
 <body>
-    <h1>🐝 Buzz Collaborative Page</h1>
-    <p>This page was created by two bots collaborating via Buzz's git server.</p>
+    <h1>🐝 Nuxx Collaborative Page</h1>
+    <p>This page was created by two bots collaborating via Nuxx's git server.</p>
     <div class="contributor">
         <strong>Bot 1</strong> — Created the initial page structure
     </div>
@@ -466,7 +466,7 @@ cat > "$BOT1_DIR/index.html" << 'HTML'
 HTML
 
 git -C "$BOT1_DIR" add -A
-git -C "$BOT1_DIR" -c user.name="Bot1" -c user.email="bot1@buzz.test" \
+git -C "$BOT1_DIR" -c user.name="Bot1" -c user.email="bot1@nuxx.test" \
     -c init.defaultBranch=main commit -m "Initial page structure"
 
 log "Bot1: pushing..."
@@ -491,12 +491,12 @@ sed -i.bak '/<\/body>/i\
         <strong>Bot 2</strong> — Added this section (pushing as bot role → promoted to member)\
     </div>\
     <footer>\
-        <p><em>Built with Buzz sovereign git hosting</em></p>\
+        <p><em>Built with Nuxx sovereign git hosting</em></p>\
     </footer>' "$BOT2_DIR/index.html"
 rm -f "$BOT2_DIR/index.html.bak"
 
 git -C "$BOT2_DIR" add -A
-git -C "$BOT2_DIR" -c user.name="Bot2" -c user.email="bot2@buzz.test" \
+git -C "$BOT2_DIR" -c user.name="Bot2" -c user.email="bot2@nuxx.test" \
     commit -m "Add bot2 section and footer"
 
 log "Bot2: pushing..."
@@ -592,7 +592,7 @@ git_clone "$BOT1_PRIVKEY" "${RELAY_HTTP}/git/${OWNER_PUBKEY}/${REPO_NAME}" "$UNS
 
 echo "<!-- unsigned change -->" >> "$UNSIGNED_DIR/index.html"
 git -C "$UNSIGNED_DIR" add -A
-git -C "$UNSIGNED_DIR" -c user.name="Bot1" -c user.email="bot1@buzz.test" \
+git -C "$UNSIGNED_DIR" -c user.name="Bot1" -c user.email="bot1@nuxx.test" \
     commit -m "Unsigned commit (no gpgsign)"
 
 if git_push "$BOT1_PRIVKEY" "$UNSIGNED_DIR"; then
@@ -615,7 +615,7 @@ git -C "$SIGNED_DIR" add -A
 NOSTR_PRIVATE_KEY="$BOT1_PRIVKEY" \
 git -C "$SIGNED_DIR" \
     -c user.name="Bot1" \
-    -c user.email="bot1@buzz.test" \
+    -c user.email="bot1@nuxx.test" \
     -c gpg.format=x509 \
     -c "gpg.x509.program=$SIGNER" \
     -c commit.gpgsign=true \
@@ -645,7 +645,7 @@ fi
 
 # ── Test: Signed commit with owner attestation (NIP-OA) ──────────────────────
 
-log "Signing with owner attestation (BUZZ_AUTH_TAG)..."
+log "Signing with owner attestation (NUXX_AUTH_TAG)..."
 OA_DIR="$WORK_DIR/oa-signed"
 
 git_clone "$BOT1_PRIVKEY" "${RELAY_HTTP}/git/${OWNER_PUBKEY}/${REPO_NAME}" "$OA_DIR" \
@@ -715,10 +715,10 @@ print(json.dumps(["auth", owner_pubkey, "", sig]))
 PYEOF
 )
 
-NOSTR_PRIVATE_KEY="$BOT1_PRIVKEY" BUZZ_AUTH_TAG="$OA_TAG" \
+NOSTR_PRIVATE_KEY="$BOT1_PRIVKEY" NUXX_AUTH_TAG="$OA_TAG" \
 git -C "$OA_DIR" \
     -c user.name="Bot1" \
-    -c user.email="bot1@buzz.test" \
+    -c user.email="bot1@nuxx.test" \
     -c gpg.format=x509 \
     -c "gpg.x509.program=$SIGNER" \
     -c commit.gpgsign=true \
@@ -731,7 +731,7 @@ DECODED_SIG=$(echo "$COMMIT_SIG" | base64 -d 2>/dev/null || echo "$COMMIT_SIG" |
 if echo "$DECODED_SIG" | grep -q '"oa"'; then
     success "Owner attestation (oa field) present in signature"
 else
-    fail "Owner attestation missing from signature — BUZZ_AUTH_TAG not picked up"
+    fail "Owner attestation missing from signature — NUXX_AUTH_TAG not picked up"
 fi
 
 # Push it
@@ -845,7 +845,7 @@ log "Hook integrity: testing symlink hook rejection..."
 
     echo "<!-- symlink test -->" >> "$SYMLINK_DIR/index.html"
     git -C "$SYMLINK_DIR" add -A
-    git -C "$SYMLINK_DIR" -c user.name="Bot1" -c user.email="bot1@buzz.test" \
+    git -C "$SYMLINK_DIR" -c user.name="Bot1" -c user.email="bot1@nuxx.test" \
         commit -m "Symlink hook test"
 
     if git_push "$BOT1_PRIVKEY" "$SYMLINK_DIR" 2>&1; then
@@ -878,7 +878,7 @@ log "Hook integrity: testing missing hook rejection..."
 
     echo "<!-- missing hook test -->" >> "$MISSING_DIR/index.html"
     git -C "$MISSING_DIR" add -A
-    git -C "$MISSING_DIR" -c user.name="Bot1" -c user.email="bot1@buzz.test" \
+    git -C "$MISSING_DIR" -c user.name="Bot1" -c user.email="bot1@nuxx.test" \
         commit -m "Missing hook test"
 
     if git_push "$BOT1_PRIVKEY" "$MISSING_DIR" 2>&1; then

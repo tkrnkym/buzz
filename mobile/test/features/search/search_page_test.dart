@@ -1,15 +1,15 @@
-import 'package:buzz/features/channels/channel.dart';
-import 'package:buzz/features/channels/channel_management_provider.dart';
-import 'package:buzz/features/channels/channels_provider.dart';
-import 'package:buzz/features/channels/message_content.dart';
-import 'package:buzz/features/channels/small_avatar.dart';
-import 'package:buzz/features/profile/profile_provider.dart';
-import 'package:buzz/features/profile/user_cache_provider.dart';
-import 'package:buzz/features/profile/user_profile.dart';
-import 'package:buzz/features/search/recent_searches_provider.dart';
-import 'package:buzz/features/search/search_page.dart';
-import 'package:buzz/features/search/search_provider.dart';
-import 'package:buzz/shared/theme/theme.dart';
+import 'package:nuxx/features/channels/channel.dart';
+import 'package:nuxx/features/channels/channel_management_provider.dart';
+import 'package:nuxx/features/channels/channels_provider.dart';
+import 'package:nuxx/features/channels/message_content.dart';
+import 'package:nuxx/features/channels/small_avatar.dart';
+import 'package:nuxx/features/profile/profile_provider.dart';
+import 'package:nuxx/features/profile/user_cache_provider.dart';
+import 'package:nuxx/features/profile/user_profile.dart';
+import 'package:nuxx/features/search/recent_searches_provider.dart';
+import 'package:nuxx/features/search/search_page.dart';
+import 'package:nuxx/features/search/search_provider.dart';
+import 'package:nuxx/shared/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

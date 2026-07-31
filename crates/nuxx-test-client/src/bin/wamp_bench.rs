@@ -13,7 +13,7 @@
 use std::time::{Duration, Instant};
 
 use nostr::Keys;
-use nuxx_test_client::BuzzTestClient;
+use nuxx_test_client::NuxxTestClient;
 use tokio::time::MissedTickBehavior;
 
 #[tokio::main]
@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
         let keys = keys.clone();
         let channel_id = channel_id.clone();
         tasks.push(tokio::spawn(async move {
-            let mut client = BuzzTestClient::connect(&url, &keys).await?;
+            let mut client = NuxxTestClient::connect(&url, &keys).await?;
             let mut interval = tokio::time::interval(per_conn_interval);
             interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
             let mut latencies: Vec<f64> = Vec::new();

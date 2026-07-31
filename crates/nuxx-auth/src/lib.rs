@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
-//! `nuxx-auth` — Authentication and authorization for the Buzz relay.
+//! `nuxx-auth` — Authentication and authorization for the Nuxx relay.
 //!
 //! ## Auth paths
 //!

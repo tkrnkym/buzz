@@ -77,9 +77,9 @@ const PASSTHROUGH_ENV: &[&str] = &[
     // was configured correctly and the child could not see it.
     "SSL_CERT_FILE",
     "SSL_CERT_DIR",
-    // Buzz identity — dev-mcp writes NOSTR_PRIVATE_KEY to a keyfile then
+    // Nuxx identity — dev-mcp writes NOSTR_PRIVATE_KEY to a keyfile then
     // removes it from its own env (children never see it). NUXX_PRIVATE_KEY
-    // and NUXX_RELAY_URL are kept for the buzz CLI. NUXX_AUTH_TAG is a
+    // and NUXX_RELAY_URL are kept for the nuxx CLI. NUXX_AUTH_TAG is a
     // non-secret signed ownership attestation needed by portable owner-scoped
     // CLI operations; MCP subprocesses are trusted like the agent runtime.
     "NOSTR_PRIVATE_KEY",

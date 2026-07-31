@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# run-tests.sh — Run Buzz test suite
+# run-tests.sh — Run Nuxx test suite
 # =============================================================================
 # Usage:
 #   ./scripts/run-tests.sh              # run all tests (default)
@@ -43,9 +43,9 @@ else
   export DATABASE_URL="postgres://nuxx:nuxx_dev@localhost:5432/nuxx" # sadscan:disable np.postgres.1
   export PGHOST=localhost
   export PGPORT=5432
-  export PGUSER=buzz
+  export PGUSER=nuxx
   export PGPASSWORD=nuxx_dev
-  export PGDATABASE=buzz
+  export PGDATABASE=nuxx
   export REDIS_URL="redis://localhost:6379"
 fi
 

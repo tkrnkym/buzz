@@ -96,7 +96,7 @@ class _RecentPhotoGalleryPicker extends HookConsumerWidget {
     Widget buildGalleryBody() {
       if (recentSnapshot.connectionState != ConnectionState.done) {
         return const Center(
-          child: BuzzLoadingIndicator(
+          child: NuxxLoadingIndicator(
             size: 44,
             semanticLabel: 'Loading recent photos',
           ),
@@ -214,7 +214,7 @@ class _RecentPhotoGalleryPicker extends HookConsumerWidget {
                     key: const ValueKey('photo-gallery-action'),
                     onPressed: isResolving.value ? null : choosePhotos,
                     icon: isResolving.value
-                        ? BuzzLoadingIndicator(
+                        ? NuxxLoadingIndicator(
                             size: 22,
                             color: context.colors.primary,
                             semanticLabel: 'Opening all photos',
@@ -226,7 +226,7 @@ class _RecentPhotoGalleryPicker extends HookConsumerWidget {
                     key: const ValueKey('photo-gallery-action'),
                     onPressed: isResolving.value ? null : choosePhotos,
                     icon: isResolving.value
-                        ? const BuzzLoadingIndicator(
+                        ? const NuxxLoadingIndicator(
                             size: 22,
                             color: Colors.white,
                             semanticLabel: 'Preparing selected photos',

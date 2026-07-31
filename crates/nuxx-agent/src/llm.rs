@@ -359,7 +359,7 @@ impl Llm {
         .map_err(PostError::into_agent)
     }
 
-    /// OpenAI dispatch with Buzz's relay-mesh `auto` policy layered over the
+    /// OpenAI dispatch with Nuxx's relay-mesh `auto` policy layered over the
     /// normal endpoint selection. When enabled, a live virtual `mesh` model is
     /// preferred; if the mesh contracts between discovery and inference, retry
     /// the same request once through the router's ordinary `auto` model.
@@ -2058,7 +2058,7 @@ async fn openrouter_post(
             .post(url)
             .header("content-type", "application/json")
             .header("HTTP-Referer", "https://github.com/tkrnkym/buzz")
-            .header("X-OpenRouter-Title", "Buzz")
+            .header("X-OpenRouter-Title", "Nuxx")
             .bearer_auth(bearer)
             .body(body_bytes.clone())
             .send()
@@ -6344,7 +6344,7 @@ mod tests {
             "got: {header_str}"
         );
         assert!(
-            header_str.contains("x-openrouter-title: buzz"),
+            header_str.contains("x-openrouter-title: nuxx"),
             "got: {header_str}"
         );
     }

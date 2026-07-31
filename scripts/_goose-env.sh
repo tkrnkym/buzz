@@ -14,13 +14,13 @@ cargo build --release -p nuxx-acp -p nuxx-cli
 
 env_args=(
     NUXX_RELAY_URL="$_relay"
-    BUZZ_PRIVATE_KEY="$_key"
-    BUZZ_ACP_AGENT_COMMAND=goose
-    BUZZ_ACP_AGENT_ARGS=acp
-    BUZZ_ACP_AGENTS="$_agents"
+    NUXX_PRIVATE_KEY="$_key"
+    NUXX_ACP_AGENT_COMMAND=goose
+    NUXX_ACP_AGENT_ARGS=acp
+    NUXX_ACP_AGENTS="$_agents"
     GOOSE_MODE=auto
 )
-[[ -n "$_prompt" ]] && env_args+=(BUZZ_ACP_SYSTEM_PROMPT="$_prompt")
+[[ -n "$_prompt" ]] && env_args+=(NUXX_ACP_SYSTEM_PROMPT="$_prompt")
 if [[ "$_heartbeat" != "0" ]]; then
-    env_args+=(BUZZ_ACP_HEARTBEAT_INTERVAL="$_heartbeat")
+    env_args+=(NUXX_ACP_HEARTBEAT_INTERVAL="$_heartbeat")
 fi

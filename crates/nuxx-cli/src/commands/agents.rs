@@ -4,12 +4,12 @@ use nuxx_sdk::builders::{build_archive_identity_request, build_unarchive_identit
 use serde_json::json;
 
 use crate::agent_management::{build_create, build_update, CreateAgentDraft, UpdateAgentDraft};
-use crate::client::BuzzClient;
+use crate::client::NuxxClient;
 use crate::error::CliError;
 use crate::validate::{read_or_stdin, validate_hex64};
 use crate::{AgentsCmd, RespondToArg};
 
-pub async fn dispatch(command: AgentsCmd, client: &BuzzClient) -> Result<(), CliError> {
+pub async fn dispatch(command: AgentsCmd, client: &NuxxClient) -> Result<(), CliError> {
     match command {
         AgentsCmd::DraftCreate {
             channel,
@@ -35,7 +35,7 @@ pub async fn dispatch(command: AgentsCmd, client: &BuzzClient) -> Result<(), Cli
                 obj.insert("saved".into(), false.into());
                 obj.insert(
                     "message".into(),
-                    "Draft sent to Buzz Desktop for owner review. Nothing changes until the owner saves it."
+                    "Draft sent to Nuxx Desktop for owner review. Nothing changes until the owner saves it."
                         .into(),
                 );
             }
@@ -77,7 +77,7 @@ pub async fn dispatch(command: AgentsCmd, client: &BuzzClient) -> Result<(), Cli
                 obj.insert("saved".into(), false.into());
                 obj.insert(
                     "message".into(),
-                    "Draft sent to Buzz Desktop for owner review. Nothing changes until the owner saves it."
+                    "Draft sent to Nuxx Desktop for owner review. Nothing changes until the owner saves it."
                         .into(),
                 );
             }
@@ -153,7 +153,7 @@ pub async fn dispatch(command: AgentsCmd, client: &BuzzClient) -> Result<(), Cli
 
 /// Require `NUXX_AUTH_TAG` and parse the owner pubkey from it. Used only by
 /// the `draft-create` and `draft-update` paths.
-fn require_owner(client: &BuzzClient) -> Result<PublicKey, CliError> {
+fn require_owner(client: &NuxxClient) -> Result<PublicKey, CliError> {
     let hex = client
         .auth_tag_owner_hex()
         .ok_or_else(|| CliError::Auth("agent draft requests require NUXX_AUTH_TAG".into()))?;
@@ -170,7 +170,7 @@ fn require_owner(client: &BuzzClient) -> Result<PublicKey, CliError> {
 ///   `Err` — silent degradation to bare would make the relay reject the
 ///   request with a misleading error.
 async fn resolve_auth(
-    client: &BuzzClient,
+    client: &NuxxClient,
     target_hex: &str,
     signer_hex: &str,
 ) -> Result<Option<[String; 4]>, CliError> {
@@ -267,7 +267,7 @@ fn normalize_relay_self_hex(self_hex: &str) -> Result<String, CliError> {
 /// - State 1: no events — `Ok(vec![])`
 /// - State 2: event passes all checks — `Ok(<pubkeys>)`
 /// - State 3: trust failure — `Err`, naming the specific failure
-pub(crate) async fn fetch_archived_snapshot(client: &BuzzClient) -> Result<Vec<String>, CliError> {
+pub(crate) async fn fetch_archived_snapshot(client: &NuxxClient) -> Result<Vec<String>, CliError> {
     // Fetch NIP-11 info to get the relay's self pubkey.
     let nip11_raw = client
         .get_public("/")
@@ -304,10 +304,10 @@ pub(crate) async fn fetch_archived_snapshot(client: &BuzzClient) -> Result<Vec<S
     Ok(archived.into_iter().map(str::to_string).collect())
 }
 
-/// `buzz agents archived`: read path over [`fetch_archived_snapshot`] for
+/// `nuxx agents archived`: read path over [`fetch_archived_snapshot`] for
 /// direct invocation — a trust failure (state 3) is fatal here so a
 /// verification command can never look like success.
-async fn cmd_archived(client: &BuzzClient) -> Result<(), CliError> {
+async fn cmd_archived(client: &NuxxClient) -> Result<(), CliError> {
     let archived = fetch_archived_snapshot(client).await?;
     println!("{}", json!({"archived": archived}));
     Ok(())

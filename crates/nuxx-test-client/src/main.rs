@@ -1,4 +1,4 @@
-//! `nuxx-test-cli` — Manual testing CLI for the Buzz relay.
+//! `nuxx-test-cli` — Manual testing CLI for the Nuxx relay.
 //!
 //! # Usage
 //!
@@ -17,7 +17,7 @@
 //!
 //! Send a message:
 //! ```text
-//! nuxx-test-cli --channel my-channel --send "Hello, Buzz!"
+//! nuxx-test-cli --channel my-channel --send "Hello, Nuxx!"
 //! ```
 //!
 //! Subscribe and watch events:
@@ -28,7 +28,7 @@
 use std::time::Duration;
 
 use nostr::{Filter, Keys};
-use nuxx_test_client::{BuzzTestClient, RelayMessage};
+use nuxx_test_client::{NuxxTestClient, RelayMessage};
 
 #[tokio::main]
 async fn main() {
@@ -66,7 +66,7 @@ async fn main() {
 
 async fn run_send(url: &str, keys: &Keys, channel: &str, message: &str, kind: u16) {
     println!("Connecting to {url}...");
-    let mut client = match BuzzTestClient::connect(url, keys).await {
+    let mut client = match NuxxTestClient::connect(url, keys).await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Failed to connect: {e}");
@@ -94,7 +94,7 @@ async fn run_send(url: &str, keys: &Keys, channel: &str, message: &str, kind: u1
 
 async fn run_subscribe(url: &str, keys: &Keys, channel: &str, kind: u16) {
     println!("Connecting to {url}...");
-    let mut client = match BuzzTestClient::connect(url, keys).await {
+    let mut client = match NuxxTestClient::connect(url, keys).await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Failed to connect: {e}");
@@ -209,7 +209,7 @@ fn parse_args(args: &[String]) -> CliOpts {
 
 fn print_help() {
     println!(
-        r#"nuxx-test-cli — Manual testing CLI for the Buzz relay
+        r#"nuxx-test-cli — Manual testing CLI for the Nuxx relay
 
 USAGE:
     nuxx-test-cli [OPTIONS]
@@ -224,7 +224,7 @@ OPTIONS:
 
 EXAMPLES:
     # Send a message to a channel
-    nuxx-test-cli --channel my-channel --send "Hello, Buzz!"
+    nuxx-test-cli --channel my-channel --send "Hello, Nuxx!"
 
     # Subscribe and watch live events
     nuxx-test-cli --channel my-channel --subscribe

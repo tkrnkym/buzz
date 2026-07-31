@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
-//! `nuxx-workflow` — Workflow engine for Buzz.
+//! `nuxx-workflow` — Workflow engine for Nuxx.
 //!
 //! Channel-scoped automations with sequential execution, variable substitution,
 //! conditional logic, and execution traces.

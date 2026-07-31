@@ -1,6 +1,6 @@
 //! Presence tracking — online/away status with TTL.
 //!
-//! Stored as `SET buzz:{community}:presence:{pubkey_hex} "online" EX 90`.
+//! Stored as `SET nuxx:{community}:presence:{pubkey_hex} "online" EX 90`.
 //! TTL is 3x the 30s heartbeat interval so a single missed heartbeat doesn't
 //! cause presence flap. Clean disconnect deletes immediately.
 
@@ -114,7 +114,7 @@ mod tests {
         let pubkey = make_pubkey();
         let ctx = ctx(0xaaaa, "a.example");
         let key = presence_key(&ctx, &pubkey);
-        let prefix = format!("buzz:{}:presence:", ctx.community());
+        let prefix = format!("nuxx:{}:presence:", ctx.community());
         assert!(key.starts_with(&prefix));
         let hex_part = key.strip_prefix(&prefix).unwrap();
         assert_eq!(hex_part.len(), 64);

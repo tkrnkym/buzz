@@ -1,10 +1,10 @@
-use crate::client::BuzzClient;
+use crate::client::NuxxClient;
 use crate::error::CliError;
 use crate::validate::{read_or_stdin, sdk_err, validate_hex64, validate_repo_id};
 use nuxx_sdk::{GitIssueMeta, GitRepoCoord, GitStatusMeta};
 
 pub async fn cmd_create_issue(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_owner: &str,
     repo_id: &str,
     subject: &str,
@@ -33,7 +33,7 @@ pub async fn cmd_create_issue(
     Ok(())
 }
 
-pub async fn cmd_get_issue(client: &BuzzClient, event: &str) -> Result<(), CliError> {
+pub async fn cmd_get_issue(client: &NuxxClient, event: &str) -> Result<(), CliError> {
     validate_hex64(event)?;
     let filter = serde_json::json!({
         "kinds": [1621],
@@ -45,7 +45,7 @@ pub async fn cmd_get_issue(client: &BuzzClient, event: &str) -> Result<(), CliEr
 }
 
 pub async fn cmd_list_issues(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_owner: &str,
     repo_id: &str,
     author: Option<&str>,
@@ -79,7 +79,7 @@ pub async fn cmd_list_issues(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn cmd_issue_status(
-    client: &BuzzClient,
+    client: &NuxxClient,
     issue: &str,
     status: &str,
     content: Option<&str>,
@@ -112,7 +112,7 @@ pub async fn cmd_issue_status(
         }
     };
 
-    // Mirrors `buzz patches status`: default a `p` tag to the repo owner
+    // Mirrors `nuxx patches status`: default a `p` tag to the repo owner
     // for discoverability, plus a `--to` escape hatch for the issue author
     // or anyone else who should be notified of the status change.
     let mut recipients = Vec::new();
@@ -144,7 +144,7 @@ pub async fn cmd_issue_status(
     Ok(())
 }
 
-pub async fn dispatch(cmd: crate::IssuesCmd, client: &BuzzClient) -> Result<(), CliError> {
+pub async fn dispatch(cmd: crate::IssuesCmd, client: &NuxxClient) -> Result<(), CliError> {
     use crate::IssuesCmd;
     match cmd {
         IssuesCmd::Create {

@@ -4,8 +4,8 @@
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-If you discover a security vulnerability in Buzz, please report it by emailing
-**buzz@block.xyz**. Include as much detail as possible:
+If you discover a security vulnerability in Nuxx, please report it by emailing
+**nuxx@block.xyz**. Include as much detail as possible:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce or a proof-of-concept (if available)
@@ -33,7 +33,7 @@ We will credit reporters in release notes unless you prefer to remain anonymous.
 | `main` (latest) | ✅ Active |
 | Previous releases | ⚠️ Best-effort; upgrade recommended |
 
-Buzz is pre-1.0. We do not maintain long-term support branches at this stage.
+Nuxx is pre-1.0. We do not maintain long-term support branches at this stage.
 All security fixes land on `main` first.
 
 ---
@@ -75,7 +75,7 @@ for SOX-grade compliance and eDiscovery.
 
 ### Desktop Secret Storage — OS Keyring
 
-The Buzz desktop app stores nsec private keys in the operating system keyring
+The Nuxx desktop app stores nsec private keys in the operating system keyring
 rather than in plaintext files: macOS Keychain, Windows Credential Manager, or
 the Linux Secret Service (`gnome-keyring` / `kwallet` via D-Bus). This covers
 both the human identity key and every managed-agent key.
@@ -88,7 +88,7 @@ plaintext file and does **not** migrate, so a transient outage cannot resurrect
 a rotated key from a leftover file.
 
 When no keyring backend is available (headless Linux with no Secret Service, for
-example), keys fall back to a `0o600` owner-only file. The `BUZZ_PRIVATE_KEY`
+example), keys fall back to a `0o600` owner-only file. The `NUXX_PRIVATE_KEY`
 environment variable, when set, always takes precedence over both stores — this
 is how harnessed agents and CI receive their identity.
 

@@ -1,6 +1,6 @@
 # Meadow Core
 
-A minimal three-agent persona pack for Buzz.
+A minimal three-agent persona pack for Nuxx.
 
 | Agent | Role |
 |-------|------|
@@ -12,10 +12,10 @@ A minimal three-agent persona pack for Buzz.
 
 ```bash
 # Validate the pack
-buzz pack validate ./examples/meadow-core
+nuxx pack validate ./examples/meadow-core
 
 # Inspect resolved config
-buzz pack inspect ./examples/meadow-core
+nuxx pack inspect ./examples/meadow-core
 
 # Import into the desktop app
 # Use the "Install Pack" button and point to this directory

@@ -1,4 +1,4 @@
-# buzz-pair
+# nuxx-pair
 
 CLI tool for testing the [NIP-AB device pairing protocol](../nuxx-core/src/pairing/NIP-AB.md) end-to-end. Exercises the full protocol over a live Nostr relay — designed for interop testing and NIP submission, not production use.
 
@@ -24,7 +24,7 @@ Both sides display a 6-digit SAS code. Confirm they match on each side, and the 
 Acts as the device holding the secret. Generates an ephemeral keypair and session secret, displays a `nostrpair://` QR URI, waits for a target to connect, performs SAS verification, and sends the payload.
 
 ```
-buzz-pair source --relay <RELAY_URL> [--nsec <BECH32_NSEC>]
+nuxx-pair source --relay <RELAY_URL> [--nsec <BECH32_NSEC>]
 ```
 
 - `--relay` — WebSocket relay URL (default: `wss://relay.damus.io`)
@@ -35,7 +35,7 @@ buzz-pair source --relay <RELAY_URL> [--nsec <BECH32_NSEC>]
 Acts as the receiving device. Reads a `nostrpair://` URI from stdin, connects to the relay encoded in the URI, sends an offer, verifies SAS, and receives the payload.
 
 ```
-buzz-pair target [--relay <OVERRIDE_URL>] [--show-secret]
+nuxx-pair target [--relay <OVERRIDE_URL>] [--show-secret]
 ```
 
 - `--relay` — Override the relay URL from the QR code
@@ -46,17 +46,17 @@ buzz-pair target [--relay <OVERRIDE_URL>] [--show-secret]
 Prints all derived cryptographic values from the NIP-AB spec's fixed test keys. Useful for verifying implementations against the spec.
 
 ```
-buzz-pair test-vectors
+nuxx-pair test-vectors
 ```
 
-## Testing Against a Local Buzz Relay
+## Testing Against a Local Nuxx Relay
 
-The CLI supports NIP-42 authentication, so it works with Buzz relays out of the box.
+The CLI supports NIP-42 authentication, so it works with Nuxx relays out of the box.
 
 ### Prerequisites
 
 - Docker running (for Postgres, Redis, etc.)
-- Buzz relay built: `cargo build --release -p nuxx-relay`
+- Nuxx relay built: `cargo build --release -p nuxx-relay`
 
 ### Start the relay
 

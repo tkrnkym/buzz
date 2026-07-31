@@ -2,7 +2,7 @@
 //!
 //! # Why this exists
 //!
-//! Buzz signs every write with the author's key, which is the right model when
+//! Nuxx signs every write with the author's key, which is the right model when
 //! nobody trusts the server. It is the wrong model for an organisation: a person
 //! who loses their key loses their identity, and there is no one to ask for it
 //! back. Slack does not have that problem because Slack has no user-held key at

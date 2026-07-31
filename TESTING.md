@@ -33,27 +33,27 @@ cp .env.example .env             # one-time
 just setup                       # start Docker services, run migrations
 ```
 
-> **Already running Buzz Desktop?** Desktop uses the same Docker container
-> names (`buzz-postgres`, `buzz-redis`) and the same
+> **Already running Nuxx Desktop?** Desktop uses the same Docker container
+> names (`nuxx-postgres`, `nuxx-redis`) and the same
 > default ports (`:5432`, `:6379`). `just setup` will reuse those
 > services, so **your test relay writes into Desktop's database**. That's
 > fine for read/write smoke tests, but: `just reset` wipes Desktop's data
 > along with yours. If you need isolation, stop Desktop first or run the
 > dev stack on a different Compose project
-> (`COMPOSE_PROJECT_NAME=buzz-dev docker compose …`).
+> (`COMPOSE_PROJECT_NAME=nuxx-dev docker compose …`).
 
-`just reset` wipes all local data and starts over — **including Buzz
+`just reset` wipes all local data and starts over — **including Nuxx
 Desktop's data** if its services are sharing your dev stack (see callout
 above).
 
 > **Heads up — scrub stale env first.** If your shell inherits any of
-> `BUZZ_AUTH_TAG`, `BUZZ_RELAY_URL`, or `BUZZ_PRIVATE_KEY` from a
+> `NUXX_AUTH_TAG`, `NUXX_RELAY_URL`, or `NUXX_PRIVATE_KEY` from a
 > prior session (or a staging config), `unset` them before continuing.
-> A stale `BUZZ_AUTH_TAG` fails the **local dev relay** with
+> A stale `NUXX_AUTH_TAG` fails the **local dev relay** with
 > `auth_error: signature verification failed` on the first CLI write —
 > it is *not* tolerated.
 > ```bash
-> unset BUZZ_AUTH_TAG BUZZ_RELAY_URL BUZZ_PRIVATE_KEY
+> unset NUXX_AUTH_TAG NUXX_RELAY_URL NUXX_PRIVATE_KEY
 > ```
 
 ### 2. Build the binaries
@@ -86,30 +86,30 @@ curl -s http://localhost:8080/_readiness        # → {"status":"ready"}
 ```
 
 > Health/readiness/liveness live on a **separate port** (default `8080`,
-> `BUZZ_HEALTH_PORT`) so K8s probes bypass auth middleware. The main app
+> `NUXX_HEALTH_PORT`) so K8s probes bypass auth middleware. The main app
 > port also exposes `/health` for convenience.
 
-The relay starts in dev mode (`BUZZ_REQUIRE_AUTH_TOKEN=false`). The startup
+The relay starts in dev mode (`NUXX_REQUIRE_AUTH_TOKEN=false`). The startup
 log emits a WARN about this — that's expected for local testing. See the env
 vars table at the bottom if you need to lock it down.
 
-> **Already running Buzz Desktop (or another relay) on `:3000` / `:8080` /
-> `:9102`?** Buzz binds three ports — main, health, metrics — and any of
+> **Already running Nuxx Desktop (or another relay) on `:3000` / `:8080` /
+> `:9102`?** Nuxx binds three ports — main, health, metrics — and any of
 > them can collide. Use a separate terminal per role and export the right
 > vars in each:
 >
 > **In the relay terminal** (before launching `nuxx-relay`):
 > ```bash
-> export BUZZ_BIND_ADDR=0.0.0.0:3030
-> export BUZZ_HEALTH_PORT=8088
-> export BUZZ_METRICS_PORT=9202
+> export NUXX_BIND_ADDR=0.0.0.0:3030
+> export NUXX_HEALTH_PORT=8088
+> export NUXX_METRICS_PORT=9202
 > export RELAY_URL=ws://localhost:3030     # advertised in NIP-42 challenges
 > nuxx-relay
 > ```
 >
 > **In your working / CLI terminal** (for steps 4+ and the ACP harness):
 > ```bash
-> export BUZZ_RELAY_URL=http://localhost:3030    # CLI target
+> export NUXX_RELAY_URL=http://localhost:3030    # CLI target
 > # verify the relay on the overridden ports:
 > curl -s http://localhost:3030/health             # → ok
 > curl -s http://localhost:8088/_readiness         # → {"status":"ready"}
@@ -117,7 +117,7 @@ vars table at the bottom if you need to lock it down.
 >
 > Every snippet later in this doc shows the defaults. When you see
 > `localhost:3000` / `:8080` in a code block, mentally substitute your
-> overrides — or the CLI will end up talking to Buzz Desktop's relay.
+> overrides — or the CLI will end up talking to Nuxx Desktop's relay.
 
 > **Ignore `just setup`'s "Next steps" banner.** It still prints
 > `just relay` (a debug build). Use `nuxx-relay` from step 2 here —
@@ -136,7 +136,7 @@ back. This is the minimum sequence an agent needs to verify a local relay.
 ```bash
 # Generate a keypair
 GEN=$(nuxx-admin generate-key)
-export BUZZ_PRIVATE_KEY=$(echo "$GEN" | awk '/Secret key:/ {print $3}')
+export NUXX_PRIVATE_KEY=$(echo "$GEN" | awk '/Secret key:/ {print $3}')
 PUBKEY=$(echo "$GEN"           | awk '/Public key:/ {print $3}')
 echo "pubkey: $PUBKEY"
 
@@ -185,7 +185,7 @@ agent over stdio, and the agent replies through MCP tools.
 
 Minimum recipe — assumes the relay from step 3 is running and the channel
 `$CHANNEL` from step 4 still exists. The agent identity must be **different**
-from the sender identity (`BUZZ_ACP_RESPOND_TO=anyone` still skips events
+from the sender identity (`NUXX_ACP_RESPOND_TO=anyone` still skips events
 the agent signed itself).
 
 ```bash
@@ -193,7 +193,7 @@ cargo build --release -p nuxx-acp
 export PATH="$PWD/target/release:$PATH"
 
 # 1. Save your sender identity from step 4 — you'll need it to @mention the agent
-SENDER_SK="$BUZZ_PRIVATE_KEY"
+SENDER_SK="$NUXX_PRIVATE_KEY"
 
 # 2. Mint a fresh agent identity and capture its pubkey
 AGENT_GEN=$(nuxx-admin generate-key)
@@ -206,23 +206,23 @@ AGENT_PUBKEY=$(echo "$AGENT_GEN" | awk '/Public key:/ {print $3}')
 nuxx channels add-member --channel "$CHANNEL" --pubkey "$AGENT_PUBKEY" --role member
 
 # 4. Switch to the agent identity and start it.
-#    nuxx-acp wants ws:// (not http://). If you set BUZZ_RELAY_URL to an
+#    nuxx-acp wants ws:// (not http://). If you set NUXX_RELAY_URL to an
 #    http:// URL in step 3, set the ws:// equivalent here — same host/port.
-export BUZZ_PRIVATE_KEY="$AGENT_SK"
-export BUZZ_RELAY_URL=ws://localhost:3000   # match step 3 (e.g. ws://localhost:3030 if overridden)
-export BUZZ_ACP_RESPOND_TO=anyone           # default is owner-only; opens the gate for testing
-# NIP-AE core-memory prompt injection is on by default; set BUZZ_ACP_NO_MEMORY=true to opt out.
+export NUXX_PRIVATE_KEY="$AGENT_SK"
+export NUXX_RELAY_URL=ws://localhost:3000   # match step 3 (e.g. ws://localhost:3030 if overridden)
+export NUXX_ACP_RESPOND_TO=anyone           # default is owner-only; opens the gate for testing
+# NIP-AE core-memory prompt injection is on by default; set NUXX_ACP_NO_MEMORY=true to opt out.
 export GOOSE_MODE=auto                        # must be 'auto' or goose hangs on prompts
 
 nuxx-acp                                    # foreground; logs to stdout (run in a separate terminal)
 
 # Optional: turn on per-turn tracing if the default log is too quiet.
-# RUST_LOG=buzz_acp=debug nuxx-acp
+# RUST_LOG=nuxx_acp=debug nuxx-acp
 ```
 
 > **Using a different ACP agent?** The default recipe assumes `goose` is on
 > `$PATH` and configured (`goose --version` should print). For codex / claude
-> code / nuxx-agent, set `BUZZ_ACP_AGENT_COMMAND` and `BUZZ_ACP_AGENT_ARGS`
+> code / nuxx-agent, set `NUXX_ACP_AGENT_COMMAND` and `NUXX_ACP_AGENT_ARGS`
 > accordingly — see `crates/nuxx-acp/README.md`. Without these, nuxx-acp
 > will fail to spawn the agent subprocess on startup.
 
@@ -235,7 +235,7 @@ The justfile also ships `just goose key="$AGENT_NSEC"` (foreground) and
 same env. See `crates/nuxx-acp/README.md` for parallel agents, heartbeats,
 respond-to gates, and forum subscriptions.
 
-To exercise deferred ACP startup, add `BUZZ_ACP_LAZY_POOL=true` before launching
+To exercise deferred ACP startup, add `NUXX_ACP_LAZY_POOL=true` before launching
 `nuxx-acp`. The harness should connect, authenticate, subscribe, and publish
 online presence without starting the configured ACP child. The first accepted,
 flushable mention should start exactly one child and then dispatch the queued
@@ -247,7 +247,7 @@ Send the agent a task — switch your shell back to the **sender** identity
 from step 4 and @mention the agent:
 
 ```bash
-export BUZZ_PRIVATE_KEY=$SENDER_SK          # the key from step 4
+export NUXX_PRIVATE_KEY=$SENDER_SK          # the key from step 4
 nuxx messages send --channel "$CHANNEL" \
   --content "Hey agent, reply PONG only."
 
@@ -269,29 +269,29 @@ out of the box with `just setup` or `just relay`. Common overrides:
 
 | Variable                          | Default                     | Notes |
 |-----------------------------------|-----------------------------|-------|
-| `BUZZ_BIND_ADDR`                | `0.0.0.0:3000`              | Main app port |
-| `BUZZ_HEALTH_PORT`              | `8080`                      | `/_liveness`, `/_readiness` |
-| `BUZZ_METRICS_PORT`             | `9102`                      | Prometheus `/metrics` |
-| `RELAY_URL`                       | `ws://localhost:3000`       | Advertised in NIP-11 / NIP-42 challenges. **Note: no `BUZZ_` prefix.** |
+| `NUXX_BIND_ADDR`                | `0.0.0.0:3000`              | Main app port |
+| `NUXX_HEALTH_PORT`              | `8080`                      | `/_liveness`, `/_readiness` |
+| `NUXX_METRICS_PORT`             | `9102`                      | Prometheus `/metrics` |
+| `RELAY_URL`                       | `ws://localhost:3000`       | Advertised in NIP-11 / NIP-42 challenges. **Note: no `NUXX_` prefix.** |
 | `DATABASE_URL`                    | `postgres://nuxx:nuxx_dev@localhost:5432/nuxx` | |
 | `REDIS_URL`                       | `redis://localhost:6379`    | |
-| `BUZZ_REQUIRE_AUTH_TOKEN`       | `false`                     | When true, REST requires NIP-98 (no `X-Pubkey` fallback) |
-| `BUZZ_REQUIRE_RELAY_MEMBERSHIP` | `false`                     | When true, only pubkeys in `relay_members` can connect |
-| `BUZZ_REQUIRE_MEDIA_GET_AUTH`   | `false`                     | When true, `GET`/`HEAD /media/*` require Blossom kind 24242 `t=get` auth plus relay membership. |
-| `BUZZ_AUDIT_ENABLED`            | `true`                      | Tamper-evident event/media audit log. Set `false`/`0`/`off` to skip its DB pool and writes. Does not disable the separate moderation audit trail. |
-| `BUZZ_AUTO_MIGRATE`             | `false`                     | Opt in with `true`/`1`/`yes`/`on` to run embedded SQLx migrations on relay startup |
+| `NUXX_REQUIRE_AUTH_TOKEN`       | `false`                     | When true, REST requires NIP-98 (no `X-Pubkey` fallback) |
+| `NUXX_REQUIRE_RELAY_MEMBERSHIP` | `false`                     | When true, only pubkeys in `relay_members` can connect |
+| `NUXX_REQUIRE_MEDIA_GET_AUTH`   | `false`                     | When true, `GET`/`HEAD /media/*` require Blossom kind 24242 `t=get` auth plus relay membership. |
+| `NUXX_AUDIT_ENABLED`            | `true`                      | Tamper-evident event/media audit log. Set `false`/`0`/`off` to skip its DB pool and writes. Does not disable the separate moderation audit trail. |
+| `NUXX_AUTO_MIGRATE`             | `false`                     | Opt in with `true`/`1`/`yes`/`on` to run embedded SQLx migrations on relay startup |
 | `RELAY_OWNER_PUBKEY`              | unset                       | Bootstrapped as `owner` in `relay_members` at first start |
-| `BUZZ_ALLOW_NIP_OA_AUTH`        | `false`                     | Enable NIP-OA owner attestation for membership |
-| `BUZZ_WEB_DIR`                  | unset (source), `/srv/buzz/web` (container) | Directory containing the invite landing bundle; the production container enables it so `/invite/{code}` always works |
-| `BUZZ_SERVE_GIT_WEB_GUI`        | `false`                     | Set to `true` or `1` to expose the bundled Git repository browser at `/` and `/repos/...`; invite routes do not depend on this flag |
+| `NUXX_ALLOW_NIP_OA_AUTH`        | `false`                     | Enable NIP-OA owner attestation for membership |
+| `NUXX_WEB_DIR`                  | unset (source), `/srv/nuxx/web` (container) | Directory containing the invite landing bundle; the production container enables it so `/invite/{code}` always works |
+| `NUXX_SERVE_GIT_WEB_GUI`        | `false`                     | Set to `true` or `1` to expose the bundled Git repository browser at `/` and `/repos/...`; invite routes do not depend on this flag |
 
 CLI-side, only two matter for testing:
 
 | Variable                | Default                  | Notes |
 |-------------------------|--------------------------|-------|
-| `BUZZ_RELAY_URL`      | `http://localhost:3000`  | CLI relay base; accepts `ws(s)://` and normalises |
-| `BUZZ_PRIVATE_KEY`    | — (**required**)         | `nsec1…` or 64-char hex |
-| `BUZZ_AUTH_TAG`       | unset                    | Optional NIP-OA owner attestation JSON |
+| `NUXX_RELAY_URL`      | `http://localhost:3000`  | CLI relay base; accepts `ws(s)://` and normalises |
+| `NUXX_PRIVATE_KEY`    | — (**required**)         | `nsec1…` or 64-char hex |
+| `NUXX_AUTH_TAG`       | unset                    | Optional NIP-OA owner attestation JSON |
 
 ---
 
@@ -301,11 +301,11 @@ CLI-side, only two matter for testing:
 |---------|-------|-----|
 | `relay error 500` or `400: restricted: not a channel member` after a code change | Stale binary | Rebuild and re-export `PATH`; or `cargo run` directly |
 | `Address already in use` on relay start (os error 48 on macOS, 98 on Linux) | Another relay (or stale process) holding `:3000` / `:8080` / `:9102` (or your override ports) | The panic line names the failing port — read it first. Then `lsof -iTCP:3000,8080,9102 -sTCP:LISTEN` (or your override equivalents). Kill the offender (`pkill -f nuxx-relay`) or use the port-override block in step 3. If you already overrode and *still* collide, a prior reviewer left a relay running on the same alt ports — kill it or pick fresh ports |
-| `auth_error: BUZZ_PRIVATE_KEY is required` | Env not exported into the CLI's shell | `export BUZZ_PRIVATE_KEY=...` (or pass `--private-key`) |
-| `auth_error: BUZZ_AUTH_TAG verification failed … signature verification failed` | A stale `BUZZ_AUTH_TAG` inherited from a parent shell. The local dev relay rejects it. | `unset BUZZ_AUTH_TAG` (see the scrub block in step 1) |
-| `auth-required: verification failed` on a closed relay | NIP-OA attestation needed | Set `BUZZ_AUTH_TAG` to the owner-issued JSON, or relax `BUZZ_REQUIRE_RELAY_MEMBERSHIP` |
+| `auth_error: NUXX_PRIVATE_KEY is required` | Env not exported into the CLI's shell | `export NUXX_PRIVATE_KEY=...` (or pass `--private-key`) |
+| `auth_error: NUXX_AUTH_TAG verification failed … signature verification failed` | A stale `NUXX_AUTH_TAG` inherited from a parent shell. The local dev relay rejects it. | `unset NUXX_AUTH_TAG` (see the scrub block in step 1) |
+| `auth-required: verification failed` on a closed relay | NIP-OA attestation needed | Set `NUXX_AUTH_TAG` to the owner-issued JSON, or relax `NUXX_REQUIRE_RELAY_MEMBERSHIP` |
 | `channels list` empty after `channels create` | The CLI doesn't echo the channel UUID; use the filter shown in step 4 | Or `POST /query` with `{"kinds":[39002]}` |
-| ACP agent ignores all events | `BUZZ_ACP_RESPOND_TO=owner-only` (default) with no owner configured | Set `BUZZ_ACP_RESPOND_TO=anyone` for testing |
+| ACP agent ignores all events | `NUXX_ACP_RESPOND_TO=owner-only` (default) with no owner configured | Set `NUXX_ACP_RESPOND_TO=anyone` for testing |
 | ACP logs `discovered 0 channel(s)` / `no channel subscriptions resolved` | Agent identity isn't a member of any channel | `nuxx channels add-member --channel "$CHANNEL" --pubkey "$AGENT_PUBKEY" --role member` from another identity |
 | `GOOSE_MODE` warning, agent hangs | Not set | `export GOOSE_MODE=auto` |
 | Tests pass locally but CI fails | Forgot to run `just ci` | `just ci` runs the gate (fmt, clippy, unit tests, desktop/web builds) |

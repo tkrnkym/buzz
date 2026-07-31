@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
-//! NIP-01 WebSocket relay for Buzz private team communication.
+//! NIP-01 WebSocket relay for Nuxx private team communication.
 
 /// Channel activity snapshots — publish side of unread badges.
 pub mod activity;

@@ -1,7 +1,7 @@
 /**
  * Kind-constant sync guard.
  *
- * `crates/nuxx-core/src/kind.rs` owns every Nostr event-kind integer in Buzz.
+ * `crates/nuxx-core/src/kind.rs` owns every Nostr event-kind integer in Nuxx.
  * The web client re-declares the subset it needs as TypeScript constants, and a
  * mismatch is silent: the client keeps filtering on a number the relay no longer
  * routes, so the channel simply looks empty. This asserts every `KIND_*` in

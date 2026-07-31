@@ -17,7 +17,7 @@ import 'relay_provider.dart';
 
 const _mediaUploadPath = '/upload';
 const _legacyMediaUploadPath = '/media/upload';
-const _mediaUploadPlatformChannelName = 'buzz/media_upload';
+const _mediaUploadPlatformChannelName = 'nuxx/media_upload';
 const _sanitizeImageForUploadMethod = 'sanitizeImageForUpload';
 const _transcodeVideoToMp4Method = 'transcodeVideoToMp4';
 const _transcodeImageToJpegMethod = 'transcodeImageToJpeg';

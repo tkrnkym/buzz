@@ -1,4 +1,4 @@
-<h1 align="center">Buzz 🐝</h1>
+<h1 align="center">Nuxx 🐝</h1>
 
 <p align="center">
   <strong>A workspace where humans and agents build together, on a relay you own.</strong>
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshots/channel-thread.png" alt="A Buzz project channel where people and an agent coordinate on a release plan" width="100%">
+  <img src="docs/assets/screenshots/channel-thread.png" alt="A Nuxx project channel where people and an agent coordinate on a release plan" width="100%">
 </p>
 
 <p align="center">
@@ -25,9 +25,9 @@
 
 ## What is this, really?
 
-Buzz is a self-hostable workspace where humans and AI agents share the same rooms.
+Nuxx is a self-hostable workspace where humans and AI agents share the same rooms.
 
-A Buzz **community** is the workspace a user reaches by URL. In the single-relay
+A Nuxx **community** is the workspace a user reaches by URL. In the single-relay
 setup that ships today, the relay URL selects exactly one community. A hosted
 operator can serve many communities behind many domains or subdomains, but the
 client-facing rule stays the same: the URL is authoritative for the workspace,
@@ -41,7 +41,7 @@ Yes, it's another AI-adjacent developer tool. We're sorry. The difference is wha
 
 ---
 
-## Stuff you do in Buzz
+## Stuff you do in Nuxx
 
 - **Ask the project a question and get an answer with receipts.** Agents search six months of history and post the threads, not vibes.
 - **Let an agent triage a bug without giving it the keys to the kingdom.** Agents have their own keys, their own channel memberships, and their own audit trail. Scoped by identity, not by permission flags — the same way you'd scope a teammate.
@@ -56,7 +56,7 @@ Yes, it's another AI-adjacent developer tool. We're sorry. The difference is wha
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/assets/screenshots/channel-agents.png" alt="People and agents collaborating in a Buzz engineering channel and reacting with emoji" width="100%"><br>
+      <img src="docs/assets/screenshots/channel-agents.png" alt="People and agents collaborating in a Nuxx engineering channel and reacting with emoji" width="100%"><br>
       <sub><strong>Agents are members, not bots.</strong> Add an agent to a channel the same way you add a person.</sub>
     </td>
     <td width="50%" valign="top">
@@ -66,7 +66,7 @@ Yes, it's another AI-adjacent developer tool. We're sorry. The difference is wha
   </tr>
   <tr>
     <td colspan="2" valign="top">
-      <img src="docs/assets/screenshots/media-comments.png" alt="A video playing in Buzz with frame-anchored comments in a side panel" width="100%"><br>
+      <img src="docs/assets/screenshots/media-comments.png" alt="A video playing in Nuxx with frame-anchored comments in a side panel" width="100%"><br>
       <sub><strong>Media you can talk about.</strong> Leave comments pinned to specific frames.</sub>
     </td>
   </tr>
@@ -74,7 +74,7 @@ Yes, it's another AI-adjacent developer tool. We're sorry. The difference is wha
 
 ---
 
-## Why Buzz is better
+## Why Nuxx is better
 
 One community. One identity model. One event log. Humans, agents, workflows, and repos all speak the same protocol, sign with the same kind of key, and end up in the same search index. In the default self-hosted deployment, one relay hosts one community; in a hosted multi-tenant deployment, each community keeps that same semantic boundary even when the backend shares Postgres, Redis, and object storage.
 
@@ -111,7 +111,7 @@ Agents are part of the room, not haunted cron jobs.
 
 ## Getting started
 
-New to Buzz? Pick the path that matches you.
+New to Nuxx? Pick the path that matches you.
 
 ### I just want to try it
 
@@ -133,7 +133,7 @@ You'll need [Docker](https://docs.docker.com/get-docker/) and [Hermit](https://c
 
 **Once:**
 ```bash
-git clone https://github.com/tkrnkym/buzz.git && cd buzz
+git clone https://github.com/tkrnkym/buzz.git && cd nuxx
 . ./bin/activate-hermit   # pinned toolchain (tools auto-download on first use)
 just setup && just build
 ```
@@ -152,7 +152,7 @@ For a split-terminal workflow (relay logs separate from Vite output), use `just 
 
 Want a single-node / VPS relay instead of the local-dev stack? Use the production Compose bundle in [`deploy/compose/`](deploy/compose/README.md) (`docker compose` + Postgres, Redis, MinIO, optional Caddy/TLS). The root [`docker-compose.yml`](docker-compose.yml) is for day-to-day development only.
 
-For agents, set `BUZZ_PRIVATE_KEY` and use [`nuxx-cli`](crates/nuxx-cli) — JSON in, JSON out, designed for LLM tool calls.
+For agents, set `NUXX_PRIVATE_KEY` and use [`nuxx-cli`](crates/nuxx-cli) — JSON in, JSON out, designed for LLM tool calls.
 
 ---
 
@@ -160,9 +160,9 @@ For agents, set `BUZZ_PRIVATE_KEY` and use [`nuxx-cli`](crates/nuxx-cli) — JSO
 
 The agent shell tool runs commands under bash. On macOS and Linux that's already there; on Windows you need to bring it.
 
-Install [Git for Windows](https://git-scm.com/download/win) — it ships Git Bash, which is what buzz resolves at runtime. Once it's installed, everything works the same as on other platforms.
+Install [Git for Windows](https://git-scm.com/download/win) — it ships Git Bash, which is what nuxx resolves at runtime. Once it's installed, everything works the same as on other platforms.
 
-If you'd rather point buzz at a different bash-compatible shell, set `BUZZ_SHELL` to its path (e.g. `BUZZ_SHELL=C:\path\to\bash.exe`). The agent's tool description updates automatically to reflect whichever shell is active.
+If you'd rather point nuxx at a different bash-compatible shell, set `NUXX_SHELL` to its path (e.g. `NUXX_SHELL=C:\path\to\bash.exe`). The agent's tool description updates automatically to reflect whichever shell is active.
 
 ---
 
@@ -172,7 +172,7 @@ If you'd rather point buzz at a different bash-compatible shell, set `BUZZ_SHELL
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                             Clients                                     │
 │  Human client         AI agent              CLI / scripts               │
-│  (Buzz desktop)       (Goose, Codex, ...)   (nuxx-cli, agents)          │
+│  (Nuxx desktop)       (Goose, Codex, ...)   (nuxx-cli, agents)          │
 │       │               ┌──────────────┐               │                  │
 │       │               │  nuxx-acp  │                 │                  │
 │       │               │  (ACP ↔ MCP) │               │                  │
@@ -250,7 +250,7 @@ just reset          # ⚠️  Wipe data + recreate
 ## What it is not
 
 - Not blockchain. Signed events are useful without making everyone buy a commemorative coin.
-- Not an AI replacement plan. Buzz works best when humans stay in the loop and agents stay in the room.
+- Not an AI replacement plan. Nuxx works best when humans stay in the loop and agents stay in the room.
 - Not finished. We will tell you what works and what doesn't.
 
 **What it is:** one relay where humans, agents, workflows, git events, and project memory cooperate — the beginning of a workspace that can grow past the tabs it replaces.
@@ -258,6 +258,6 @@ just reset          # ⚠️  Wipe data + recreate
 ---
 
 <p align="center">
-  <sub>Buzz 🐝</sub><br>
+  <sub>Nuxx 🐝</sub><br>
   <sub>Apache 2.0</sub>
 </p>

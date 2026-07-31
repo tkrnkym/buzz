@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Opt-in escape hatch for sandboxes that ship a pinned Chromium whose revision
 // does not match this Playwright version's expected download. Unset in CI, so
 // the normal managed-browser path is unaffected.
-const executablePath = process.env.BUZZ_PLAYWRIGHT_CHROMIUM;
+const executablePath = process.env.NUXX_PLAYWRIGHT_CHROMIUM;
 
 export default defineConfig({
   testDir: "./tests/e2e",

@@ -4,7 +4,7 @@ use nuxx_core::{
     kind::KIND_GIT_REPO_ANNOUNCEMENT,
 };
 
-use crate::client::{normalize_write_response, BuzzClient};
+use crate::client::{normalize_write_response, NuxxClient};
 use crate::error::CliError;
 use crate::validate::validate_repo_id;
 
@@ -14,7 +14,7 @@ fn parse_events(json: &str) -> Result<Vec<Event>, CliError> {
 }
 
 async fn fetch_own_repo_announcement(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_id: &str,
 ) -> Result<Option<Event>, CliError> {
     let filter = serde_json::json!({
@@ -207,7 +207,7 @@ fn validate_write_response(raw: &str) -> Result<String, CliError> {
     Ok(normalize_write_response(raw))
 }
 
-async fn submit_repo_update(client: &BuzzClient, builder: EventBuilder) -> Result<(), CliError> {
+async fn submit_repo_update(client: &NuxxClient, builder: EventBuilder) -> Result<(), CliError> {
     let event = client.sign_event(builder)?;
     let raw = client.submit_event(event).await?;
     println!("{}", validate_write_response(&raw)?);
@@ -256,7 +256,7 @@ fn build_create_announcement(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn cmd_create_repo(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_id: &str,
     name: Option<&str>,
     description: Option<&str>,
@@ -281,7 +281,7 @@ pub async fn cmd_create_repo(
 }
 
 pub async fn cmd_get_repo(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_id: &str,
     owner: Option<&str>,
 ) -> Result<(), CliError> {
@@ -305,7 +305,7 @@ pub async fn cmd_get_repo(
 }
 
 pub async fn cmd_list_repos(
-    client: &BuzzClient,
+    client: &NuxxClient,
     owner: Option<&str>,
     limit: Option<u32>,
 ) -> Result<(), CliError> {
@@ -332,7 +332,7 @@ pub async fn cmd_list_repos(
     Ok(())
 }
 
-async fn current_repo(client: &BuzzClient, repo_id: &str) -> Result<Event, CliError> {
+async fn current_repo(client: &NuxxClient, repo_id: &str) -> Result<Event, CliError> {
     validate_repo_id(repo_id)?;
     fetch_own_repo_announcement(client, repo_id)
         .await?
@@ -343,14 +343,14 @@ async fn current_repo(client: &BuzzClient, repo_id: &str) -> Result<Event, CliEr
         })
 }
 
-async fn cmd_protect_list(client: &BuzzClient, repo_id: &str) -> Result<(), CliError> {
+async fn cmd_protect_list(client: &NuxxClient, repo_id: &str) -> Result<(), CliError> {
     let event = current_repo(client, repo_id).await?;
     println!("{}", protection_rules_json(&event)?);
     Ok(())
 }
 
 async fn cmd_protect_set(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_id: &str,
     ref_pattern: &str,
     push_role: Option<crate::RepoPushRole>,
@@ -377,7 +377,7 @@ async fn cmd_protect_set(
 }
 
 async fn cmd_protect_remove(
-    client: &BuzzClient,
+    client: &NuxxClient,
     repo_id: &str,
     ref_pattern: &str,
 ) -> Result<(), CliError> {
@@ -410,14 +410,14 @@ async fn cmd_protect_remove(
 /// and the caller's membership are the relay's authority at git-access
 /// time; a CLI-side network pre-check would just be TOCTOU with extra
 /// latency.
-async fn cmd_bind_repo(client: &BuzzClient, repo_id: &str, channel: &str) -> Result<(), CliError> {
+async fn cmd_bind_repo(client: &NuxxClient, repo_id: &str, channel: &str) -> Result<(), CliError> {
     let event = current_repo(client, repo_id).await?;
     let builder =
         build_updated_repo_announcement(&event, RepoChange::BindChannel(channel.to_string()))?;
     submit_repo_update(client, builder).await
 }
 
-pub async fn dispatch(cmd: crate::ReposCmd, client: &BuzzClient) -> Result<(), CliError> {
+pub async fn dispatch(cmd: crate::ReposCmd, client: &NuxxClient) -> Result<(), CliError> {
     use crate::{ReposCmd, ReposProtectCmd};
     match cmd {
         ReposCmd::Create {

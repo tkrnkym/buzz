@@ -1,4 +1,4 @@
-//! Embedded SQLx migrations for Buzz.
+//! Embedded SQLx migrations for Nuxx.
 //!
 //! Fresh deployments apply the checked-in SQL files under `migrations/`. The
 //! multi-tenant rewrite owns a clean consolidated `0001`; legacy single-tenant
@@ -10,7 +10,7 @@ use crate::Result;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../migrations");
 
-/// Run all pending Buzz database migrations.
+/// Run all pending Nuxx database migrations.
 pub async fn run_migrations(pool: &PgPool) -> Result<()> {
     reject_legacy_nip_rs_cardinality_ambiguity(pool).await?;
     MIGRATOR.run(pool).await?;
@@ -565,7 +565,7 @@ mod tests {
 
         // Bumped with every added migration on purpose: the count is a guard
         // that a migration file was not added without being noticed here.
-        assert_eq!(migrations.len(), 30);
+        assert_eq!(migrations.len(), 31);
         assert_eq!(migrations[0].version, 1);
         assert_eq!(&*migrations[0].description, "initial schema");
         assert!(migrations[0]
@@ -957,7 +957,7 @@ mod tests {
             .contains("for update"));
 
         // 0030 narrows the mesh-status retention trigger to the new spelling and
-        // renames the function/trigger off `buzz`. The whole executable body must
+        // renames the function/trigger off `nuxx`. The whole executable body must
         // be free of the legacy spelling EXCEPT the two DROP statements, which
         // name the objects 0019 actually created and would not resolve otherwise.
         assert_eq!(migrations[29].version, 30);
@@ -978,6 +978,24 @@ mod tests {
             .join("\n");
         assert!(!without_drops.contains("buzz-mesh-member-status"));
         assert!(!without_drops.contains("buzz-mesh-status"));
+
+        // 0031 widens the app_profile CHECK instead of replacing it: the column
+        // holds stored data, so excluding the pre-rename values would invalidate
+        // every row registered before the gateway was renamed.
+        assert_eq!(migrations[30].version, 31);
+        let app_profile = migrations[30].sql.as_str();
+        assert!(app_profile.contains("push_gateway_installations_app_profile_check"));
+        for value in [
+            "nuxx-ios-production",
+            "nuxx-ios-sandbox",
+            "buzz-ios-production",
+            "buzz-ios-sandbox",
+        ] {
+            assert!(
+                app_profile.contains(value),
+                "app_profile CHECK must still admit {value}"
+            );
+        }
         assert!(mesh_body.contains("AFTER UPDATE OF deleted_at ON events"));
         // 0019's partition-pruning clause and delete order must survive the
         // recreate.

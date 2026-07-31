@@ -8,22 +8,22 @@ services:
       relay:
         condition: service_healthy
     environment:
-      BUZZ_DOMAIN: ${BUZZ_DOMAIN:?set BUZZ_DOMAIN}
+      NUXX_DOMAIN: ${NUXX_DOMAIN:?set NUXX_DOMAIN}
     ports:
       - "${CADDY_HTTP_PORT:-80}:80"
       - "${CADDY_HTTPS_PORT:-443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - buzz-caddy-data:/data
-      - buzz-caddy-config:/config
+      - nuxx-caddy-data:/data
+      - nuxx-caddy-config:/config
     restart: unless-stopped
     networks:
-      - buzz-net
+      - nuxx-net
 
 volumes:
-  buzz-caddy-data:
+  nuxx-caddy-data:
     labels:
       com.nuxx.volume: caddy-data
-  buzz-caddy-config:
+  nuxx-caddy-config:
     labels:
       com.nuxx.volume: caddy-config

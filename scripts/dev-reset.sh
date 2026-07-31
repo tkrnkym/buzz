@@ -6,7 +6,7 @@
 #
 # Stops all services and removes ALL local service
 # volumes (data is lost!), brings everything back up fresh, and runs migrations.
-# Installed Buzz state is preserved.
+# Installed Nuxx state is preserved.
 # =============================================================================
 set -euo pipefail
 
@@ -31,7 +31,7 @@ cd "${REPO_ROOT}"
 
 if [[ "${1:-}" != "--yes" ]]; then
   echo -e "${YELLOW}WARNING: This will DELETE all development data (postgres, minio volumes).${NC}"
-  echo -e "   Installed Buzz app state and its production keyring are preserved."
+  echo -e "   Installed Nuxx app state and its production keyring are preserved."
   echo -e "   Redis data is ephemeral and always wiped on restart."
   echo ""
   read -r -p "Are you sure? [y/N] " confirm

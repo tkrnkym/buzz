@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::client::{
     extract_d_tag, extract_p_tags, extract_tag_value, normalize_write_response,
-    print_create_response, BuzzClient,
+    print_create_response, NuxxClient,
 };
 use crate::commands::agents::fetch_archived_snapshot;
 use crate::commands::channel_templates::{self, ChannelTemplateRecord, TemplateAgentRoster};
@@ -23,7 +23,7 @@ fn extract_channel_metadata(e: &serde_json::Value) -> serde_json::Value {
 }
 
 pub async fn cmd_list_channels(
-    client: &BuzzClient,
+    client: &NuxxClient,
     visibility: Option<&str>,
     member: Option<bool>,
     limit: Option<u32>,
@@ -117,7 +117,7 @@ pub async fn cmd_list_channels(
 /// (private channels they're not a member of), so we just post-filter the
 /// returned events by name and project them into a stable JSON shape.
 pub async fn cmd_search_channels(
-    client: &BuzzClient,
+    client: &NuxxClient,
     query: &str,
     exact: bool,
     include_archived: bool,
@@ -187,7 +187,7 @@ impl ChannelSummary {
                 "d" => channel_id = val.map(str::to_string),
                 "name" => name = val.map(str::to_string),
                 "t" => channel_type = val.map(str::to_string),
-                // NIP-29 emits both `private` and `public` (Buzz adds the latter).
+                // NIP-29 emits both `private` and `public` (Nuxx adds the latter).
                 // The presence of either tag is the source of truth; tag value is unused.
                 "private" => visibility = Some("private".to_string()),
                 "public" => visibility = Some("public".to_string()),
@@ -221,7 +221,7 @@ fn name_matches(name: &str, needle_lower: &str, exact: bool) -> bool {
     }
 }
 
-pub async fn cmd_get_channel(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_get_channel(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     validate_uuid(channel_id)?;
     let filter = serde_json::json!({
         "kinds": [39000],
@@ -242,7 +242,7 @@ pub async fn cmd_get_channel(client: &BuzzClient, channel_id: &str) -> Result<()
 }
 
 pub async fn cmd_list_channel_members(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
 ) -> Result<(), CliError> {
     validate_uuid(channel_id)?;
@@ -259,7 +259,7 @@ pub async fn cmd_list_channel_members(
     Ok(())
 }
 
-pub async fn cmd_get_canvas(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_get_canvas(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     validate_uuid(channel_id)?;
     let filter = serde_json::json!({
         "kinds": [40100],
@@ -280,7 +280,7 @@ pub async fn cmd_get_canvas(client: &BuzzClient, channel_id: &str) -> Result<(),
 }
 
 pub async fn cmd_create_channel(
-    client: &BuzzClient,
+    client: &NuxxClient,
     name: &str,
     channel_type: &str,
     visibility: &str,
@@ -397,7 +397,7 @@ struct RosterResolution {
 /// set — the CLI reads a single relay snapshot, not a local reconciled
 /// merge, so "unknown" here is indistinguishable from "empty."
 async fn fetch_team_persona_slugs(
-    client: &BuzzClient,
+    client: &NuxxClient,
     owner: &str,
     team_id: &str,
 ) -> Result<Vec<String>, CliError> {
@@ -438,7 +438,7 @@ async fn fetch_team_persona_slugs(
 /// instance across requests). Returns every event whose `content.persona_id`
 /// is in `slugs`, keyed by the event's `d` tag (the agent pubkey).
 async fn scan_managed_agents_by_owner(
-    client: &BuzzClient,
+    client: &NuxxClient,
     owner: &str,
     slugs: &HashSet<&str>,
 ) -> Result<Vec<ResolvedAgent>, CliError> {
@@ -491,7 +491,7 @@ fn apply_cardinality_rule(
                 return Err(CliError::Usage(format!(
                     "persona '{slug}' has {} live instances for this owner ({}); \
                      pass a template with a single instance per persona, or resolve \
-                     the duplicate in Buzz Desktop before creating the channel",
+                     the duplicate in Nuxx Desktop before creating the channel",
                     many.len(),
                     candidates.join(", ")
                 )));
@@ -607,7 +607,7 @@ fn finalize_roster_resolution(
 /// entirely before any channel-creation side effect — a cardinality error
 /// aborts with nothing created.
 async fn build_roster_resolution(
-    client: &BuzzClient,
+    client: &NuxxClient,
     owner: &str,
     roster: &TemplateAgentRoster,
 ) -> Result<RosterResolution, CliError> {
@@ -642,7 +642,7 @@ async fn build_roster_resolution(
     finalize_roster_resolution(&slugs, found, archived_result, &mut std::io::stderr())
 }
 
-/// `buzz channels create --template <name>`: load a desktop-local channel
+/// `nuxx channels create --template <name>`: load a desktop-local channel
 /// template, resolve its agent roster against the relay, create the
 /// channel, apply the canvas template, and add resolved agents as members.
 ///
@@ -653,7 +653,7 @@ async fn build_roster_resolution(
 /// not fatal.
 #[allow(clippy::too_many_arguments)]
 pub async fn cmd_create_channel_from_template(
-    client: &BuzzClient,
+    client: &NuxxClient,
     name: &str,
     template_name: &str,
     templates_file: Option<&str>,
@@ -830,7 +830,7 @@ fn validate_ttl_seconds(secs: i64) -> Result<i32, CliError> {
 }
 
 pub async fn cmd_update_channel(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
     name: Option<&str>,
     description: Option<&str>,
@@ -862,7 +862,7 @@ pub async fn cmd_update_channel(
 }
 
 pub async fn cmd_set_channel_topic(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
     topic: &str,
 ) -> Result<(), CliError> {
@@ -878,7 +878,7 @@ pub async fn cmd_set_channel_topic(
 }
 
 pub async fn cmd_set_channel_purpose(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
     purpose: &str,
 ) -> Result<(), CliError> {
@@ -893,7 +893,7 @@ pub async fn cmd_set_channel_purpose(
     Ok(())
 }
 
-pub async fn cmd_join_channel(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_join_channel(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     let channel_uuid = parse_uuid(channel_id)?;
 
     let builder = nuxx_sdk::build_join(channel_uuid)
@@ -905,7 +905,7 @@ pub async fn cmd_join_channel(client: &BuzzClient, channel_id: &str) -> Result<(
     Ok(())
 }
 
-pub async fn cmd_leave_channel(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_leave_channel(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     let channel_uuid = parse_uuid(channel_id)?;
 
     let builder = nuxx_sdk::build_leave(channel_uuid)
@@ -917,7 +917,7 @@ pub async fn cmd_leave_channel(client: &BuzzClient, channel_id: &str) -> Result<
     Ok(())
 }
 
-pub async fn cmd_archive_channel(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_archive_channel(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     let channel_uuid = parse_uuid(channel_id)?;
 
     let builder = nuxx_sdk::build_archive(channel_uuid)
@@ -929,7 +929,7 @@ pub async fn cmd_archive_channel(client: &BuzzClient, channel_id: &str) -> Resul
     Ok(())
 }
 
-pub async fn cmd_unarchive_channel(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_unarchive_channel(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     let channel_uuid = parse_uuid(channel_id)?;
 
     let builder = nuxx_sdk::build_unarchive(channel_uuid)
@@ -941,7 +941,7 @@ pub async fn cmd_unarchive_channel(client: &BuzzClient, channel_id: &str) -> Res
     Ok(())
 }
 
-pub async fn cmd_delete_channel(client: &BuzzClient, channel_id: &str) -> Result<(), CliError> {
+pub async fn cmd_delete_channel(client: &NuxxClient, channel_id: &str) -> Result<(), CliError> {
     let channel_uuid = parse_uuid(channel_id)?;
 
     let builder = nuxx_sdk::build_delete_channel(channel_uuid)
@@ -954,7 +954,7 @@ pub async fn cmd_delete_channel(client: &BuzzClient, channel_id: &str) -> Result
 }
 
 pub async fn cmd_add_channel_member(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
     pubkey: &str,
     role: Option<&str>,
@@ -985,7 +985,7 @@ pub async fn cmd_add_channel_member(
 }
 
 pub async fn cmd_remove_channel_member(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
     pubkey: &str,
 ) -> Result<(), CliError> {
@@ -1002,7 +1002,7 @@ pub async fn cmd_remove_channel_member(
 }
 
 /// Set the channel addition policy — sign and submit a kind:10100 (agent profile) event.
-pub async fn cmd_set_add_policy(client: &BuzzClient, policy: &str) -> Result<(), CliError> {
+pub async fn cmd_set_add_policy(client: &NuxxClient, policy: &str) -> Result<(), CliError> {
     match policy {
         "anyone" | "owner_only" | "nobody" => {}
         _ => {
@@ -1013,7 +1013,7 @@ pub async fn cmd_set_add_policy(client: &BuzzClient, policy: &str) -> Result<(),
     }
 
     // Check if this policy is allowed by the deployment.
-    // NOTE: This gate covers only the `buzz channels set-add-policy` CLI path.
+    // NOTE: This gate covers only the `nuxx channels set-add-policy` CLI path.
     // A client that submits a kind:10100 event directly to the relay bypasses
     // this check. Full enforcement requires relay-side validation, which is
     // intentionally out of scope for this change (see team decision: no
@@ -1047,7 +1047,7 @@ pub async fn cmd_set_add_policy(client: &BuzzClient, policy: &str) -> Result<(),
 }
 
 pub async fn cmd_set_canvas(
-    client: &BuzzClient,
+    client: &NuxxClient,
     channel_id: &str,
     content: &str,
 ) -> Result<(), CliError> {
@@ -1065,7 +1065,7 @@ pub async fn cmd_set_canvas(
 
 pub async fn dispatch(
     cmd: crate::ChannelsCmd,
-    client: &BuzzClient,
+    client: &NuxxClient,
     format: &crate::OutputFormat,
 ) -> Result<(), CliError> {
     use crate::ChannelsCmd;
@@ -1165,7 +1165,7 @@ pub async fn dispatch(
     }
 }
 
-pub async fn dispatch_canvas(cmd: crate::CanvasCmd, client: &BuzzClient) -> Result<(), CliError> {
+pub async fn dispatch_canvas(cmd: crate::CanvasCmd, client: &NuxxClient) -> Result<(), CliError> {
     use crate::CanvasCmd;
     match cmd {
         CanvasCmd::Get { channel } => cmd_get_canvas(client, &channel).await,
@@ -1181,7 +1181,7 @@ mod tests {
         validate_ttl_seconds, ArchivedExclusion, ChannelSummary, ResolvedAgent, RosterResolution,
         SkippedSlug,
     };
-    use crate::client::BuzzClient;
+    use crate::client::NuxxClient;
     use crate::CliError;
     use serde_json::json;
 
@@ -1262,15 +1262,15 @@ mod tests {
 
     #[test]
     fn name_matches_substring_case_insensitive() {
-        assert!(name_matches("Buzz-Chat-Composer", "composer", false));
-        assert!(name_matches("Buzz-Chat-Composer", "buzz", false));
+        assert!(name_matches("Nuxx-Chat-Composer", "composer", false));
+        assert!(name_matches("Nuxx-Chat-Composer", "nuxx", false));
         assert!(!name_matches("design", "composer", false));
     }
 
     #[test]
     fn name_matches_exact_case_insensitive() {
-        assert!(name_matches("Buzz", "buzz", true));
-        assert!(!name_matches("Buzz-Chat", "buzz", true));
+        assert!(name_matches("Nuxx", "nuxx", true));
+        assert!(!name_matches("Nuxx-Chat", "nuxx", true));
     }
 
     #[test]
@@ -1349,12 +1349,12 @@ mod tests {
     // If the NUXX_ACP_ALLOWED_CHANNEL_ADD_POLICIES check were removed from cmd_set_add_policy,
     // this test would fail (it would proceed to sign_event and return a different error).
 
-    fn make_test_client() -> BuzzClient {
+    fn make_test_client() -> NuxxClient {
         // Scalar = 1 is the smallest valid secp256k1 private key.
         let keys =
             nostr::Keys::parse("0000000000000000000000000000000000000000000000000000000000000001")
                 .expect("valid test key");
-        BuzzClient::new("ws://localhost:3000".to_string(), keys, None, None)
+        NuxxClient::new("ws://localhost:3000".to_string(), keys, None, None)
             .expect("client construction should not fail")
     }
 

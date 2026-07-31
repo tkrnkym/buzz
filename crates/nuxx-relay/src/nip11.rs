@@ -120,7 +120,7 @@ impl RelayInfo {
     /// `relay_self` is the relay's own signing pubkey (hex), advertised as the
     /// NIP-11 `self` field. NIP-11 defines `self` generically as the relay's
     /// identity key; other NIPs reference it. Notably NIP-29 (group metadata
-    /// kinds 39000/39001/39002, which Buzz signs with `state.relay_keypair`
+    /// kinds 39000/39001/39002, which Nuxx signs with `state.relay_keypair`
     /// unconditionally) requires clients to verify those events against
     /// `self`. Pass `Some` whenever the relay has a stable signing key.
     ///
@@ -152,7 +152,7 @@ impl RelayInfo {
 
         Self {
             name: "channels.nuxx.ai relay".to_string(),
-            description: "Buzz — private team communication relay".to_string(),
+            description: "Nuxx — private team communication relay".to_string(),
             icon: icon.filter(|s| !s.is_empty()).map(|s| s.to_string()),
             pubkey: None,
             contact: None,

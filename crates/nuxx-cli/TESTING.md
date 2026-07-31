@@ -12,8 +12,8 @@ Docker services running and healthy:
 
 ```bash
 docker compose ps
-# buzz-postgres   healthy
-# buzz-redis      healthy
+# nuxx-postgres   healthy
+# nuxx-redis      healthy
 ```
 
 If not running: `just setup` from the repo root.
@@ -28,7 +28,7 @@ Tools: `jq`, `curl`, Rust toolchain.
 cargo build -p nuxx-cli
 ```
 
-Use `cargo run -p nuxx-cli --` or the built binary at `target/debug/buzz`.
+Use `cargo run -p nuxx-cli --` or the built binary at `target/debug/nuxx`.
 
 ---
 
@@ -37,7 +37,7 @@ Use `cargo run -p nuxx-cli --` or the built binary at `target/debug/buzz`.
 In a separate terminal:
 
 ```bash
-cd REPOS/buzz-nostr
+cd REPOS/nuxx-nostr
 set -a && source .env && set +a
 cargo run -p nuxx-relay
 ```
@@ -49,7 +49,7 @@ curl -s http://localhost:3000/_liveness
 # "ok" or 200 status
 ```
 
-The `.env` should have `BUZZ_REQUIRE_AUTH_TOKEN=false` for local dev.
+The `.env` should have `NUXX_REQUIRE_AUTH_TOKEN=false` for local dev.
 
 ---
 
@@ -62,20 +62,20 @@ via direct DB access. Use this for testing admin operations (archive,
 delete-channel, add/remove-channel-member).
 
 ```bash
-DATABASE_URL="${DATABASE_URL:?set DATABASE_URL for the local Buzz database}" \
+DATABASE_URL="${DATABASE_URL:?set DATABASE_URL for the local Nuxx database}" \
 cargo run -p nuxx-admin -- mint-token \
   --name "cli-test" \
   --scopes "messages:read,messages:write,channels:read,channels:write,users:read,users:write,files:read,files:write,admin:channels"
 ```
 
 This generates a keypair and prints:
-- **Private key (nsec)** — save for `BUZZ_PRIVATE_KEY` testing
+- **Private key (nsec)** — save for `NUXX_PRIVATE_KEY` testing
 
 Export:
 
 ```bash
-export BUZZ_RELAY_URL="http://localhost:3000"
-export BUZZ_PRIVATE_KEY="nsec1..."   # from the mint output
+export NUXX_RELAY_URL="http://localhost:3000"
+export NUXX_PRIVATE_KEY="nsec1..."   # from the mint output
 ```
 
 ### Scope reference
@@ -452,34 +452,34 @@ not JSON — except `get`/`ls`, which emit JSON.
 
 ```bash
 # set (first publish — --title required, body from stdin)
-cat <<'EOF' | buzz notes set --name dco-check --title "DCO Check" \
+cat <<'EOF' | nuxx notes set --name dco-check --title "DCO Check" \
   --summary "How we verify DCO" --tag dco --tag ci --content -
 Run `git log --format='%(trailers:key=Signed-off-by)'` ...
 EOF
 # → prints event_id / naddr / coordinate / slug / title
 
 # set (edit — omit --title to carry it forward; published_at preserved)
-echo "Updated body." | buzz notes set --name dco-check --content -
+echo "Updated body." | nuxx notes set --name dco-check --content -
 
 # get by name (own author resolves directly; cross-author #d query otherwise)
-buzz notes get --name dco-check | jq .
-buzz notes get --name dco-check --content-only
+nuxx notes get --name dco-check | jq .
+nuxx notes get --name dco-check --content-only
 
 # get by naddr (exact coordinate; paste the naddr from a set/get above)
-buzz notes get --naddr "$NADDR" | jq .
+nuxx notes get --naddr "$NADDR" | jq .
 
 # ls (own by default; --author all across the team; --tag filters)
-buzz notes ls | jq .
-buzz notes ls --tag dco | jq .
-buzz notes ls --author all --limit 10 | jq .
+nuxx notes ls | jq .
+nuxx notes ls --tag dco | jq .
+nuxx notes ls --author all --limit 10 | jq .
 
 # rm (NIP-09 a-tag deletion; subsequent get must 404)
-buzz notes rm --name dco-check
+nuxx notes rm --name dco-check
 # → prints deleted <coordinate> / deletion <event-id>
-buzz notes get --name dco-check   # exits non-zero: not found
+nuxx notes get --name dco-check   # exits non-zero: not found
 
 # rm of a slug you never published → NotFound, no kind:5 emitted
-buzz notes rm --name does-not-exist   # exits non-zero
+nuxx notes rm --name does-not-exist   # exits non-zero
 ```
 
 ---
@@ -514,9 +514,9 @@ nuxx users set-profile 2>&1; echo "exit: $?"
 # exit: 1 (at least one field required)
 
 # Exit 3: No auth configured
-env -u BUZZ_PRIVATE_KEY \
+env -u NUXX_PRIVATE_KEY \
   cargo run -p nuxx-cli -- channels list 2>&1; echo "exit: $?"
-# stderr: {"error":"auth_error","message":"auth error: BUZZ_PRIVATE_KEY is required (use --private-key or set env var)"}
+# stderr: {"error":"auth_error","message":"auth error: NUXX_PRIVATE_KEY is required (use --private-key or set env var)"}
 # exit: 3
 
 # Not-found returns null, not an error (exit 0)
@@ -532,14 +532,14 @@ nuxx channels get --channel "00000000-0000-0000-0000-000000000000"
 Test authentication.
 
 ```bash
-# Private key (BUZZ_PRIVATE_KEY)
-BUZZ_PRIVATE_KEY="nsec1..." nuxx channels list | jq .
+# Private key (NUXX_PRIVATE_KEY)
+NUXX_PRIVATE_KEY="nsec1..." nuxx channels list | jq .
 # Should succeed
 
 # No auth → exit 3
-env -u BUZZ_PRIVATE_KEY \
+env -u NUXX_PRIVATE_KEY \
   cargo run -p nuxx-cli -- channels list 2>&1; echo "exit: $?"
-# stderr: {"error":"auth_error","message":"auth error: BUZZ_PRIVATE_KEY is required (use --private-key or set env var)"}
+# stderr: {"error":"auth_error","message":"auth error: NUXX_PRIVATE_KEY is required (use --private-key or set env var)"}
 # exit: 3
 ```
 

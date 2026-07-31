@@ -1,12 +1,12 @@
-//! `buzz mem` — agent-side engram management (NIP-AE).
+//! `nuxx mem` — agent-side engram management (NIP-AE).
 //!
 //! Subcommands:
-//! - `buzz mem ls`                   — list non-tombstoned memories
-//! - `buzz mem get <slug>`            — print the value to stdout
-//! - `buzz mem hash <slug>`           — print sha256(value) hex
-//! - `buzz mem set <slug> <value|-> ` — write a value (use `-` for stdin)
-//! - `buzz mem patch <slug>`          — apply a unified diff to the current value
-//! - `buzz mem rm <slug>`             — publish a tombstone
+//! - `nuxx mem ls`                   — list non-tombstoned memories
+//! - `nuxx mem get <slug>`            — print the value to stdout
+//! - `nuxx mem hash <slug>`           — print sha256(value) hex
+//! - `nuxx mem set <slug> <value|-> ` — write a value (use `-` for stdin)
+//! - `nuxx mem patch <slug>`          — apply a unified diff to the current value
+//! - `nuxx mem rm <slug>`             — publish a tombstone
 //!
 //! By default, the caller's `NUXX_PRIVATE_KEY` is the agent's nsec. The
 //! agent's owner pubkey is resolved from `NUXX_AUTH_TAG` (NIP-OA attestation)
@@ -25,12 +25,12 @@ use nuxx_core::engram::{
 };
 use nuxx_core::kind::KIND_AGENT_ENGRAM;
 
-use crate::client::BuzzClient;
+use crate::client::NuxxClient;
 use crate::error::CliError;
 
 /// Resolve the agent's owner pubkey: explicit `--owner` flag wins, otherwise
 /// fall back to the NIP-OA `auth_tag` (which carries owner pubkey in slot 1).
-fn resolve_owner(client: &BuzzClient, owner_flag: Option<&str>) -> Result<PublicKey, CliError> {
+fn resolve_owner(client: &NuxxClient, owner_flag: Option<&str>) -> Result<PublicKey, CliError> {
     if let Some(s) = owner_flag {
         return PublicKey::from_hex(s)
             .map_err(|e| CliError::Usage(format!("--owner must be a 64-hex pubkey: {e}")));
@@ -52,7 +52,7 @@ fn resolve_owner(client: &BuzzClient, owner_flag: Option<&str>) -> Result<Public
 /// `--agent <pubkey>`; the CLI identity is then the owner and the supplied
 /// pubkey is the agent author to query/decrypt.
 fn resolve_reader(
-    client: &BuzzClient,
+    client: &NuxxClient,
     owner_flag: Option<&str>,
     agent_flag: Option<&str>,
 ) -> Result<(PublicKey, PublicKey, PublicKey), CliError> {
@@ -90,7 +90,7 @@ fn now_secs() -> u64 {
 /// `message` field starts with `"duplicate:"` when the write was rejected
 /// as already-superseded by a later head (NIP-33 LWW). In that case we
 /// surface a `Conflict` so callers don't lie about success.
-async fn submit_engram(client: &BuzzClient, event: nostr::Event) -> Result<(), CliError> {
+async fn submit_engram(client: &NuxxClient, event: nostr::Event) -> Result<(), CliError> {
     let raw = client.submit_event(event).await?;
     let parsed: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| CliError::Other(format!("relay response is not JSON: {e} ({raw})")))?;
@@ -134,7 +134,7 @@ fn parse_events(json: &str) -> Result<Vec<nostr::Event>, CliError> {
 
 /// Fetch the head event for `slug`, returning `(Option<Event>, Option<Body>)`.
 async fn fetch_head(
-    client: &BuzzClient,
+    client: &NuxxClient,
     agent: &PublicKey,
     owner: &PublicKey,
     slug: &str,
@@ -185,9 +185,9 @@ async fn fetch_head(
     Ok((Some(head), body))
 }
 
-/// `buzz mem ls` — list non-tombstoned memory entries.
+/// `nuxx mem ls` — list non-tombstoned memory entries.
 pub async fn cmd_ls(
-    client: &BuzzClient,
+    client: &NuxxClient,
     owner_flag: Option<&str>,
     agent_flag: Option<&str>,
     json: bool,
@@ -271,11 +271,11 @@ pub async fn cmd_ls(
     Ok(())
 }
 
-/// `buzz mem get <slug>` — print value (memory) or profile (core) to stdout.
+/// `nuxx mem get <slug>` — print value (memory) or profile (core) to stdout.
 ///
 /// Exit codes: 0 on found, 1 on absent or tombstoned.
 pub async fn cmd_get(
-    client: &BuzzClient,
+    client: &NuxxClient,
     raw_slug: &str,
     owner_flag: Option<&str>,
     agent_flag: Option<&str>,
@@ -291,7 +291,7 @@ pub async fn cmd_get(
             Err(CliError::NotFound(format!("tombstoned: {slug}")))
         }
         Some(Body::Memory { value: Some(v), .. }) => {
-            // Raw stdout, no trailing newline — round-trips with `buzz mem set foo -`.
+            // Raw stdout, no trailing newline — round-trips with `nuxx mem set foo -`.
             std::io::stdout()
                 .write_all(v.as_bytes())
                 .map_err(|e| CliError::Other(e.to_string()))
@@ -302,7 +302,7 @@ pub async fn cmd_get(
     }
 }
 
-/// `buzz mem set <slug> <value|->` — write a value or core profile.
+/// `nuxx mem set <slug> <value|->` — write a value or core profile.
 ///
 /// Pass `-` to read the value from stdin.
 ///
@@ -312,7 +312,7 @@ pub async fn cmd_get(
 /// otherwise commit an empty value — silently destroying the slug.
 /// A literal `""` positional argument is still accepted (explicit intent).
 pub async fn cmd_set(
-    client: &BuzzClient,
+    client: &NuxxClient,
     raw_slug: &str,
     raw_value: &str,
     owner_flag: Option<&str>,
@@ -339,7 +339,7 @@ pub async fn cmd_set(
         if buf.is_empty() && !allow_empty {
             return Err(CliError::Usage(
                 "refusing to write empty value from stdin (an upstream pipeline step likely \
-                 failed). Pass --allow-empty to confirm, or use `buzz mem rm <slug>` to \
+                 failed). Pass --allow-empty to confirm, or use `nuxx mem rm <slug>` to \
                  tombstone."
                     .into(),
             ));
@@ -482,7 +482,7 @@ fn verify_hunks_at_declared_position(
 /// Used by `mem hash` and `mem patch` — they both need "the value or fail".
 /// Returns `(head_event, value)` so the caller can preserve monotonic ordering.
 async fn fetch_value(
-    client: &BuzzClient,
+    client: &NuxxClient,
     agent: &PublicKey,
     owner: &PublicKey,
     slug: &str,
@@ -499,14 +499,14 @@ async fn fetch_value(
     }
 }
 
-/// `buzz mem hash <slug>` — print sha256(value) in hex to stdout.
+/// `nuxx mem hash <slug>` — print sha256(value) in hex to stdout.
 ///
 /// The output is a 64-character hex digest followed by a newline (line-
 /// oriented for shell use). Use this to capture a base-hash before editing,
-/// then pass it to `buzz mem patch --base-hash <hex>` to make the edit
+/// then pass it to `nuxx mem patch --base-hash <hex>` to make the edit
 /// safe against concurrent writes.
 pub async fn cmd_hash(
-    client: &BuzzClient,
+    client: &NuxxClient,
     raw_slug: &str,
     owner_flag: Option<&str>,
     agent_flag: Option<&str>,
@@ -519,7 +519,7 @@ pub async fn cmd_hash(
     Ok(())
 }
 
-/// `buzz mem patch <slug>` — apply a unified diff to the current value.
+/// `nuxx mem patch <slug>` — apply a unified diff to the current value.
 ///
 /// Reads a unified diff from stdin (or `--patch-file <path>`), fetches the
 /// current head, applies the diff with **strict context matching** (no
@@ -536,7 +536,7 @@ pub async fn cmd_hash(
 ///   can chain edits.
 #[allow(clippy::too_many_arguments)]
 pub async fn cmd_patch(
-    client: &BuzzClient,
+    client: &NuxxClient,
     raw_slug: &str,
     patch_path: Option<&str>,
     base_hash: Option<&str>,
@@ -558,7 +558,7 @@ pub async fn cmd_patch(
         }
         (None, false) => {
             return Err(CliError::Usage(
-                "missing --base-hash <hex> (run `buzz mem hash <slug>` to get it). \
+                "missing --base-hash <hex> (run `nuxx mem hash <slug>` to get it). \
                  Pass --no-base-hash to skip this check at your own risk."
                     .into(),
             ));
@@ -659,7 +659,7 @@ pub async fn cmd_patch(
     if new_value.is_empty() && !allow_empty {
         return Err(CliError::Usage(
             "refusing to write empty value (patch result is empty). \
-             Pass --allow-empty to confirm, or use `buzz mem rm <slug>` to tombstone."
+             Pass --allow-empty to confirm, or use `nuxx mem rm <slug>` to tombstone."
                 .into(),
         ));
     }
@@ -697,14 +697,14 @@ pub async fn cmd_patch(
     Ok(())
 }
 
-/// `buzz mem rm <slug>` — publish a tombstone (`value: null`).
+/// `nuxx mem rm <slug>` — publish a tombstone (`value: null`).
 ///
 /// `rm core` writes a tombstone-shaped body, but a core tombstone has no
 /// well-defined semantics in NIP-AE (the spec only defines tombstones for
 /// memory entries). We refuse it and tell the operator to overwrite `core`
 /// with an empty profile instead.
 pub async fn cmd_rm(
-    client: &BuzzClient,
+    client: &NuxxClient,
     raw_slug: &str,
     owner_flag: Option<&str>,
 ) -> Result<(), CliError> {
@@ -712,7 +712,7 @@ pub async fn cmd_rm(
         normalize_slug(raw_slug).map_err(|e| CliError::Usage(format!("invalid slug: {e}")))?;
     if slug == engram::CORE_SLUG {
         return Err(CliError::Usage(
-            "core cannot be tombstoned; overwrite it with `buzz mem set core ''` instead".into(),
+            "core cannot be tombstoned; overwrite it with `nuxx mem set core ''` instead".into(),
         ));
     }
     let owner = resolve_owner(client, owner_flag)?;
@@ -734,7 +734,7 @@ pub async fn cmd_rm(
     Ok(())
 }
 
-pub async fn dispatch(cmd: crate::MemCmd, client: &BuzzClient) -> Result<(), CliError> {
+pub async fn dispatch(cmd: crate::MemCmd, client: &NuxxClient) -> Result<(), CliError> {
     use crate::MemCmd;
     match cmd {
         MemCmd::Ls { owner, agent, json } => {
@@ -785,8 +785,8 @@ mod tests {
     // verify base-hash from the shell. Hard-coded vectors from the NIST and
     // common quick-check inputs.
 
-    fn test_client(keys: nostr::Keys) -> BuzzClient {
-        BuzzClient::new("http://127.0.0.1:9".into(), keys, None, None).unwrap()
+    fn test_client(keys: nostr::Keys) -> NuxxClient {
+        NuxxClient::new("http://127.0.0.1:9".into(), keys, None, None).unwrap()
     }
 
     #[test]

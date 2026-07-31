@@ -101,7 +101,7 @@ export interface ChannelTimeline {
  *
  * Three subscriptions, because the events live in different filter spaces:
  *
- * 1. `#h` — messages, system rows, edits (40003), Buzz deletes (9005).
+ * 1. `#h` — messages, system rows, edits (40003), Nuxx deletes (9005).
  * 2. `#e` over the loaded message ids — reactions (7) and NIP-09 deletes (5),
  *    neither of which carries an `h` tag.
  * 3. `#e` over the loaded reaction ids — withdrawals, which are kind:5 against

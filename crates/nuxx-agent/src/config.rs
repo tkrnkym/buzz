@@ -732,7 +732,7 @@ pub struct Config {
     pub openai_api: OpenAiApi,
     /// Prefer mesh-llm's virtual `mesh` model when the configured/effective
     /// OpenAI model is `auto` and the live model catalog advertises it.
-    /// Set by Buzz's relay-mesh provider via
+    /// Set by Nuxx's relay-mesh provider via
     /// `NUXX_AGENT_PREFER_MESH_FOR_AUTO=1`; other providers keep their
     /// existing `auto` semantics.
     pub prefer_mesh_for_auto: bool,
@@ -2589,7 +2589,7 @@ mod tests {
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// Compute the valid effort values for a provider/model pair, mirroring
-    /// `getProviderEffortConfig` in `buzzAgentConfig.ts`.
+    /// `getProviderEffortConfig` in `nuxxAgentConfig.ts`.
     ///
     /// Returns `(valid_values, default_value)` where `default_value` is `None`
     /// for Anthropic manual-budget models (TS `defaultValue: null`), otherwise

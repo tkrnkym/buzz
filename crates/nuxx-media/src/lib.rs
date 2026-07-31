@@ -1,4 +1,4 @@
-//! Media storage, validation, and thumbnail generation for Buzz.
+//! Media storage, validation, and thumbnail generation for Nuxx.
 //!
 //! Library crate — no Axum dependency for handlers. Axum handlers live in `nuxx-relay`.
 

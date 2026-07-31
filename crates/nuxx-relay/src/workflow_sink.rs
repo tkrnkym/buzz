@@ -254,7 +254,7 @@ impl ActionSink for RelayActionSink {
             //    - Signed by relay keypair (event.pubkey = relay pubkey)
             //    - `p` tag attributes the message to the workflow owner
             //    - `h` tag scopes to the channel (NIP-29, canonical UUID)
-            //    - `buzz:workflow` tag prevents recursive workflow triggering
+            //    - `nuxx:workflow` tag prevents recursive workflow triggering
             //    - one `p` tag per `@Name` that resolves to a channel member,
             //      so mentioned agents are woken (wake is `p`-tag gated)
             let mut tags = vec![
@@ -262,7 +262,7 @@ impl ActionSink for RelayActionSink {
                     .map_err(|e| ActionSinkError::EventBuild(format!("p tag: {e}")))?,
                 Tag::parse(["h", &channel_id_canonical])
                     .map_err(|e| ActionSinkError::EventBuild(format!("h tag: {e}")))?,
-                Tag::parse(["buzz:workflow", "true"])
+                Tag::parse(["nuxx:workflow", "true"])
                     .map_err(|e| ActionSinkError::EventBuild(format!("workflow tag: {e}")))?,
             ];
 

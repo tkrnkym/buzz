@@ -1,4 +1,4 @@
-//! Smart HTTP git transport for Buzz.
+//! Smart HTTP git transport for Nuxx.
 //!
 //! Three endpoints implement the git Smart HTTP protocol:
 //! - `GET  /git/{owner}/{repo}/info/refs?service={svc}` — ref advertisement
@@ -94,7 +94,7 @@ impl axum::extract::FromRequestParts<Arc<AppState>> for GitAuth {
                     .status(StatusCode::UNAUTHORIZED)
                     .header(
                         "WWW-Authenticate",
-                        format!("Nostr realm=\"buzz\", method=\"{method}\""),
+                        format!("Nostr realm=\"nuxx\", method=\"{method}\""),
                     )
                     .body(Body::from("missing Authorization header"))
                     .unwrap()
@@ -105,7 +105,7 @@ impl axum::extract::FromRequestParts<Arc<AppState>> for GitAuth {
                 .status(StatusCode::UNAUTHORIZED)
                 .header(
                     "WWW-Authenticate",
-                    format!("Nostr realm=\"buzz\", method=\"{method}\""),
+                    format!("Nostr realm=\"nuxx\", method=\"{method}\""),
                 )
                 .body(Body::from("expected Authorization: Nostr <base64>"))
                 .unwrap()
@@ -438,7 +438,7 @@ async fn authorize_git_read(
                 return Err((
                     StatusCode::NOT_FOUND,
                     format!(
-                        "run: buzz repos bind --id {repo_name} --channel <channel-uuid> — repository {repo_name:?} has no channel binding, so the relay cannot authorize access"
+                        "run: nuxx repos bind --id {repo_name} --channel <channel-uuid> — repository {repo_name:?} has no channel binding, so the relay cannot authorize access"
                     ),
                 )
                     .into_response());
@@ -2762,7 +2762,7 @@ mod sec005_read_gate_tests {
             .expect("read remediation body");
         let body = String::from_utf8(bytes.to_vec()).expect("utf-8 body");
         assert!(
-            body.starts_with(&format!("run: buzz repos bind --id {}", f.repo)),
+            body.starts_with(&format!("run: nuxx repos bind --id {}", f.repo)),
             "remediation must lead with the actionable command (got {body:?})"
         );
         assert_ne!(body, GENERIC_DENIAL);

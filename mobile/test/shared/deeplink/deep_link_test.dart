@@ -1,4 +1,4 @@
-import 'package:buzz/shared/deeplink/deep_link.dart';
+import 'package:nuxx/shared/deeplink/deep_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -50,7 +50,7 @@ void main() {
       );
     });
 
-    test('rejects non-buzz scheme', () {
+    test('rejects non-nuxx scheme', () {
       expect(
         parseMessageDeepLink(Uri.parse('https://message?channel=a&id=b')),
         isNull,
@@ -91,7 +91,7 @@ void _inviteTests() {
       );
     });
 
-    test('parses buzz join handoff link', () {
+    test('parses nuxx join handoff link', () {
       final link = parseInviteDeepLink(
         Uri.parse(
           'buzz://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123',
@@ -106,7 +106,7 @@ void _inviteTests() {
       );
     });
 
-    test('normalizes trailing slash in buzz join handoff', () {
+    test('normalizes trailing slash in nuxx join handoff', () {
       final link = parseInviteDeepLink(
         Uri.parse(
           'buzz://join?relay=wss%3A%2F%2Frelay.example.com%2F&code=abc123',
@@ -115,7 +115,7 @@ void _inviteTests() {
       expect(link?.relayUrl, 'wss://relay.example.com');
     });
 
-    test('rejects plaintext public buzz join handoff', () {
+    test('rejects plaintext public nuxx join handoff', () {
       final relay = Uri.encodeQueryComponent('ws://relay.example.com');
       expect(
         parseInviteDeepLink(Uri.parse('buzz://join?relay=$relay&code=abc')),
@@ -123,7 +123,7 @@ void _inviteTests() {
       );
     });
 
-    test('preserves policy receipt in buzz join handoff', () {
+    test('preserves policy receipt in nuxx join handoff', () {
       final link = parseInviteDeepLink(
         Uri.parse(
           'buzz://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123&policy_receipt=receipt.value',
@@ -177,7 +177,7 @@ void _inviteTests() {
       );
     });
 
-    test('rejects buzz join without websocket relay or code', () {
+    test('rejects nuxx join without websocket relay or code', () {
       expect(
         parseInviteDeepLink(
           Uri.parse('buzz://join?relay=https://relay.example.com&code=abc'),
@@ -208,7 +208,7 @@ void _inviteTests() {
       }
     });
 
-    test('rejects buzz join with dangerous relay schemes', () {
+    test('rejects nuxx join with dangerous relay schemes', () {
       // The `relay=` param is an allowlist — only `ws` / `wss` are safe to
       // hand to a Nostr relay session. Anything else must be dropped by the
       // parser so a hostile QR / share link can't smuggle a browser scheme

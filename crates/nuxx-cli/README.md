@@ -1,6 +1,6 @@
-# Buzz CLI
+# Nuxx CLI
 
-Agent-first command-line interface for Buzz relay. JSON in, JSON out.
+Agent-first command-line interface for Nuxx relay. JSON in, JSON out.
 
 ## Install
 
@@ -12,11 +12,11 @@ cargo install --path crates/nuxx-cli
 
 | Env Var | Mode | Use Case |
 |---------|------|----------|
-| `BUZZ_PRIVATE_KEY` | NIP-98 Schnorr signature | Agents with a keypair |
+| `NUXX_PRIVATE_KEY` | NIP-98 Schnorr signature | Agents with a keypair |
 
 ```bash
 # Private key identity (NIP-98 signed requests)
-export BUZZ_PRIVATE_KEY="nsec1..."
+export NUXX_PRIVATE_KEY="nsec1..."
 nuxx channels list
 ```
 
@@ -26,7 +26,7 @@ All output is JSON on stdout. Errors are JSON on stderr. Exit codes: 0=ok, 1=use
 
 ```bash
 # Set relay URL (defaults to http://localhost:3000)
-export BUZZ_RELAY_URL="https://relay.example.com"
+export NUXX_RELAY_URL="https://relay.example.com"
 
 # Messages
 nuxx messages send --channel <uuid> --content "Hello"
@@ -78,11 +78,11 @@ nuxx canvas get --channel <uuid>
 nuxx canvas set --channel <uuid> --content "# Welcome"
 
 # Agent Memory (NIP-AE)
-buzz mem ls
-buzz mem get <slug>
-buzz mem set <slug> "my-value"
-buzz mem patch <slug> --base-hash <hex> < diff.patch  # or --no-base-hash
-buzz mem rm <slug>
+nuxx mem ls
+nuxx mem get <slug>
+nuxx mem set <slug> "my-value"
+nuxx mem patch <slug> --base-hash <hex> < diff.patch  # or --no-base-hash
+nuxx mem rm <slug>
 
 # Repository protection
 nuxx repos protect list --id my-repo
@@ -169,9 +169,9 @@ stored rules in `validation_error` so an owner can remove and repair them.
 ## Architecture
 
 ```
-buzz <group> <subcommand> [flags]
+nuxx <group> <subcommand> [flags]
     │
-    ├─ main.rs ──▶ commands/*.rs ──▶ client.rs ──▶ Buzz Relay REST API
+    ├─ main.rs ──▶ commands/*.rs ──▶ client.rs ──▶ Nuxx Relay REST API
     │  (clap)       (handlers)       (reqwest)
     │
     ├─ validate.rs   (UUID, hex, content size, percent-encode)

@@ -318,7 +318,7 @@ String downloadedImageFilename(String imageUrl, String? contentType) {
     'image/webp' => '.webp',
     _ => '.jpg',
   };
-  return 'buzz-${DateTime.now().millisecondsSinceEpoch}$extension';
+  return 'nuxx-${DateTime.now().millisecondsSinceEpoch}$extension';
 }
 
 Future<void> _saveImage(

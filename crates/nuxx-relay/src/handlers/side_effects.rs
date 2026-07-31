@@ -219,7 +219,7 @@ pub async fn handle_side_effects(
 
 /// Validate a standard NIP-09 deletion event before it is stored.
 ///
-/// Buzz accepts standard deletions for self-authored events, plus the owning
+/// Nuxx accepts standard deletions for self-authored events, plus the owning
 /// human deleting their agent's events (mirrors `validate_edit_ownership`).
 /// Channel admin deletions continue to use kind 9005.
 pub async fn validate_standard_deletion_event(
@@ -1079,7 +1079,7 @@ pub async fn emit_group_discovery_events(
                 tags.push(Tag::parse(["p", &pubkey_hex])?);
             }
         }
-        // Buzz channels always require explicit membership
+        // Nuxx channels always require explicit membership
         tags.push(Tag::parse(["closed"])?);
         // Channel type tag so clients can distinguish stream/forum/dm without inference
         tags.push(Tag::parse(["t", &channel.channel_type])?);
@@ -2826,7 +2826,7 @@ async fn ensure_manifest_pointer(
 ///
 /// The seeded empty manifest is the source of truth; this event is the
 /// derived notification. Fires once per announce, signed by the relay,
-/// carrying the announcer's pubkey in the `p` tag (buzz extension).
+/// carrying the announcer's pubkey in the `p` tag (nuxx extension).
 async fn emit_initial_ref_state(
     tenant: &TenantContext,
     state: &Arc<AppState>,

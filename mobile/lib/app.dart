@@ -16,7 +16,7 @@ import 'shared/auth/auth.dart';
 import 'shared/deeplink/pending_deep_link_provider.dart';
 import 'shared/relay/relay.dart';
 import 'shared/theme/theme.dart';
-import 'shared/widgets/buzz_loading_indicator.dart';
+import 'shared/widgets/nuxx_loading_indicator.dart';
 
 class App extends HookConsumerWidget {
   const App({super.key});
@@ -38,11 +38,11 @@ class App extends HookConsumerWidget {
     // Derive the gradient from the themes that produced each color scheme.
     // This keeps fallbacks and pinned brightness changes aligned with the
     // rendered palette rather than the raw persisted selection.
-    final buzzLightGradient = buzzTopSectionGradient(
+    final nuxxLightGradient = nuxxTopSectionGradient(
       resolved.lightTheme?.name ?? '',
       lightScheme.brightness,
     );
-    final buzzDarkGradient = buzzTopSectionGradient(
+    final nuxxDarkGradient = nuxxTopSectionGradient(
       resolved.darkTheme?.name ?? '',
       darkScheme.brightness,
     );
@@ -82,11 +82,11 @@ class App extends HookConsumerWidget {
       title: 'channels.nuxx.ai',
       theme: AppTheme.light(
         colorScheme: lightScheme,
-        topSectionGradient: buzzLightGradient,
+        topSectionGradient: nuxxLightGradient,
       ),
       darkTheme: AppTheme.dark(
         colorScheme: darkScheme,
-        topSectionGradient: buzzDarkGradient,
+        topSectionGradient: nuxxDarkGradient,
       ),
       themeMode: effectiveMode,
       home: authState.when(
@@ -116,7 +116,7 @@ class _SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: BuzzLoadingIndicator(
+        child: NuxxLoadingIndicator(
           size: 56,
           semanticLabel: 'Starting channels.nuxx.ai',
         ),

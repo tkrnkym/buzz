@@ -215,8 +215,8 @@ impl PushTransport for ApnsTransport {
             Err(_) => return DeliveryOutcome::ConfigurationFault,
         };
         let base_url = match profile {
-            AppProfile::BuzzIosProduction => &self.production_base_url,
-            AppProfile::BuzzIosSandbox => &self.sandbox_base_url,
+            AppProfile::NuxxIosProduction => &self.production_base_url,
+            AppProfile::NuxxIosSandbox => &self.sandbox_base_url,
         };
         let response = self
             .client
@@ -310,13 +310,13 @@ mod tests {
             (
                 uuid::Uuid::nil(),
                 1,
-                AppProfile::BuzzIosProduction,
+                AppProfile::NuxxIosProduction,
                 "00".repeat(32),
             ),
             (
                 uuid::Uuid::max(),
                 i64::MAX,
-                AppProfile::BuzzIosSandbox,
+                AppProfile::NuxxIosSandbox,
                 "ff".repeat(32),
             ),
         ] {

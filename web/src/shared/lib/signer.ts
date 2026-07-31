@@ -1,7 +1,7 @@
 /**
  * Signer port for the web client.
  *
- * Every write in Buzz is a signed Nostr event, so the client needs a signing
+ * Every write in Nuxx is a signed Nostr event, so the client needs a signing
  * capability before it can do anything but read. Where that capability comes from
  * is a product decision that is still open (a browser-held key vs. an
  * SSO-authenticated remote signer), so the rest of the client depends on this
@@ -20,7 +20,7 @@
  * - A NIP-46 remote signer (`bunker://` / `nostrconnect://`) — the natural fit
  *   for SSO, since the id_token authenticates a session with the signer service
  *   and no key material reaches the page. `crates/nuxx-core/src/pairing/
- *   NIP-AB.md` already defines those payload types. Note that Buzz also needs
+ *   NIP-AB.md` already defines those payload types. Note that Nuxx also needs
  *   `nip44_encrypt` / `nip44_decrypt` through the same channel: read state,
  *   channel sections, mutes, and reminders are all encrypted to self.
  * - A locally-held durable key (IndexedDB, passphrase- or passkey-wrapped).
@@ -54,7 +54,7 @@ export interface Signer {
   /**
    * Whether NIP-44 encryption is available.
    *
-   * Buzz keeps personal state (read positions, sections, mutes) on the relay as
+   * Nuxx keeps personal state (read positions, sections, mutes) on the relay as
    * ciphertext, so a signer without this cannot sync it. NIP-44 is *optional* in
    * NIP-07 and some extensions omit it, so this has to be feature-detected and
    * surfaced rather than assumed.

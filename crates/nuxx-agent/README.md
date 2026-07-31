@@ -38,26 +38,26 @@ The agent's **output is its tool calls**. Generated text is forwarded to the cli
 cargo build --release -p nuxx-agent
 
 # Run against Anthropic
-BUZZ_AGENT_PROVIDER=anthropic \
+NUXX_AGENT_PROVIDER=anthropic \
 ANTHROPIC_API_KEY=sk-ant-... \
 ANTHROPIC_MODEL=claude-sonnet-4-5 \
   ./target/release/nuxx-agent
 
 # Or any OpenAI-compatible endpoint
-BUZZ_AGENT_PROVIDER=openai \
+NUXX_AGENT_PROVIDER=openai \
 OPENAI_COMPAT_API_KEY=sk-... \
 OPENAI_COMPAT_MODEL=gpt-5 \
 OPENAI_COMPAT_BASE_URL=https://api.openai.com/v1 \
   ./target/release/nuxx-agent
 
 # Or OpenRouter
-BUZZ_AGENT_PROVIDER=openrouter \
+NUXX_AGENT_PROVIDER=openrouter \
 OPENROUTER_API_KEY=sk-or-v1-... \
 OPENROUTER_MODEL=anthropic/claude-sonnet-4.5 \
   ./target/release/nuxx-agent
 
 # Or Databricks model serving via OAuth 2.0 PKCE
-BUZZ_AGENT_PROVIDER=databricks \
+NUXX_AGENT_PROVIDER=databricks \
 DATABRICKS_HOST=https://dbc-...cloud.databricks.com \
 DATABRICKS_MODEL=goose-claude-4-6-sonnet \
   ./target/release/nuxx-agent
@@ -135,7 +135,7 @@ Everything is environment variables. No flags, no config files. (We are a subpro
 
 | Variable | Default | Notes |
 |---|---|---|
-| `BUZZ_AGENT_PROVIDER` | — | Required. `anthropic`, `openai`, `openrouter`, `databricks`, or `databricks_v2`. No implicit fallback — the agent errors at startup when this is unset. |
+| `NUXX_AGENT_PROVIDER` | — | Required. `anthropic`, `openai`, `openrouter`, `databricks`, or `databricks_v2`. No implicit fallback — the agent errors at startup when this is unset. |
 | `ANTHROPIC_API_KEY` | — | Required when provider=anthropic. |
 | `ANTHROPIC_MODEL` | — | Required when provider=anthropic. |
 | `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | |
@@ -150,26 +150,26 @@ Everything is environment variables. No flags, no config files. (We are a subpro
 | `DATABRICKS_HOST` | — | Required when provider=databricks or provider=databricks_v2. |
 | `DATABRICKS_MODEL` | — | Required when provider=databricks or provider=databricks_v2. |
 | `DATABRICKS_TOKEN` | — | Optional static bearer escape hatch. If unset, Databricks uses browser OAuth + refresh cache. |
-| `BUZZ_AGENT_SYSTEM_PROMPT` | built-in | Inline system prompt. |
-| `BUZZ_AGENT_SYSTEM_PROMPT_FILE` | — | File path. Mutually exclusive with the above. |
-| `BUZZ_AGENT_MAX_ROUNDS` | `0` | Tool-loop iteration cap. 0 = unlimited. |
-| `BUZZ_AGENT_MAX_OUTPUT_TOKENS` | `32768` | Per LLM call. Headroom for large tool-call inputs (e.g. file writes via heredoc); Sonnet 4 / Opus 4 cap at 64K. |
-| `BUZZ_AGENT_MAX_CONTEXT_TOKENS` | `200000` | Provider context window used by the handoff gate. |
-| `BUZZ_AGENT_MAX_HANDOFFS` | `10` | Max context handoffs per session before falling back to truncation. |
-| `BUZZ_AGENT_LLM_TIMEOUT_SECS` | `240` | Max seconds with no response bytes before abandoning an LLM call (per-read inactivity, not wall-clock). |
-| `BUZZ_AGENT_TOOL_TIMEOUT_SECS` | `660` | Per-tool call timeout in seconds |
-| `BUZZ_AGENT_MAX_PARALLEL_TOOLS` | `8` | Max concurrent tool calls per turn (1 = sequential) |
-| `BUZZ_AGENT_MAX_SESSIONS` | unlimited | Max concurrent ACP sessions. Sessions are cheap; default has no cap. |
-| `BUZZ_AGENT_MAX_LINE_BYTES` | `4194304` | 4 MiB. Hard cap on inbound JSON-RPC frames. |
-| `BUZZ_AGENT_MAX_HISTORY_BYTES` | `1048576` | 1 MiB. Old turns are evicted past this. |
-| `BUZZ_AGENT_MAX_TOOL_RESULT_TEXT_BYTES` | `51200` | 50 KiB. Per-result cap on tool-output text; oversize is middle-elided (head + tail kept) with an inline marker. Images are exempt. |
+| `NUXX_AGENT_SYSTEM_PROMPT` | built-in | Inline system prompt. |
+| `NUXX_AGENT_SYSTEM_PROMPT_FILE` | — | File path. Mutually exclusive with the above. |
+| `NUXX_AGENT_MAX_ROUNDS` | `0` | Tool-loop iteration cap. 0 = unlimited. |
+| `NUXX_AGENT_MAX_OUTPUT_TOKENS` | `32768` | Per LLM call. Headroom for large tool-call inputs (e.g. file writes via heredoc); Sonnet 4 / Opus 4 cap at 64K. |
+| `NUXX_AGENT_MAX_CONTEXT_TOKENS` | `200000` | Provider context window used by the handoff gate. |
+| `NUXX_AGENT_MAX_HANDOFFS` | `10` | Max context handoffs per session before falling back to truncation. |
+| `NUXX_AGENT_LLM_TIMEOUT_SECS` | `240` | Max seconds with no response bytes before abandoning an LLM call (per-read inactivity, not wall-clock). |
+| `NUXX_AGENT_TOOL_TIMEOUT_SECS` | `660` | Per-tool call timeout in seconds |
+| `NUXX_AGENT_MAX_PARALLEL_TOOLS` | `8` | Max concurrent tool calls per turn (1 = sequential) |
+| `NUXX_AGENT_MAX_SESSIONS` | unlimited | Max concurrent ACP sessions. Sessions are cheap; default has no cap. |
+| `NUXX_AGENT_MAX_LINE_BYTES` | `4194304` | 4 MiB. Hard cap on inbound JSON-RPC frames. |
+| `NUXX_AGENT_MAX_HISTORY_BYTES` | `1048576` | 1 MiB. Old turns are evicted past this. |
+| `NUXX_AGENT_MAX_TOOL_RESULT_TEXT_BYTES` | `51200` | 50 KiB. Per-result cap on tool-output text; oversize is middle-elided (head + tail kept) with an inline marker. Images are exempt. |
 
 
 ## Providers
 
-`nuxx-agent` speaks a few HTTP dialects. Pick with `BUZZ_AGENT_PROVIDER`.
+`nuxx-agent` speaks a few HTTP dialects. Pick with `NUXX_AGENT_PROVIDER`.
 
-| Provider | `BUZZ_AGENT_PROVIDER` | Endpoint (auto) | Tested with |
+| Provider | `NUXX_AGENT_PROVIDER` | Endpoint (auto) | Tested with |
 |---|---|---|---|
 | Anthropic | `anthropic` | `POST {base}/v1/messages` | claude-sonnet-4-5, claude-opus-4 |
 | OpenAI | `openai` | `POST {base}/responses` | gpt-5, gpt-5-mini, o4-mini, gpt-4o |
@@ -181,7 +181,7 @@ Everything is environment variables. No flags, no config files. (We are a subpro
 | Databricks | `databricks` | `POST {host}/serving-endpoints/{model}/invocations` | goose-claude-4-6-sonnet |
 | Databricks AI Gateway v2 | `databricks_v2` | `POST {host}/ai-gateway/{provider}/v1/...` | databricks-gpt-5-5, databricks-claude-opus-4-7 |
 
-If `BUZZ_AGENT_PROVIDER=anthropic` is selected without `ANTHROPIC_API_KEY`, `BUZZ_AGENT_PROVIDER=openai` is selected without `OPENAI_COMPAT_API_KEY`, or `BUZZ_AGENT_PROVIDER=openrouter` is selected without `OPENROUTER_API_KEY`, the agent returns an error — there is no implicit fallback to another provider.
+If `NUXX_AGENT_PROVIDER=anthropic` is selected without `ANTHROPIC_API_KEY`, `NUXX_AGENT_PROVIDER=openai` is selected without `OPENAI_COMPAT_API_KEY`, or `NUXX_AGENT_PROVIDER=openrouter` is selected without `OPENROUTER_API_KEY`, the agent returns an error — there is no implicit fallback to another provider.
 
 `provider=openai` speaks two HTTP dialects: the [Responses API](https://platform.openai.com/docs/api-reference/responses) (`/v1/responses`, required for GPT-5 / o-series tool-calling on OpenAI's own service) and the [Chat Completions API](https://platform.openai.com/docs/api-reference/chat) (`/chat/completions`, the broadly-supported OpenAI-compatible wire format).
 
@@ -192,7 +192,7 @@ By default (`OPENAI_COMPAT_API=auto`) the agent picks **Responses** when `OPENAI
 - `reasoning.effort` is set on the request when reasoning effort is configured. The request deliberately carries no `provider.require_parameters` filter: that filter routes only to endpoints advertising every parameter in the body, and 83 of 274 tools-capable OpenRouter models do not advertise `reasoning`, so it turns an effort setting into a hard 404 on a valid model id. A model that cannot reason answers without reasoning instead.
 - The response's `reasoning_details` array (opaque extended-thinking payload) is captured and replayed byte-for-byte on the next turn's assistant message, so multi-turn tool use keeps the model's chain-of-thought.
 - `anthropic/*` models get Anthropic-style `cache_control` breakpoints injected on the system message and the last two user messages.
-- Retryable statuses (429 and typed `provider_overloaded` 503) honor the documented `Retry-After` header (clamped to a small ceiling — see `RETRY_AFTER_CAP_SECS` in `llm.rs` — since the sleep happens outside `BUZZ_AGENT_LLM_TIMEOUT_SECS`); 502 and untyped 503 retry with jittered backoff instead. `401` is treated as an expired/invalid key and refreshed once, while `402` (no credits) and `403` (guardrail/moderation/permission) fail immediately without retry.
+- Retryable statuses (429 and typed `provider_overloaded` 503) honor the documented `Retry-After` header (clamped to a small ceiling — see `RETRY_AFTER_CAP_SECS` in `llm.rs` — since the sleep happens outside `NUXX_AGENT_LLM_TIMEOUT_SECS`); 502 and untyped 503 retry with jittered backoff instead. `401` is treated as an expired/invalid key and refreshed once, while `402` (no credits) and `403` (guardrail/moderation/permission) fail immediately without retry.
 
 `Provider` is a Rust `enum` with one `match` in `Llm::complete`. There is no trait, no `Box<dyn>`, no async-trait. Adding a provider is a `match` arm and one `body`/`parse` pair in `llm.rs`.
 
@@ -237,31 +237,31 @@ The trust boundary is **the operator who launched the agent**. The harness, MCP 
 | MCP child env | Whitelist (`PATH`, `HOME`, `TERM`, `LANG`, `LC_ALL`, `TMPDIR`) plus what the client explicitly passes. Your `ANTHROPIC_API_KEY` does not leak into MCP children. |
 | MCP child lifetime | Process group via `setpgid(0,0)` in `pre_exec`. On transport break or shutdown: `killpg(SIGKILL)`. Grandchildren die too. |
 | Server poisoning | After a timeout or transport break, the offending server is marked dead. Future calls trigger a lazy restart with exponential backoff. Other servers keep working. |
-| Frame size | `BUZZ_AGENT_MAX_LINE_BYTES` (default 4 MiB). Oversize → connection killed. |
+| Frame size | `NUXX_AGENT_MAX_LINE_BYTES` (default 4 MiB). Oversize → connection killed. |
 | LLM response size | 16 MiB hard cap. Both `Content-Length` precheck and streaming-buffer cap. |
 | Cancellation | `tokio::select! { biased; _ = cancel.changed() => ... }` at every loop boundary. Cancel always wins the race. |
-| Session isolation | Unlimited concurrent sessions by default (configurable via `BUZZ_AGENT_MAX_SESSIONS`). One prompt per session at a time. Each session gets its own MCP servers. |
+| Session isolation | Unlimited concurrent sessions by default (configurable via `NUXX_AGENT_MAX_SESSIONS`). One prompt per session at a time. Each session gets its own MCP servers. |
 | `tool_use ↔ tool_result` pairing | Encoded in the type system. Every `ToolCall` and `ToolResult` carries a `provider_id: String` (not `Option`). |
 
 ### Bounded Everything
 
 | Limit | Default | Where |
 |---|---|---|
-| Inbound JSON-RPC frame | 4 MiB | `BUZZ_AGENT_MAX_LINE_BYTES` |
+| Inbound JSON-RPC frame | 4 MiB | `NUXX_AGENT_MAX_LINE_BYTES` |
 | Single prompt | 1 MiB | `MAX_PROMPT_BYTES` |
-| History window | 1 MiB | `BUZZ_AGENT_MAX_HISTORY_BYTES` |
+| History window | 1 MiB | `NUXX_AGENT_MAX_HISTORY_BYTES` |
 | LLM response body | 16 MiB | `MAX_LLM_RESPONSE_BYTES` |
 | LLM error body | 4 KiB | `MAX_LLM_ERROR_BODY_BYTES` |
 | Tool result body (total, incl. images) | 8 MiB | `MAX_TOOL_RESULT_BYTES` |
-| Tool result text | 50 KiB | `BUZZ_AGENT_MAX_TOOL_RESULT_TEXT_BYTES` |
+| Tool result text | 50 KiB | `NUXX_AGENT_MAX_TOOL_RESULT_TEXT_BYTES` |
 | MCP servers / session | 16 | `MAX_MCP_SERVERS` |
 | Tools / session | 128 | `MAX_TOOLS_PER_SESSION` |
 | Tool description bytes | 1 KiB | `MAX_DESCRIPTION_BYTES` |
 | Tool schema bytes | 4 KiB | `MAX_SCHEMA_BYTES` (oversize → replaced with `{}`) |
 | Tool calls per turn | 64 | `MAX_TOOL_CALLS_PER_TURN` |
-| Loop rounds | 0 (unlimited) | `BUZZ_AGENT_MAX_ROUNDS` |
-| LLM read inactivity timeout | 240 s | `BUZZ_AGENT_LLM_TIMEOUT_SECS` |
-| Tool call timeout | 660 s | `BUZZ_AGENT_TOOL_TIMEOUT_SECS` |
+| Loop rounds | 0 (unlimited) | `NUXX_AGENT_MAX_ROUNDS` |
+| LLM read inactivity timeout | 240 s | `NUXX_AGENT_LLM_TIMEOUT_SECS` |
+| Tool call timeout | 660 s | `NUXX_AGENT_TOOL_TIMEOUT_SECS` |
 
 ## What This Is NOT
 

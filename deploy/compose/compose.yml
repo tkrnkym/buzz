@@ -1,29 +1,29 @@
-name: buzz-prod
+name: nuxx-prod
 
 services:
   relay:
-    image: ${BUZZ_IMAGE:-ghcr.io/tkrnkym/nuxx:main}
+    image: ${NUXX_IMAGE:-ghcr.io/tkrnkym/nuxx:main}
     env_file:
       - .env
     environment:
-      BUZZ_BIND_ADDR: 0.0.0.0:3000
-      BUZZ_HEALTH_PORT: "8080"
-      BUZZ_METRICS_PORT: "9102"
-      DATABASE_URL: postgres://${POSTGRES_USER:-buzz}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-buzz}
+      NUXX_BIND_ADDR: 0.0.0.0:3000
+      NUXX_HEALTH_PORT: "8080"
+      NUXX_METRICS_PORT: "9102"
+      DATABASE_URL: postgres://${POSTGRES_USER:-nuxx}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nuxx}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379
-      BUZZ_S3_ENDPOINT: http://minio:9000
+      NUXX_S3_ENDPOINT: http://minio:9000
       # Docker DNS resolves `minio`, not arbitrary `<bucket>.minio` hosts.
-      BUZZ_S3_ADDRESSING_STYLE: path
-      BUZZ_S3_ACCESS_KEY: ${BUZZ_S3_ACCESS_KEY:?set BUZZ_S3_ACCESS_KEY}
-      BUZZ_S3_SECRET_KEY: ${BUZZ_S3_SECRET_KEY:?set BUZZ_S3_SECRET_KEY}
-      BUZZ_S3_BUCKET: ${BUZZ_S3_BUCKET:-buzz-media}
-      BUZZ_GIT_REPO_PATH: /data/git
-      BUZZ_AUTO_MIGRATE: ${BUZZ_AUTO_MIGRATE:-false}
-      BUZZ_GIT_CONFORMANCE_PROBE: ${BUZZ_GIT_CONFORMANCE_PROBE:-true}
+      NUXX_S3_ADDRESSING_STYLE: path
+      NUXX_S3_ACCESS_KEY: ${NUXX_S3_ACCESS_KEY:?set NUXX_S3_ACCESS_KEY}
+      NUXX_S3_SECRET_KEY: ${NUXX_S3_SECRET_KEY:?set NUXX_S3_SECRET_KEY}
+      NUXX_S3_BUCKET: ${NUXX_S3_BUCKET:-nuxx-media}
+      NUXX_GIT_REPO_PATH: /data/git
+      NUXX_AUTO_MIGRATE: ${NUXX_AUTO_MIGRATE:-false}
+      NUXX_GIT_CONFORMANCE_PROBE: ${NUXX_GIT_CONFORMANCE_PROBE:-true}
     ports:
-      - "${BUZZ_HTTP_PORT:-3000}:3000"
+      - "${NUXX_HTTP_PORT:-3000}:3000"
     volumes:
-      - buzz-git-data:/data/git
+      - nuxx-git-data:/data/git
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,17 +46,17 @@ services:
       start_period: 30s
     restart: unless-stopped
     networks:
-      - buzz-net
+      - nuxx-net
 
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-buzz}
-      POSTGRES_USER: ${POSTGRES_USER:-buzz}
+      POSTGRES_DB: ${POSTGRES_DB:-nuxx}
+      POSTGRES_USER: ${POSTGRES_USER:-nuxx}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - buzz-postgres-data:/var/lib/postgresql/data
+      - nuxx-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -65,7 +65,7 @@ services:
       start_period: 10s
     restart: unless-stopped
     networks:
-      - buzz-net
+      - nuxx-net
 
   redis:
     image: redis:7-alpine
@@ -73,7 +73,7 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
     volumes:
-      - buzz-redis-data:/data
+      - nuxx-redis-data:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
       interval: 5s
@@ -82,16 +82,16 @@ services:
       start_period: 5s
     restart: unless-stopped
     networks:
-      - buzz-net
+      - nuxx-net
 
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${BUZZ_S3_ACCESS_KEY:?set BUZZ_S3_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${BUZZ_S3_SECRET_KEY:?set BUZZ_S3_SECRET_KEY}
+      MINIO_ROOT_USER: ${NUXX_S3_ACCESS_KEY:?set NUXX_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${NUXX_S3_SECRET_KEY:?set NUXX_S3_SECRET_KEY}
     volumes:
-      - buzz-minio-data:/data
+      - nuxx-minio-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
       interval: 5s
@@ -100,7 +100,7 @@ services:
       start_period: 10s
     restart: unless-stopped
     networks:
-      - buzz-net
+      - nuxx-net
 
   minio-init:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
@@ -108,35 +108,35 @@ services:
       minio:
         condition: service_healthy
     environment:
-      BUZZ_S3_ACCESS_KEY: ${BUZZ_S3_ACCESS_KEY:?set BUZZ_S3_ACCESS_KEY}
-      BUZZ_S3_SECRET_KEY: ${BUZZ_S3_SECRET_KEY:?set BUZZ_S3_SECRET_KEY}
-      BUZZ_S3_BUCKET: ${BUZZ_S3_BUCKET:-buzz-media}
+      NUXX_S3_ACCESS_KEY: ${NUXX_S3_ACCESS_KEY:?set NUXX_S3_ACCESS_KEY}
+      NUXX_S3_SECRET_KEY: ${NUXX_S3_SECRET_KEY:?set NUXX_S3_SECRET_KEY}
+      NUXX_S3_BUCKET: ${NUXX_S3_BUCKET:-nuxx-media}
     entrypoint: >
       /bin/sh -euc '
-        mc alias set local http://minio:9000 "$${BUZZ_S3_ACCESS_KEY}" "$${BUZZ_S3_SECRET_KEY}"
-        mc mb --ignore-existing "local/$${BUZZ_S3_BUCKET}"
-        mc anonymous set none "local/$${BUZZ_S3_BUCKET}"
+        mc alias set local http://minio:9000 "$${NUXX_S3_ACCESS_KEY}" "$${NUXX_S3_SECRET_KEY}"
+        mc mb --ignore-existing "local/$${NUXX_S3_BUCKET}"
+        mc anonymous set none "local/$${NUXX_S3_BUCKET}"
       '
     restart: "no"
     networks:
-      - buzz-net
+      - nuxx-net
 
 volumes:
-  buzz-postgres-data:
+  nuxx-postgres-data:
     labels:
       com.nuxx.volume: postgres
-  buzz-redis-data:
+  nuxx-redis-data:
     labels:
       com.nuxx.volume: redis
-  buzz-minio-data:
+  nuxx-minio-data:
     labels:
       com.nuxx.volume: minio
-  buzz-git-data:
+  nuxx-git-data:
     labels:
       com.nuxx.volume: git
 
 networks:
-  buzz-net:
+  nuxx-net:
     driver: bridge
     labels:
       com.nuxx.network: production

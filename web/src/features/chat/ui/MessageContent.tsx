@@ -63,7 +63,7 @@ export function MessageContent({
   return (
     <Markdown
       content={content}
-      // `buzz:` is not a scheme react-markdown keeps, so allow it through before
+      // `nuxx:` is not a scheme react-markdown keeps, so allow it through before
       // the link renderer can act on it.
       preserveUrl={isMessageLink}
       renderLink={renderLink}

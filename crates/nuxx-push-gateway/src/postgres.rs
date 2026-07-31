@@ -63,8 +63,8 @@ fn ts(v: DateTime<Utc>) -> i64 {
 }
 fn profile(v: &str) -> Result<AppProfile, AuthorityError> {
     match v {
-        "nuxx-ios-production" => Ok(AppProfile::BuzzIosProduction),
-        "nuxx-ios-sandbox" => Ok(AppProfile::BuzzIosSandbox),
+        "nuxx-ios-production" => Ok(AppProfile::NuxxIosProduction),
+        "nuxx-ios-sandbox" => Ok(AppProfile::NuxxIosSandbox),
         _ => Err(AuthorityError::Unavailable),
     }
 }

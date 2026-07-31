@@ -1,10 +1,10 @@
-import 'package:buzz/features/channels/channel.dart';
-import 'package:buzz/features/channels/channels_provider.dart';
-import 'package:buzz/features/channels/deep_link_dispatcher.dart';
-import 'package:buzz/features/invites/invite_join_provider.dart';
-import 'package:buzz/shared/auth/auth.dart';
-import 'package:buzz/shared/deeplink/deep_link.dart';
-import 'package:buzz/shared/deeplink/pending_deep_link_provider.dart';
+import 'package:nuxx/features/channels/channel.dart';
+import 'package:nuxx/features/channels/channels_provider.dart';
+import 'package:nuxx/features/channels/deep_link_dispatcher.dart';
+import 'package:nuxx/features/invites/invite_join_provider.dart';
+import 'package:nuxx/shared/auth/auth.dart';
+import 'package:nuxx/shared/deeplink/deep_link.dart';
+import 'package:nuxx/shared/deeplink/pending_deep_link_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -227,11 +227,11 @@ class _ThrowingCommunityStorage extends CommunityStorage {
 class _RecordingPendingDeepLinkNotifier extends PendingDeepLinkNotifier {
   _RecordingPendingDeepLinkNotifier(this.link);
 
-  final BuzzDeepLink link;
+  final NuxxDeepLink link;
   int consumeCalls = 0;
 
   @override
-  BuzzDeepLink? build() => link;
+  NuxxDeepLink? build() => link;
 
   @override
   void consume() {
@@ -243,10 +243,10 @@ class _RecordingPendingDeepLinkNotifier extends PendingDeepLinkNotifier {
 class _FakePendingDeepLinkNotifier extends PendingDeepLinkNotifier {
   _FakePendingDeepLinkNotifier(this.link);
 
-  final BuzzDeepLink link;
+  final NuxxDeepLink link;
 
   @override
-  BuzzDeepLink? build() => link;
+  NuxxDeepLink? build() => link;
 }
 
 class _FakeChannelsNotifier extends ChannelsNotifier {

@@ -2,7 +2,7 @@
 //!
 //! These tests exercise the full pack-resolve pipeline and verify that:
 //! - Goose personas emit GOOSE_PROVIDER, GOOSE_MODEL, GOOSE_TEMPERATURE
-//! - Buzz-agent personas emit NUXX_AGENT_MODEL, NUXX_AGENT_PROVIDER
+//! - Nuxx-agent personas emit NUXX_AGENT_MODEL, NUXX_AGENT_PROVIDER
 //! - The import filter strips derived provider/model keys but preserves knobs
 //! - Multi-runtime packs produce correct per-persona env var prefixes
 //! - Models without a provider prefix emit only the model key (no provider)
@@ -250,17 +250,17 @@ You are a goose bot.
     )
     .unwrap();
 
-    // Buzz-agent persona
+    // Nuxx-agent persona
     fs::write(
         root.join("agents/nuxx-bot.persona.md"),
         r#"---
 name: "nuxx-bot"
-display_name: "Buzz Bot"
+display_name: "Nuxx Bot"
 description: "A nuxx-agent runtime bot"
 runtime: "nuxx-agent"
 model: "openai:gpt-4o"
 ---
-You are a buzz bot.
+You are a nuxx bot.
 "#,
     )
     .unwrap();
@@ -273,7 +273,7 @@ You are a buzz bot.
         .iter()
         .find(|p| p.name == "goose-bot")
         .expect("goose-bot should exist");
-    let buzz = pack
+    let nuxx = pack
         .personas
         .iter()
         .find(|p| p.name == "nuxx-bot")
@@ -299,8 +299,8 @@ You are a buzz bot.
         "goose persona must not emit NUXX_AGENT_PROVIDER"
     );
 
-    // Buzz-agent persona gets NUXX_AGENT_* env vars
-    let nuxx_env: std::collections::HashMap<_, _> = buzz
+    // Nuxx-agent persona gets NUXX_AGENT_* env vars
+    let nuxx_env: std::collections::HashMap<_, _> = nuxx
         .runtime_env_vars
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))

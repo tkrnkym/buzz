@@ -144,8 +144,8 @@ impl Config {
         let enabled_profiles = req(e, "NUXX_PUSH_ENABLED_PROFILES")?
             .split(',')
             .map(|profile| match profile {
-                "nuxx-ios-production" => Ok(crate::model::AppProfile::BuzzIosProduction),
-                "nuxx-ios-sandbox" => Ok(crate::model::AppProfile::BuzzIosSandbox),
+                "nuxx-ios-production" => Ok(crate::model::AppProfile::NuxxIosProduction),
+                "nuxx-ios-sandbox" => Ok(crate::model::AppProfile::NuxxIosSandbox),
                 _ => Err(ConfigError::Invalid("NUXX_PUSH_ENABLED_PROFILES")),
             })
             .collect::<Result<HashSet<_>, _>>()?;
@@ -220,7 +220,7 @@ mod tests {
             ),
             (
                 "DATABASE_URL".into(),
-                "postgres://buzz:test@localhost/buzz".into(),
+                "postgres://nuxx:test@localhost/nuxx".into(),
             ),
             ("NUXX_PUSH_APP_ATTEST_APP_ID".into(), "TEAM.app".into()),
             (

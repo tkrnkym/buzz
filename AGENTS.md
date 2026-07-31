@@ -1,6 +1,6 @@
 # AGENTS.md — AI Agent Contributor Guide
 
-This guide is for AI agents contributing to the Buzz codebase. It covers
+This guide is for AI agents contributing to the Nuxx codebase. It covers
 agent-specific context and conventions. For general contributor info (setup,
 code style, PR process, architecture), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -37,7 +37,7 @@ crates/
   nuxx-audit          # Hash-chain audit log
   nuxx-media          # Blossom/S3 media storage
   # Agent surface
-  nuxx-acp            # ACP harness bridging Buzz events to AI agents
+  nuxx-acp            # ACP harness bridging Nuxx events to AI agents
   nuxx-agent          # Minimal ACP-compliant agent (non-streaming, tool-calls-as-output)
   nuxx-dev-mcp        # Developer MCP server — shell + file-edit tools
   nuxx-persona        # Agent persona packs
@@ -109,7 +109,7 @@ Additional rules:
 
 ## Key Patterns
 
-**Nostr-first HTTP surface**: Buzz's primary API is NIP-29 over WebSocket. The relay also exposes a narrow HTTP surface: NIP-11/NIP-05 metadata, `POST /events`, `POST /query`, `POST /count`, workflow webhooks at `/hooks/{id}`, Blossom media, git smart HTTP, git policy hooks, and health probes. These HTTP paths all preserve the same host-derived community boundary.
+**Nostr-first HTTP surface**: Nuxx's primary API is NIP-29 over WebSocket. The relay also exposes a narrow HTTP surface: NIP-11/NIP-05 metadata, `POST /events`, `POST /query`, `POST /count`, workflow webhooks at `/hooks/{id}`, Blossom media, git smart HTTP, git policy hooks, and health probes. These HTTP paths all preserve the same host-derived community boundary.
 
 **Prefer Nostr events over new HTTP endpoints**: For new feature work, model
 the operation as a Nostr event (new kind in `nuxx-core/src/kind.rs`, handler
@@ -151,9 +151,9 @@ check existing reply handlers for the pattern.
 ## Agent CLI (`nuxx-cli`)
 
 `nuxx` is the agent-first CLI. Auth env vars
-(`BUZZ_RELAY_URL`, `BUZZ_PRIVATE_KEY`, `BUZZ_AUTH_TAG`) are auto-injected
+(`NUXX_RELAY_URL`, `NUXX_PRIVATE_KEY`, `NUXX_AUTH_TAG`) are auto-injected
 by the ACP harness into managed agent subprocesses. In development, set
-`BUZZ_PRIVATE_KEY` and `BUZZ_RELAY_URL` in your environment manually.
+`NUXX_PRIVATE_KEY` and `NUXX_RELAY_URL` in your environment manually.
 
 ### Building the CLI
 
@@ -182,7 +182,7 @@ All reads return sig-stripped JSON arrays; all writes return
 0=ok, 1=input error, 2=network/relay, 3=auth, 4=other, 5=write conflict (NIP-33 LWW).
 
 `--format compact` is a **global** flag — it goes before the subcommand:
-`buzz --format compact channels list`, NOT `nuxx channels list --format compact`.
+`nuxx --format compact channels list`, NOT `nuxx channels list --format compact`.
 
 See `crates/nuxx-cli/TESTING.md` for the full live-testing runbook.
 

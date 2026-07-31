@@ -1,4 +1,4 @@
-# Multi-Tenant Buzz Relay: A Formal Specification
+# Multi-Tenant Nuxx Relay: A Formal Specification
 
 `draft`
 
@@ -13,7 +13,7 @@ across the relay's logical interface (query results, authorization decisions,
 emitted errors, and audit-chain contents) — and **authorization soundness** — no
 credential, signature, or forged event lets an actor cross a community boundary.
 
-Today a Buzz relay *process* is the security boundary: one `DATABASE_URL`, one
+Today a Nuxx relay *process* is the security boundary: one `DATABASE_URL`, one
 relay keypair, one relay-global `relay_members` table, with `channel_id` (the
 `h` tag) as the only sub-relay locality. The model proven here demotes the relay
 process to stateless compute and elevates a new **community** entity to the
@@ -325,7 +325,7 @@ high-labeled value flows into a low observation"):
   prefixes — `auth-required`, `restricted`, `invalid`, `duplicate`, `pow`,
   `rate-limited`, `blocked`, `error`, `frame-too-large`). Emitting a non-`Σ_err`
   string is a structural code violation (the C2.2 code-fence — a lint, not a model
-  property). Today `RelayError::Database(#[from] buzz_db::DbError)` (`error.rs:11`)
+  property). Today `RelayError::Database(#[from] nuxx_db::DbError)` (`error.rs:11`)
   is the seam. The *unauthenticated/REST* error surface (`not-found`,
   `bad-request`) is a **distinct fence** — C2.4's typed-input constraint, not
   `Σ_err` — because it has no tenant scope and no label, so it sits outside the
@@ -663,7 +663,7 @@ Each axiom is *admitted* per deployment, not assumed universally:
   migration lint asserting `channels.community_id` is never mutated after insert
   (no `UPDATE`/`ALTER`/drop-recreate). A failing lint rejects the deployment.
 - **P-SIG / A_HASH** are the standard Nostr crypto assumptions; admitted by using
-  the audited libraries the rest of Buzz uses.
+  the audited libraries the rest of Nuxx uses.
 - **P3** is admitted by the NIP-98 handler enforcing *both* timestamp-range
   validation and the seen-event-id check (`check_nip98_replay`) before any mint.
   Two structural gates make the seen-set sound, and both are conformance checks
@@ -679,8 +679,8 @@ Each axiom is *admitted* per deployment, not assumed universally:
      be shared across pods (e.g. Redis with the same atomic insert-if-absent
      semantics and TTL ≥ 120 s). The chart default (`replicaCount: 1`) satisfies
      this gate today; the shipped HA examples (`replicaCount: 3` in
-     `deploy/charts/buzz/examples/argocd-app.yaml:27` and
-     `deploy/charts/buzz/examples/flux-helmrelease.yaml:35`) are
+     `deploy/charts/nuxx/examples/argocd-app.yaml:27` and
+     `deploy/charts/nuxx/examples/flux-helmrelease.yaml:35`) are
      P3-non-conforming as shipped unless the operator adds one of:
      - **(a)** an ingress annotation hashing upstream selection on a header stable
        across replays — `nginx.ingress.kubernetes.io/upstream-hash-by:
@@ -961,9 +961,9 @@ The model's obligations map to concrete code seams:
 - **Redis / subscription refinement** — Redis pub/sub keys, presence keys, typing
   keys, cache invalidation channels, and local-echo dedup labels include
   community context in any shared multi-tenant deployment. The safe shape is
-  `buzz:{community}:channel:{channel_id}`,
-  `buzz:{community}:presence:{pubkey}`, and
-  `buzz:{community}:typing:{channel_id}`. The current unprefixed keys are
+  `nuxx:{community}:channel:{channel_id}`,
+  `nuxx:{community}:presence:{pubkey}`, and
+  `nuxx:{community}:typing:{channel_id}`. The current unprefixed keys are
   admissible only for the degenerate single-community deployment or physically
   isolated Redis.
 - **Media / Blossom** — raw blob bytes may remain content-addressed and

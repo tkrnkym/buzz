@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build Sprig — one deploy-anywhere multicall binary for the Buzz ACP
+# Build Sprig — one deploy-anywhere multicall binary for the Nuxx ACP
 # harness, agent, and developer MCP. The archive exposes these command names:
 #
 #   sprig            implementation binary
 #   nuxx-acp       link to sprig (ACP harness)
 #   nuxx-agent     link to sprig (ACP-compliant agent)
 #   nuxx-dev-mcp   link to sprig (developer MCP server; also dispatches
-#                    rg/tree/buzz/git-credential-nostr/git-sign-nostr)
+#                    rg/tree/nuxx/git-credential-nostr/git-sign-nostr)
 #
 # Usage:
 #   ./scripts/build-sprig.sh [version] [target]
@@ -133,18 +133,18 @@ JSON
 cat > "${STAGING}/README.md" <<'README'
 # Sprig
 
-Sprig is the all-in-one Buzz agent binary for deploy-anywhere environments.
+Sprig is the all-in-one Nuxx agent binary for deploy-anywhere environments.
 It exposes the ACP harness, ACP agent, and developer MCP command names as symlinks
 to one multicall binary so shared Rust runtime/TLS code is stored only once.
 
 Commands:
 
 - `sprig` — prints usage/version. Invoke a personality by one of the links below.
-- `nuxx-acp` — ACP harness that bridges Buzz channel events to an
+- `nuxx-acp` — ACP harness that bridges Nuxx channel events to an
   ACP-compliant agent over stdio.
 - `nuxx-agent` — ACP-compliant agent (spawns MCP servers, calls LLMs).
 - `nuxx-dev-mcp` — Developer MCP server (shell, str_replace, todo) and
-  multicall entrypoint for `rg`, `tree`, `buzz`, `git-credential-nostr`,
+  multicall entrypoint for `rg`, `tree`, `nuxx`, `git-credential-nostr`,
   `git-sign-nostr`.
 
 See `sprig.json` for SHA-256s, sizes, target, and source git SHA.
@@ -160,13 +160,13 @@ export PATH="/opt/sprig:$PATH"
 
 ```bash
 # Agent provider
-export BUZZ_AGENT_PROVIDER=anthropic            # or openai
+export NUXX_AGENT_PROVIDER=anthropic            # or openai
 export ANTHROPIC_API_KEY=sk-...
 export ANTHROPIC_MODEL=claude-sonnet-4-20250514
 
-# Nostr identity (shared by nuxx-acp, git auth, signing, and buzz CLI)
+# Nostr identity (shared by nuxx-acp, git auth, signing, and nuxx CLI)
 export NOSTR_PRIVATE_KEY=nsec1...
-export BUZZ_PRIVATE_KEY="$NOSTR_PRIVATE_KEY"
+export NUXX_PRIVATE_KEY="$NOSTR_PRIVATE_KEY"
 export NUXX_RELAY_URL=https://your-relay.example.com
 ```
 README

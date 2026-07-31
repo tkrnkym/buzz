@@ -7,16 +7,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val uploadKeystorePath = providers.environmentVariable("BUZZ_ANDROID_UPLOAD_KEYSTORE_PATH").orNull
-val uploadKeystorePassword = providers.environmentVariable("BUZZ_ANDROID_UPLOAD_KEYSTORE_PASSWORD").orNull
-val uploadKeyAlias = providers.environmentVariable("BUZZ_ANDROID_UPLOAD_KEY_ALIAS").orNull
-val uploadKeyPassword = providers.environmentVariable("BUZZ_ANDROID_UPLOAD_KEY_PASSWORD").orNull
+val uploadKeystorePath = providers.environmentVariable("NUXX_ANDROID_UPLOAD_KEYSTORE_PATH").orNull
+val uploadKeystorePassword = providers.environmentVariable("NUXX_ANDROID_UPLOAD_KEYSTORE_PASSWORD").orNull
+val uploadKeyAlias = providers.environmentVariable("NUXX_ANDROID_UPLOAD_KEY_ALIAS").orNull
+val uploadKeyPassword = providers.environmentVariable("NUXX_ANDROID_UPLOAD_KEY_PASSWORD").orNull
 val uploadSigningValues =
     mapOf(
-        "BUZZ_ANDROID_UPLOAD_KEYSTORE_PATH" to uploadKeystorePath,
-        "BUZZ_ANDROID_UPLOAD_KEYSTORE_PASSWORD" to uploadKeystorePassword,
-        "BUZZ_ANDROID_UPLOAD_KEY_ALIAS" to uploadKeyAlias,
-        "BUZZ_ANDROID_UPLOAD_KEY_PASSWORD" to uploadKeyPassword,
+        "NUXX_ANDROID_UPLOAD_KEYSTORE_PATH" to uploadKeystorePath,
+        "NUXX_ANDROID_UPLOAD_KEYSTORE_PASSWORD" to uploadKeystorePassword,
+        "NUXX_ANDROID_UPLOAD_KEY_ALIAS" to uploadKeyAlias,
+        "NUXX_ANDROID_UPLOAD_KEY_PASSWORD" to uploadKeyPassword,
     )
 val missingUploadSigningValues = uploadSigningValues.filterValues { it.isNullOrBlank() }.keys
 val hasUploadSigning = missingUploadSigningValues.isEmpty()
@@ -53,18 +53,18 @@ if (worktreeIdSuffix != null && !worktreeIdSuffix.matches(Regex("""\.[a-z][a-z0-
 //     pipeline that signs through the central APK Signer service (Cashkite,
 //     BOT-1234). No keystore material may be present in this mode.
 val releaseSigningMode =
-    providers.environmentVariable("BUZZ_ANDROID_RELEASE_SIGNING").orNull ?: "upload-keystore"
+    providers.environmentVariable("NUXX_ANDROID_RELEASE_SIGNING").orNull ?: "upload-keystore"
 val externalReleaseSigning = releaseSigningMode == "external"
 if (releaseSigningMode !in setOf("upload-keystore", "external")) {
     throw GradleException(
-        "BUZZ_ANDROID_RELEASE_SIGNING must be \"upload-keystore\" or \"external\", got: " +
+        "NUXX_ANDROID_RELEASE_SIGNING must be \"upload-keystore\" or \"external\", got: " +
             releaseSigningMode,
     )
 }
 if (externalReleaseSigning && uploadSigningValues.values.any { !it.isNullOrBlank() }) {
     throw GradleException(
-        "BUZZ_ANDROID_RELEASE_SIGNING=external must not be combined with " +
-            "BUZZ_ANDROID_UPLOAD_* credentials; unset one of them.",
+        "NUXX_ANDROID_RELEASE_SIGNING=external must not be combined with " +
+            "NUXX_ANDROID_UPLOAD_* credentials; unset one of them.",
     )
 }
 
@@ -91,7 +91,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        resValue("string", "app_name", "Buzz")
+        resValue("string", "app_name", "Nuxx")
     }
 
     signingConfigs {
@@ -113,7 +113,7 @@ android {
                 applicationIdSuffix = worktreeIdSuffix
             }
             if (worktreeLabel != null) {
-                resValue("string", "app_name", "Buzz ($worktreeLabel)")
+                resValue("string", "app_name", "Nuxx ($worktreeLabel)")
             }
         }
         release {
@@ -139,33 +139,33 @@ gradle.taskGraph.whenReady {
     if (buildsRelease && externalReleaseSigning) {
         // External signing: the unsigned bundle goes to the central APK
         // Signer. All keystore checks are intentionally skipped; the
-        // guard above already rejected any BUZZ_ANDROID_UPLOAD_* values.
+        // guard above already rejected any NUXX_ANDROID_UPLOAD_* values.
         return@whenReady
     }
     if (buildsRelease && !hasUploadSigning) {
         throw GradleException(
             "Release builds require Android upload signing credentials. Missing: " +
                 missingUploadSigningValues.sorted().joinToString(", ") +
-                ". For central APK Signer pipelines set BUZZ_ANDROID_RELEASE_SIGNING=external.",
+                ". For central APK Signer pipelines set NUXX_ANDROID_RELEASE_SIGNING=external.",
         )
     }
     if (buildsRelease) {
         val configuredKeystore = File(requireNotNull(uploadKeystorePath))
         if (!configuredKeystore.isAbsolute) {
             throw GradleException(
-                "BUZZ_ANDROID_UPLOAD_KEYSTORE_PATH must be absolute: $configuredKeystore",
+                "NUXX_ANDROID_UPLOAD_KEYSTORE_PATH must be absolute: $configuredKeystore",
             )
         }
         val keystore = file(configuredKeystore)
         val repositoryRoot = rootProject.projectDir.parentFile.parentFile.canonicalFile
         if (keystore.canonicalFile.toPath().startsWith(repositoryRoot.toPath())) {
             throw GradleException(
-                "BUZZ_ANDROID_UPLOAD_KEYSTORE_PATH must be outside the repository: $keystore",
+                "NUXX_ANDROID_UPLOAD_KEYSTORE_PATH must be outside the repository: $keystore",
             )
         }
         if (!keystore.isFile || !keystore.canRead()) {
             throw GradleException(
-                "BUZZ_ANDROID_UPLOAD_KEYSTORE_PATH is not a readable file: $keystore",
+                "NUXX_ANDROID_UPLOAD_KEYSTORE_PATH is not a readable file: $keystore",
             )
         }
     }

@@ -1,6 +1,6 @@
 //! Git permission types — ref patterns, protection rules, and policy evaluation inputs.
 //!
-//! This module defines the core data types for the Buzz git permission system.
+//! This module defines the core data types for the Nuxx git permission system.
 //! The permission model: channel role = repo role; `nuxx-protect` tags on
 //! kind:30617 add constraints that apply to everyone (including the owner).
 //!
@@ -41,7 +41,7 @@ pub const GIT_NO_CHANNEL_BINDING_BODY: &str =
 
 /// Tag name a repo announcement uses to bind itself to a channel.
 ///
-/// The pre-rename spelling (`buzz-channel`) is no longer recognized. These tag
+/// The pre-rename spelling (`nuxx-channel`) is no longer recognized. These tag
 /// names live inside *signed* kind:30617 events and cannot be rewritten —
 /// re-signing needs the author's key and editing invalidates the signature — so
 /// a repo announced before the rename is no longer bound to its channel and must
@@ -50,7 +50,7 @@ pub const CHANNEL_TAG: &str = "nuxx-channel";
 
 /// Tag name carrying one ref-protection rule.
 ///
-/// The pre-rename spelling (`buzz-protect`) is no longer recognized. As with
+/// The pre-rename spelling (`nuxx-protect`) is no longer recognized. As with
 /// [`CHANNEL_TAG`] the old tag cannot be rewritten in place, so a repo announced
 /// before the rename parses with **no protection rules** — force-push and delete
 /// protection stop applying to it until it is re-announced. That is a silent
@@ -678,7 +678,7 @@ mod tests {
         for name in [
             "protect",
             "nuxx",
-            "buzz",
+            "nuxx",
             "x-nuxx-protect",
             "nuxx-protected",
             "buzz-protect",

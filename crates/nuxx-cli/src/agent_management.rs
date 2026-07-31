@@ -1,4 +1,4 @@
-//! Owner-reviewed agent draft requests published through Buzz observer frames.
+//! Owner-reviewed agent draft requests published through Nuxx observer frames.
 
 use nostr::{Event, Keys, PublicKey};
 use nuxx_core::observer::{encrypt_observer_payload, OBSERVER_FRAME_TELEMETRY};

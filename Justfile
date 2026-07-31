@@ -1,4 +1,4 @@
-# Buzz — development task runner
+# Nuxx — development task runner
 
 set dotenv-load := true
 
@@ -178,7 +178,7 @@ mesh-e2e-hardware:
     cargo run -p nuxx-relay --example mesh_serve_client_smoke
 
 # Three isolated node processes: trusted member joins and infers; stranger is rejected.
-# Uses temp homes and explicit mesh owner keystores. Never reads the Buzz Keychain.
+# Uses temp homes and explicit mesh owner keystores. Never reads the Nuxx Keychain.
 mesh-e2e-admission:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -211,7 +211,7 @@ relay-web: bootstrap _ensure-migrations
     export PATH="{{justfile_directory()}}/bin:$PATH"
     [[ -d node_modules ]] || pnpm install
     pnpm -C web build
-    BUZZ_WEB_DIR=./web/dist cargo run -p nuxx-relay
+    NUXX_WEB_DIR=./web/dist cargo run -p nuxx-relay
 
 # Build and run the private read-only admin dashboard
 admin: bootstrap _ensure-migrations
@@ -220,9 +220,9 @@ admin: bootstrap _ensure-migrations
     export PATH="{{justfile_directory()}}/bin:$PATH"
     [[ -d node_modules ]] || pnpm install
     pnpm -C admin-web build
-    export BUZZ_ADMIN_HOST="${BUZZ_ADMIN_HOST:-admin.localhost:3000}"
-    export BUZZ_ADMIN_WEB_DIR="${BUZZ_ADMIN_WEB_DIR:-{{justfile_directory()}}/admin-web/dist}"
-    echo "Admin dashboard: http://${BUZZ_ADMIN_HOST}/reports"
+    export NUXX_ADMIN_HOST="${NUXX_ADMIN_HOST:-admin.localhost:3000}"
+    export NUXX_ADMIN_WEB_DIR="${NUXX_ADMIN_WEB_DIR:-{{justfile_directory()}}/admin-web/dist}"
+    echo "Admin dashboard: http://${NUXX_ADMIN_HOST}/reports"
     cargo run -p nuxx-relay
 
 # Seed deterministic reports and product feedback for local admin dashboard review
@@ -322,7 +322,7 @@ mobile-dev:
     unset GIT_DIR GIT_WORK_TREE
     flutter run
 
-# Uninstall stale worktree-suffixed Buzz debug installs (production apps kept)
+# Uninstall stale worktree-suffixed Nuxx debug installs (production apps kept)
 mobile-clean:
     ./scripts/mobile-worktree-clean.sh
 
@@ -395,7 +395,7 @@ _release-pr lane version:
             CHANGELOG="crates/nuxx-relay/CHANGELOG.md"
             ADD_FILES=(crates/nuxx-relay/Cargo.toml Cargo.lock crates/nuxx-relay/CHANGELOG.md)
             LOG_PATHS=(crates/nuxx-relay/ crates/nuxx-core/ crates/nuxx-db/ crates/nuxx-auth/ crates/nuxx-pubsub/ crates/nuxx-search/ crates/nuxx-audit/ crates/nuxx-media/ crates/nuxx-sdk/ crates/nuxx-workflow/ crates/nuxx-conformance/ migrations/)
-            ARTIFACT="Buzz Relay" ;;
+            ARTIFACT="Nuxx Relay" ;;
         *)
             echo "Error: unknown release lane '{{ lane }}'"
             exit 1 ;;
@@ -516,8 +516,8 @@ _release-pr lane version:
 
 # ─── Agent Harness ────────────────────────────────────────────────────────────
 
-# Run a goose agent connected to a Buzz relay (foreground)
-goose relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$BUZZ_PRIVATE_KEY":
+# Run a goose agent connected to a Nuxx relay (foreground)
+goose relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$NUXX_PRIVATE_KEY":
     #!/usr/bin/env bash
     set -euo pipefail
     export PATH="{{justfile_directory()}}/bin:$PATH"
@@ -525,7 +525,7 @@ goose relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$BUZZ_
     exec env "${env_args[@]}" ./target/release/nuxx-acp
 
 # Run a goose agent in the background (screen session named 'goose-agent-N')
-goose-bg relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$BUZZ_PRIVATE_KEY":
+goose-bg relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$NUXX_PRIVATE_KEY":
     #!/usr/bin/env bash
     set -euo pipefail
     export PATH="{{justfile_directory()}}/bin:$PATH"
@@ -535,14 +535,14 @@ goose-bg relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$BU
 
 # ─── Benchmarking ─────────────────────────────────────────────────────────────
 
-# Run the Buzz orchestra benchmark — leaderboard-eligible by default (TB 2.1, k=5, Sonnet+Haiku). Stands up its own Docker stack; flags pass to benchmark.py (--dataset/--path, --include-task, --attempts, --manifest, --dry-run, ...)
+# Run the Nuxx orchestra benchmark — leaderboard-eligible by default (TB 2.1, k=5, Sonnet+Haiku). Stands up its own Docker stack; flags pass to benchmark.py (--dataset/--path, --include-task, --attempts, --manifest, --dry-run, ...)
 benchmark *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     export PATH="{{justfile_directory()}}/bin:$PATH"
-    uv run --project benchmarks/harbor-buzz-orchestra/testbed \
-        benchmarks/harbor-buzz-orchestra/scripts/benchmark.py {{ARGS}}
+    uv run --project benchmarks/harbor-nuxx-orchestra/testbed \
+        benchmarks/harbor-nuxx-orchestra/scripts/benchmark.py {{ARGS}}
 
 # Stop the benchmark Docker stack (state and channels are kept)
 benchmark-down:
-    docker compose --project-name buzz-benchmark down
+    docker compose --project-name nuxx-benchmark down

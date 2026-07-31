@@ -39,7 +39,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             <!-- Handle nuxx:// deep links (e.g. nuxx://message?channel=…&id=…).
-                 `buzz` is the pre-rename scheme and stays registered: links
+                 `nuxx` is the pre-rename scheme and stays registered: links
                  carrying it live inside already-signed message events and in
                  links people pasted before the rename, so an installed build
                  must keep answering them. New links are written as `nuxx`. -->

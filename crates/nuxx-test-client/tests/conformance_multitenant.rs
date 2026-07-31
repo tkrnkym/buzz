@@ -665,7 +665,7 @@ mod api_tokens_nip98_replay {
     /// spendable in B" — IS asserted by this test, but as a **positive
     /// control** rather than a mutate-bite. Reasoning:
     ///
-    /// The replay key shape is `buzz:{community}:nip98:{event_id_hex}` (see
+    /// The replay key shape is `nuxx:{community}:nip98:{event_id_hex}` (see
     /// `crates/nuxx-auth/src/nip98_replay.rs:103 nip98_replay_key`). The
     /// community prefix is what makes the key per-community; the
     /// `event_id_hex` is what makes it per-event. **On natural wire traffic
@@ -709,7 +709,7 @@ mod api_tokens_nip98_replay {
     ///
     /// What the tripwire DOES catch: a future regression that globalizes the
     /// seen-set namespace by truncating or normalizing the key (e.g.,
-    /// "simplifying" the key to just `buzz:nip98:{event_id}`, or
+    /// "simplifying" the key to just `nuxx:nip98:{event_id}`, or
     /// canonicalizing `u` in a way that collapses cross-tenant `u` values
     /// into the same event_id) would break the "spend in A doesn't burn the
     /// slot in B" arm even though u-tags differ. The tripwire assertion gives
@@ -918,7 +918,7 @@ mod users_profiles_nip05 {
     use super::*;
 
     use nostr::{EventBuilder, Keys, Kind};
-    use nuxx_test_client::BuzzTestClient;
+    use nuxx_test_client::NuxxTestClient;
 
     /// Convert any base form to `ws(s)://` for WS connect.
     fn to_ws(base: &str) -> String {
@@ -950,7 +950,7 @@ mod users_profiles_nip05 {
     /// relay's ingest side-effect at `crates/nuxx-relay/src/handlers/side_effects.rs::handle_kind0_profile`
     /// also syncs the parsed fields into `users` via
     /// `update_user_profile(tenant.community(), pubkey, ...)`.
-    async fn publish_kind0(client: &mut BuzzTestClient, keys: &Keys, content_json: &str) -> String {
+    async fn publish_kind0(client: &mut NuxxTestClient, keys: &Keys, content_json: &str) -> String {
         let event = EventBuilder::new(Kind::Metadata, content_json)
             .sign_with_keys(keys)
             .unwrap();
@@ -1054,12 +1054,12 @@ mod users_profiles_nip05 {
         let content_b = serde_json::json!({"display_name": "B profile"}).to_string();
 
         // Connect each side, publish each side's kind:0.
-        let mut client_a = BuzzTestClient::connect(&ws_a, &keys)
+        let mut client_a = NuxxTestClient::connect(&ws_a, &keys)
             .await
             .expect("connect A");
         let _id_a = publish_kind0(&mut client_a, &keys, &content_a).await;
 
-        let mut client_b = BuzzTestClient::connect(&ws_b, &keys)
+        let mut client_b = NuxxTestClient::connect(&ws_b, &keys)
             .await
             .expect("connect B");
         let _id_b = publish_kind0(&mut client_b, &keys, &content_b).await;
@@ -1183,12 +1183,12 @@ mod users_profiles_nip05 {
         let content_b = serde_json::json!({"display_name": local, "nip05": handle_b}).to_string();
 
         // Register each pubkey under the same local-part in its own community.
-        let mut client_a = BuzzTestClient::connect(&ws_a, &keys_a)
+        let mut client_a = NuxxTestClient::connect(&ws_a, &keys_a)
             .await
             .expect("connect A");
         let _ = publish_kind0(&mut client_a, &keys_a, &content_a).await;
 
-        let mut client_b = BuzzTestClient::connect(&ws_b, &keys_b)
+        let mut client_b = NuxxTestClient::connect(&ws_b, &keys_b)
             .await
             .expect("connect B");
         let _ = publish_kind0(&mut client_b, &keys_b, &content_b).await;
@@ -1342,7 +1342,7 @@ mod channels_membership {
     use super::*;
 
     use nostr::{EventBuilder, Keys, Kind, Tag};
-    use nuxx_test_client::BuzzTestClient;
+    use nuxx_test_client::NuxxTestClient;
 
     /// Convert any base form to `ws(s)://` for WS connect.
     fn to_ws(base: &str) -> String {
@@ -1420,7 +1420,7 @@ mod channels_membership {
     /// community), so a post to A's channel via A's connection resolves to
     /// A's channel row, never B's.
     async fn post_kind9(
-        client: &mut BuzzTestClient,
+        client: &mut NuxxTestClient,
         keys: &Keys,
         channel_id: &str,
         content: &str,
@@ -1579,12 +1579,12 @@ mod channels_membership {
         let content_b = "B message in shared-UUID channel".to_string();
 
         // Connect each side, post each side's kind:9.
-        let mut client_a = BuzzTestClient::connect(&ws_a, &keys)
+        let mut client_a = NuxxTestClient::connect(&ws_a, &keys)
             .await
             .expect("connect A");
         let _id_a = post_kind9(&mut client_a, &keys, &chan_a, &content_a).await;
 
-        let mut client_b = BuzzTestClient::connect(&ws_b, &keys)
+        let mut client_b = NuxxTestClient::connect(&ws_b, &keys)
             .await
             .expect("connect B");
         let _id_b = post_kind9(&mut client_b, &keys, &chan_b, &content_b).await;
@@ -1955,7 +1955,7 @@ mod search_fts {
     use super::*;
 
     use nostr::{Alphabet, EventBuilder, Filter, Keys, Kind, SingleLetterTag, Tag};
-    use nuxx_test_client::{BuzzTestClient, RelayMessage};
+    use nuxx_test_client::{NuxxTestClient, RelayMessage};
 
     /// Convert an `http(s)://host[:port]` base into the `ws(s)://` form the
     /// websocket client needs. The conformance docstring documents URLs as
@@ -2028,7 +2028,7 @@ mod search_fts {
     /// Post a kind:9 with `content` to `channel_id` over the WS connection
     /// `client`. Returns the event id hex (so we can target it with NIP-09).
     async fn post_kind9(
-        client: &mut BuzzTestClient,
+        client: &mut NuxxTestClient,
         keys: &Keys,
         channel_id: &str,
         content: &str,
@@ -2047,7 +2047,7 @@ mod search_fts {
     /// Run a one-shot NIP-50 search for `token` scoped to `channel_id` and
     /// return the events received before EOSE.
     async fn search_for(
-        client: &mut BuzzTestClient,
+        client: &mut NuxxTestClient,
         channel_id: &str,
         token: &str,
     ) -> Vec<nostr::Event> {
@@ -2166,7 +2166,7 @@ mod search_fts {
         let content_b = format!("B community probe {token}");
 
         // Connect to A, post in A.
-        let mut client_a = BuzzTestClient::connect(&ws_a, &keys)
+        let mut client_a = NuxxTestClient::connect(&ws_a, &keys)
             .await
             .expect("connect A");
         let id_a = post_kind9(&mut client_a, &keys, &chan_a, &content_a).await;
@@ -2174,7 +2174,7 @@ mod search_fts {
         // Connect to B, post in B (same key, same channel UUID, same token —
         // only the community label in the content + the community itself
         // differ).
-        let mut client_b = BuzzTestClient::connect(&ws_b, &keys)
+        let mut client_b = NuxxTestClient::connect(&ws_b, &keys)
             .await
             .expect("connect B");
         let _id_b = post_kind9(&mut client_b, &keys, &chan_b, &content_b).await;
@@ -2291,7 +2291,7 @@ mod pubsub_presence_typing {
     use super::*;
 
     use nostr::{Alphabet, EventBuilder, Filter, Keys, Kind, SingleLetterTag, Tag};
-    use nuxx_test_client::{BuzzTestClient, RelayMessage};
+    use nuxx_test_client::{NuxxTestClient, RelayMessage};
 
     const KIND_PRESENCE_UPDATE: u16 = 20001;
     const KIND_TYPING_INDICATOR: u16 = 20002;
@@ -2358,7 +2358,7 @@ mod pubsub_presence_typing {
         channel_uuid.to_string()
     }
 
-    async fn publish_presence(client: &mut BuzzTestClient, keys: &Keys, status: &str) {
+    async fn publish_presence(client: &mut NuxxTestClient, keys: &Keys, status: &str) {
         let event = EventBuilder::new(Kind::Custom(KIND_PRESENCE_UPDATE), status)
             .sign_with_keys(keys)
             .unwrap();
@@ -2393,7 +2393,7 @@ mod pubsub_presence_typing {
         resp.json().await.expect("parse /query JSON")
     }
 
-    async fn subscribe_typing(client: &mut BuzzTestClient, sub_id: &str, channel_id: &str) {
+    async fn subscribe_typing(client: &mut NuxxTestClient, sub_id: &str, channel_id: &str) {
         let filter = Filter::new()
             .kind(Kind::Custom(KIND_TYPING_INDICATOR))
             .custom_tags(SingleLetterTag::lowercase(Alphabet::H), [channel_id]);
@@ -2413,7 +2413,7 @@ mod pubsub_presence_typing {
     }
 
     async fn publish_typing(
-        client: &mut BuzzTestClient,
+        client: &mut NuxxTestClient,
         keys: &Keys,
         channel_id: &str,
         content: &str,
@@ -2433,7 +2433,7 @@ mod pubsub_presence_typing {
     /// after the expected local event so a cross-community leak has a window to
     /// surface as a second/wrong-content live delivery.
     async fn drain_live_events(
-        client: &mut BuzzTestClient,
+        client: &mut NuxxTestClient,
         sub_id: &str,
         quiet_for: Duration,
     ) -> Vec<nostr::Event> {
@@ -2472,7 +2472,7 @@ mod pubsub_presence_typing {
         );
     }
 
-    /// Obligation: keys are `buzz:{community}:…`; cross-node fan-out never
+    /// Obligation: keys are `nuxx:{community}:…`; cross-node fan-out never
     /// delivers an A event to a B subscription, even for the same channel UUID;
     /// the same pubkey can be online in A and away in B independently.
     ///
@@ -2484,7 +2484,7 @@ mod pubsub_presence_typing {
     ///    → `nuxx_pubsub::get_presence_bulk`). A's query must return only A's
     ///    status and B's only B's. This bites the Redis key format in
     ///    `crates/nuxx-pubsub/src/presence.rs::presence_key`, which must include
-    ///    `ctx.community()` (`buzz:{community}:presence:{pubkey}`). Same pubkey
+    ///    `ctx.community()` (`nuxx:{community}:presence:{pubkey}`). Same pubkey
     ///    is required: it proves the isolation coordinate is community, not key.
     ///
     /// 2. **Typing / subscription fan-out fence.** The same channel UUID is
@@ -2524,10 +2524,10 @@ mod pubsub_presence_typing {
         let keys = Keys::generate();
         let pubkey_hex = keys.public_key().to_hex();
 
-        let mut client_a = BuzzTestClient::connect(&ws_a, &keys)
+        let mut client_a = NuxxTestClient::connect(&ws_a, &keys)
             .await
             .expect("connect A");
-        let mut client_b = BuzzTestClient::connect(&ws_b, &keys)
+        let mut client_b = NuxxTestClient::connect(&ws_b, &keys)
             .await
             .expect("connect B");
 

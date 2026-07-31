@@ -452,7 +452,7 @@ mod tests {
         std::fs::create_dir_all(&skill_dir).unwrap();
         std::fs::write(
             skill_dir.join("SKILL.md"),
-            "---\nname: nuxx-cli\ndescription: CLI reference for Buzz managed agents\n---\nUse `buzz` to manage agents.\n",
+            "---\nname: nuxx-cli\ndescription: CLI reference for Nuxx managed agents\n---\nUse `nuxx` to manage agents.\n",
         )
         .unwrap();
 
@@ -472,12 +472,12 @@ mod tests {
             "missing Available Skills"
         );
         assert!(
-            result.contains("nuxx-cli: CLI reference for Buzz managed agents"),
+            result.contains("nuxx-cli: CLI reference for Nuxx managed agents"),
             "missing skill bullet"
         );
         // Body must NOT be inlined — lazy loading only.
         assert!(
-            !result.contains("Use `buzz` to manage agents."),
+            !result.contains("Use `nuxx` to manage agents."),
             "skill body must not be inlined in system prompt"
         );
         // The load_skill instruction must be present.
