@@ -1,4 +1,4 @@
-mod buzz_agent;
+mod nuxx_agent;
 mod claude;
 mod codex;
 mod goose;

@@ -171,7 +171,7 @@ fn saved_agent_model_discovery_uses_record_snapshot_for_definition_less_agent() 
             "name": "test-agent",
             "private_key_nsec": "nsec1fake",
             "relay_url": "wss://localhost:3000",
-            "acp_command": "buzz-acp",
+            "acp_command": "nuxx-acp",
             "agent_command": "goose",
             "agent_command_override": "goose",
             "agent_args": [],
@@ -364,7 +364,7 @@ fn model_discovery_ignores_stale_record_for_linked_agent() {
             "persona_id": "persona-1",
             "private_key_nsec": "nsec1fake",
             "relay_url": "wss://localhost:3000",
-            "acp_command": "buzz-acp",
+            "acp_command": "nuxx-acp",
             "agent_command": "goose",
             "agent_args": [],
             "mcp_command": "",
@@ -433,7 +433,7 @@ fn model_discovery_ignores_stale_record_for_linked_agent() {
 // Databricks provider detection
 // ---------------------------------------------------------------------------
 //
-// Parse/filter/pagination tests live in crates/buzz-agent/src/catalog.rs
+// Parse/filter/pagination tests live in crates/nuxx-agent/src/catalog.rs
 // (they moved there with the Option C refactor).
 
 // ---------------------------------------------------------------------------
@@ -482,7 +482,7 @@ fn linked_instance_ignores_model_provider_prompt_writes() {
             "persona_id": "p1",
             "private_key_nsec": "nsec1fake",
             "relay_url": "wss://localhost:3000",
-            "acp_command": "buzz-acp",
+            "acp_command": "nuxx-acp",
             "agent_command": "goose",
             "agent_args": [],
             "mcp_command": "",
@@ -533,7 +533,7 @@ fn definition_less_instance_accepts_model_provider_prompt_writes() {
             "name": "standalone-agent",
             "private_key_nsec": "nsec1fake",
             "relay_url": "wss://localhost:3000",
-            "acp_command": "buzz-acp",
+            "acp_command": "nuxx-acp",
             "agent_command": "goose",
             "agent_args": [],
             "mcp_command": "",
@@ -736,9 +736,9 @@ fn openrouter_saved_agent_model_discovery_resolves_provider() {
             "name": "test-agent",
             "private_key_nsec": "nsec1fake",
             "relay_url": "wss://localhost:3000",
-            "acp_command": "buzz-acp",
-            "agent_command": "buzz-agent",
-            "agent_command_override": "buzz-agent",
+            "acp_command": "nuxx-acp",
+            "agent_command": "nuxx-agent",
+            "agent_command_override": "nuxx-agent",
             "agent_args": [],
             "mcp_command": "",
             "turn_timeout_seconds": 320,
@@ -790,7 +790,7 @@ fn openrouter_draft_agent_model_discovery_derives_provider_env() {
     )]);
 
     let merged = draft_agent_model_discovery_env(
-        "buzz-agent",
+        "nuxx-agent",
         Some("openrouter"),
         &BTreeMap::new(),
         &env_vars,
@@ -811,7 +811,7 @@ fn openrouter_draft_agent_model_discovery_derives_provider_env() {
 #[test]
 fn draft_agent_model_discovery_env_omits_provider_when_absent() {
     let merged =
-        draft_agent_model_discovery_env("buzz-agent", None, &BTreeMap::new(), &BTreeMap::new());
+        draft_agent_model_discovery_env("nuxx-agent", None, &BTreeMap::new(), &BTreeMap::new());
     assert!(
         !merged.contains_key("BUZZ_AGENT_PROVIDER"),
         "no provider must be derived when the caller supplies none"
@@ -834,7 +834,7 @@ fn draft_agent_model_discovery_env_layers_all_three_tiers_in_order() {
     // floor, loses to user env.
     let definition_env = BTreeMap::from([
         ("SHARED".to_string(), "from-definition".to_string()),
-        // Collides with tier 1: `buzz-agent`'s own provider env var, which the
+        // Collides with tier 1: `nuxx-agent`'s own provider env var, which the
         // `provider` argument derives below.
         ("BUZZ_AGENT_PROVIDER".to_string(), "openai".to_string()),
         ("USER_OVER_DEF".to_string(), "from-definition".to_string()),
@@ -851,7 +851,7 @@ fn draft_agent_model_discovery_env_layers_all_three_tiers_in_order() {
 
     // Tier 1 (floor): `Some("openrouter")` derives BUZZ_AGENT_PROVIDER.
     let merged = draft_agent_model_discovery_env(
-        "buzz-agent",
+        "nuxx-agent",
         Some("openrouter"),
         &definition_env,
         &env_vars,

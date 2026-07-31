@@ -11,7 +11,7 @@ fn record() -> ManagedAgentRecord {
         auth_tag: None,
         relay_url: "ws://localhost:3000".into(),
         avatar_url: None,
-        acp_command: "buzz-acp".into(),
+        acp_command: "nuxx-acp".into(),
         agent_command: "goose".into(),
         agent_command_override: None,
         agent_args: vec![],

@@ -649,7 +649,7 @@ mod tests {
             auth_tag: None,
             relay_url: "ws://localhost:3000".to_string(),
             avatar_url: None,
-            acp_command: "buzz-acp".to_string(),
+            acp_command: "nuxx-acp".to_string(),
             agent_command: "goose".to_string(),
             agent_args: vec![],
             mcp_command: "".to_string(),
@@ -1084,11 +1084,11 @@ mod tests {
     #[test]
     fn baked_env_allowlist_is_case_insensitive() {
         // Known-safe keys — case-insensitive match must allow them.
-        assert!(super::is_safe_to_reveal("buzz_agent_provider"));
+        assert!(super::is_safe_to_reveal("nuxx_agent_provider"));
         assert!(super::is_safe_to_reveal("BUZZ_AGENT_PROVIDER"));
-        assert!(super::is_safe_to_reveal("buzz_agent_model"));
+        assert!(super::is_safe_to_reveal("nuxx_agent_model"));
         assert!(super::is_safe_to_reveal("BUZZ_AGENT_MODEL"));
-        assert!(super::is_safe_to_reveal("buzz_agent_thinking_effort"));
+        assert!(super::is_safe_to_reveal("nuxx_agent_thinking_effort"));
         assert!(super::is_safe_to_reveal("BUZZ_AGENT_THINKING_EFFORT"));
         assert!(super::is_safe_to_reveal("databricks_host"));
         assert!(super::is_safe_to_reveal("DATABRICKS_HOST"));

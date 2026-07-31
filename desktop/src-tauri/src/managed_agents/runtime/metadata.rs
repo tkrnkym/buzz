@@ -41,7 +41,7 @@ pub(crate) const SESSION_TITLE_ENV_VAR: &str = "BUZZ_ACP_SESSION_TITLE";
 ///
 /// The harness still owns whitespace collapsing, the length cap, and channel
 /// qualification — see `sanitize_session_title` and `compose_session_title` in
-/// `buzz-acp`.
+/// `nuxx-acp`.
 pub(crate) fn resolve_session_title(display_name: Option<&str>, name: &str) -> Option<String> {
     [display_name, Some(name)]
         .into_iter()

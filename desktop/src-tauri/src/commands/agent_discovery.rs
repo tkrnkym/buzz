@@ -194,7 +194,7 @@ pub async fn save_custom_harness(
 /// Remove a user-defined harness definition from `<app-data>/custom_harnesses/`.
 ///
 /// Only `source: custom` harnesses may be deleted. Attempting to delete a
-/// built-in id (goose, claude, codex, buzz-agent) returns an error without
+/// built-in id (goose, claude, codex, nuxx-agent) returns an error without
 /// touching the filesystem.
 #[tauri::command]
 pub async fn delete_custom_harness(id: String, app: tauri::AppHandle) -> Result<(), String> {
@@ -1632,13 +1632,13 @@ mod tests {
         );
     }
 
-    /// buzz-agent has no install commands on any platform.
+    /// nuxx-agent has no install commands on any platform.
     #[test]
-    fn test_buzz_agent_has_no_install_commands() {
-        let buzz = crate::managed_agents::known_acp_runtime_exact("buzz-agent").unwrap();
+    fn test_nuxx_agent_has_no_install_commands() {
+        let buzz = crate::managed_agents::known_acp_runtime_exact("nuxx-agent").unwrap();
         assert!(
             buzz.cli_install_commands_for_os().is_empty(),
-            "buzz-agent ships with the app — must never have install commands"
+            "nuxx-agent ships with the app — must never have install commands"
         );
     }
 
@@ -1823,7 +1823,7 @@ mod tests {
     }
 }
 
-/// Returns the Windows-only Git Bash prerequisite used by buzz-agent's shell MCP.
+/// Returns the Windows-only Git Bash prerequisite used by nuxx-agent's shell MCP.
 /// `None` on other platforms keeps the shared Doctor surfaces platform-neutral.
 #[tauri::command]
 pub async fn discover_git_bash_prerequisite(

@@ -3,7 +3,7 @@ pub(crate) mod agent_events;
 pub(crate) mod agent_snapshot;
 pub(crate) mod team_snapshot;
 pub(crate) use agent_env::{
-    baked_build_env, build_buzz_agent_provider_defaults, discovery_env_with_baked_floor,
+    baked_build_env, build_nuxx_agent_provider_defaults, discovery_env_with_baked_floor,
 };
 mod backend;
 pub(crate) mod config_bridge;

@@ -18,7 +18,7 @@ const GOOSE_AVATAR_URL: &str = "https://goose-docs.ai/img/logo_dark.png";
 const CLAUDE_CODE_AVATAR_URL: &str = "https://anthropic.gallerycdn.vsassets.io/extensions/anthropic/claude-code/2.1.77/1773707456892/Microsoft.VisualStudio.Services.Icons.Default";
 const CODEX_AVATAR_URL: &str = "https://openai.gallerycdn.vsassets.io/extensions/openai/chatgpt/26.5313.41514/1773706730621/Microsoft.VisualStudio.Services.Icons.Default";
 const BUZZ_AGENT_AVATAR_URL: &str =
-    "https://raw.githubusercontent.com/block/buzz/refs/heads/main/crates/buzz-agent/buzz-agent.png";
+    "https://raw.githubusercontent.com/block/buzz/refs/heads/main/crates/nuxx-agent/nuxx-agent.png";
 fn common_binary_paths() -> &'static [PathBuf] {
     static PATHS: OnceLock<Vec<PathBuf>> = OnceLock::new();
     PATHS.get_or_init(|| {
@@ -142,7 +142,7 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
         commands: &["codex-acp"],
         aliases: &[],
         avatar_url: CODEX_AVATAR_URL,
-        mcp_command: Some("buzz-dev-mcp"),
+        mcp_command: Some("nuxx-dev-mcp"),
         mcp_hooks: false,
         underlying_cli: Some("codex"),
         cli_install_commands: &["curl -fsSL https://chatgpt.com/codex/install.sh | sh"],
@@ -170,12 +170,12 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
         auth_probe_args: Some(&["codex", "login", "status"]),
     },
     KnownAcpRuntime {
-        id: "buzz-agent",
+        id: "nuxx-agent",
         label: "Buzz Agent",
-        commands: &["buzz-agent"],
+        commands: &["nuxx-agent"],
         aliases: &[],
         avatar_url: BUZZ_AGENT_AVATAR_URL,
-        mcp_command: Some("buzz-dev-mcp"),
+        mcp_command: Some("nuxx-dev-mcp"),
         mcp_hooks: true,
         underlying_cli: None,
         cli_install_commands: &[],
@@ -273,17 +273,17 @@ pub(crate) fn known_acp_runtime_exact(id: &str) -> Option<&'static KnownAcpRunti
 }
 
 /// The agent command a freshly-created agent defaults to when the create
-/// request supplies none. Resolves the bundled `buzz-agent` from the catalog so
+/// request supplies none. Resolves the bundled `nuxx-agent` from the catalog so
 /// the default cannot drift from the provider definition. Falls back to the id
 /// if the catalog entry is missing.
 ///
 /// The previous default was the bare global `goose`, which is not on PATH on a
 /// stock Windows install: every worker failed with `program not found`. The
-/// bundled `buzz-agent` ships with the app and resolves on every platform.
+/// bundled `nuxx-agent` ships with the app and resolves on every platform.
 pub fn default_agent_command() -> String {
-    known_acp_runtime_exact("buzz-agent")
+    known_acp_runtime_exact("nuxx-agent")
         .and_then(|p| p.commands.first().copied())
-        .unwrap_or("buzz-agent")
+        .unwrap_or("nuxx-agent")
         .to_string()
 }
 
@@ -408,7 +408,7 @@ pub(crate) fn dangling_harness_display(id: &str) -> String {
 /// resolved (i.e. the definition was deleted after the agent was created).
 ///
 /// Returns `Err("DANGLING_HARNESS_ID:<id>")` so callers can surface the error
-/// without falling through to `buzz-agent`.  When there is no runtime id at all
+/// without falling through to `nuxx-agent`.  When there is no runtime id at all
 /// the fallback to `default_agent_command()` is intentional (legacy agents
 /// pre-date the unified harness model).
 pub fn try_record_agent_command(
@@ -464,7 +464,7 @@ fn default_agent_args(command: &str) -> Option<Vec<String>> {
     match normalize_command_identity(command).as_str() {
         "goose" => Some(vec!["acp".to_string()]),
         "codex" | "codex-acp" | "claude-agent-acp" | "claude-code-acp" | "claude-code"
-        | "claudecode" | "buzz-agent" => Some(Vec::new()),
+        | "claudecode" | "nuxx-agent" => Some(Vec::new()),
         _ => None,
     }
 }

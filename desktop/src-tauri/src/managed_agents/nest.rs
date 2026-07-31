@@ -39,8 +39,8 @@ const NEST_DIRS: &[&str] = &[
 /// Fully static — no runtime interpolation, no secrets, no user paths.
 pub(crate) const AGENTS_MD: &str = include_str!("nest_agents.md");
 
-/// Default SKILL.md content for the buzz-cli skill.
-/// Written to ~/.buzz/.agents/skills/buzz-cli/SKILL.md on first init.
+/// Default SKILL.md content for the nuxx-cli skill.
+/// Written to ~/.buzz/.agents/skills/nuxx-cli/SKILL.md on first init.
 const BUZZ_CLI_SKILL_MD: &str = include_str!("nest_skill.md");
 
 /// Template content version for AGENTS.md static content (above managed markers).
@@ -56,7 +56,7 @@ const BEGIN_MARKER: &str = "<!-- BEGIN BUZZ MANAGED";
 const END_MARKER: &str = "<!-- END BUZZ MANAGED -->";
 
 /// Canonical skill directory path relative to the nest root.
-const CANONICAL_SKILL_DIR: &str = ".agents/skills/buzz-cli";
+const CANONICAL_SKILL_DIR: &str = ".agents/skills/nuxx-cli";
 
 /// Nest directory name for production builds.
 const NEST_DIR_PROD: &str = ".buzz";
@@ -144,9 +144,9 @@ pub fn ensure_nest() -> Result<(), String> {
 ///
 /// - Creates the root directory and all subdirectories.
 /// - Writes `AGENTS.md` only if it doesn't already exist.
-/// - Writes `.agents/skills/buzz-cli/SKILL.md` only if it doesn't already exist.
+/// - Writes `.agents/skills/nuxx-cli/SKILL.md` only if it doesn't already exist.
 /// - Creates harness-specific symlinks pointing to the canonical
-///   `.agents/skills/buzz-cli` directory for each known provider.
+///   `.agents/skills/nuxx-cli` directory for each known provider.
 /// - Sets 700 permissions on the root, all subdirectories, and the skill
 ///   directory tree (Unix).
 ///
@@ -210,7 +210,7 @@ pub fn ensure_nest_at(root: &Path) -> Result<(), String> {
         }
     }
 
-    // Write buzz-cli skill to the harness-agnostic .agents path.
+    // Write nuxx-cli skill to the harness-agnostic .agents path.
     // The first-init write uses the new canonical path; migration from
     // the old .claude path is handled in refresh_skill_md_if_stale.
     let agents_skill_dir = root.join(CANONICAL_SKILL_DIR);
@@ -235,7 +235,7 @@ pub fn ensure_nest_at(root: &Path) -> Result<(), String> {
     }
 
     // Create harness-specific symlinks for all known providers.
-    // Migration of the old .claude/skills/buzz-cli real dir is handled in
+    // Migration of the old .claude/skills/nuxx-cli real dir is handled in
     // refresh_skill_md_if_stale; ensure_skill_symlinks skips paths that already exist.
     ensure_skill_symlinks(root)?;
 
@@ -315,7 +315,7 @@ fn ensure_skill_symlinks(root: &Path) -> Result<(), String> {
     for skill_dir in known_skill_dirs() {
         let parent = root.join(skill_dir);
         fs::create_dir_all(&parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
-        let link = parent.join("buzz-cli");
+        let link = parent.join("nuxx-cli");
         if link.symlink_metadata().is_ok() {
             continue; // symlink or real path exists — skip
         }
@@ -470,16 +470,16 @@ fn refresh_agents_md_if_stale(root: &Path) -> Result<(), String> {
 ///
 /// SKILL.md has no user-editable sections — it is fully overwritten on version bump.
 fn refresh_skill_md_if_stale(root: &Path) -> Result<(), String> {
-    let agents_skill_dir = root.join(".agents/skills/buzz-cli");
+    let agents_skill_dir = root.join(".agents/skills/nuxx-cli");
     let version_path = agents_skill_dir.join(".skill-version");
     if read_version_file(&version_path) >= NEST_SKILL_VERSION {
         return Ok(());
     }
 
-    // Migration: if .claude/skills/buzz-cli exists as a real directory
+    // Migration: if .claude/skills/nuxx-cli exists as a real directory
     // (pre-migration install), copy user's SKILL.md to the new location
     // then remove the old directory so we can replace it with a symlink.
-    let old_skill_dir = root.join(".claude/skills/buzz-cli");
+    let old_skill_dir = root.join(".claude/skills/nuxx-cli");
     let old_is_real_dir = old_skill_dir
         .symlink_metadata()
         .map(|m| m.file_type().is_dir())
@@ -515,13 +515,13 @@ fn refresh_skill_md_if_stale(root: &Path) -> Result<(), String> {
             .map_err(|e| format!("remove {}: {e}", old_skill_dir.display()))?;
     }
 
-    // Create/replace the .claude/skills/buzz-cli symlink.
+    // Create/replace the .claude/skills/nuxx-cli symlink.
     #[cfg(unix)]
     {
         let claude_skills_dir = root.join(".claude/skills");
         fs::create_dir_all(&claude_skills_dir)
             .map_err(|e| format!("create {}: {e}", claude_skills_dir.display()))?;
-        let symlink_path = root.join(".claude/skills/buzz-cli");
+        let symlink_path = root.join(".claude/skills/nuxx-cli");
         // Remove any stale symlink before (re)creating.
         let symlink_exists = symlink_path
             .symlink_metadata()
@@ -532,7 +532,7 @@ fn refresh_skill_md_if_stale(root: &Path) -> Result<(), String> {
                 .map_err(|e| format!("remove symlink {}: {e}", symlink_path.display()))?;
         }
         create_symlink(
-            std::path::Path::new("../../.agents/skills/buzz-cli"),
+            std::path::Path::new("../../.agents/skills/nuxx-cli"),
             &symlink_path,
         )
         .map_err(|e| format!("symlink {}: {e}", symlink_path.display()))?;

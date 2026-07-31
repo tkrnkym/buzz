@@ -85,10 +85,10 @@ zeroize = "1"
 reqwest = { version = "0.13", features = ["json", "query", "stream", "blocking"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std"] }
 url = "2"
-buzz_core_pkg = { package = "buzz-core", path = "../../crates/buzz-core" }
-buzz_persona_pkg = { package = "buzz-persona", path = "../../crates/buzz-persona" }
-buzz_sdk_pkg = { package = "buzz-sdk", path = "../../crates/buzz-sdk" }
-buzz_agent_pkg = { package = "buzz-agent", path = "../../crates/buzz-agent" }
+nuxx_core_pkg = { package = "nuxx-core", path = "../../crates/nuxx-core" }
+nuxx_persona_pkg = { package = "nuxx-persona", path = "../../crates/nuxx-persona" }
+nuxx_sdk_pkg = { package = "nuxx-sdk", path = "../../crates/nuxx-sdk" }
+nuxx_agent_pkg = { package = "nuxx-agent", path = "../../crates/nuxx-agent" }
 iroh = { version = "1.0.2", optional = true }
 mesh-llm-sdk = { git = "https://github.com/Mesh-LLM/mesh-llm.git", rev = "f455d493a2ae82baf2a326e2d0fda351433b4b30", package = "mesh-llm-sdk", default-features = false, features = ["client", "serving"], optional = true }
 mesh-llm-host-runtime = { git = "https://github.com/Mesh-LLM/mesh-llm.git", rev = "f455d493a2ae82baf2a326e2d0fda351433b4b30", package = "mesh-llm-host-runtime", default-features = false, features = ["dynamic-native-runtime"], optional = true }
@@ -133,4 +133,4 @@ tracing = "0.1"
 tokio = { version = "1", features = ["test-util"] }
 # The relay's media validation, so the snapshot-sharing tests can prove the
 # full export → sanitize → relay-accept → import contract end to end.
-buzz_media_pkg = { package = "buzz-media", path = "../../crates/buzz-media" }
+nuxx_media_pkg = { package = "nuxx-media", path = "../../crates/nuxx-media" }

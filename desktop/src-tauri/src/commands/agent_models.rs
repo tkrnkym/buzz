@@ -28,7 +28,7 @@ use crate::{
     util::now_iso,
 };
 
-/// Query available models from an agent via `buzz-acp models --json`.
+/// Query available models from an agent via `nuxx-acp models --json`.
 ///
 /// Spawns a short-lived subprocess (no relay connection needed). The subprocess
 /// starts the agent, queries its model catalog, and exits. ~2-5s total.
@@ -685,7 +685,7 @@ async fn discover_anthropic_models(
 // Databricks model discovery (v1 + v2)
 // ---------------------------------------------------------------------------
 //
-// Delegates to buzz_agent_pkg::catalog::discover_databricks_models, which
+// Delegates to nuxx_agent_pkg::catalog::discover_databricks_models, which
 // acquires auth in-process via build_token_source:
 //   - Static bearer (DATABRICKS_TOKEN): returned immediately.
 //   - PKCE cache hit: returned from disk without a browser flow.
@@ -702,13 +702,13 @@ fn is_databricks_provider(provider: Option<&str>) -> bool {
     )
 }
 
-fn databricks_agent_provider(provider: &str) -> buzz_agent_pkg::config::Provider {
+fn databricks_agent_provider(provider: &str) -> nuxx_agent_pkg::config::Provider {
     if provider.trim().eq_ignore_ascii_case("databricks_v2")
         || provider.trim().eq_ignore_ascii_case("databricks-v2")
     {
-        buzz_agent_pkg::config::Provider::DatabricksV2
+        nuxx_agent_pkg::config::Provider::DatabricksV2
     } else {
-        buzz_agent_pkg::config::Provider::Databricks
+        nuxx_agent_pkg::config::Provider::Databricks
     }
 }
 
@@ -732,15 +732,15 @@ async fn discover_databricks_models(
     let api_key = env_or_process_value(env, "DATABRICKS_TOKEN").unwrap_or_default();
 
     let agent_provider = databricks_agent_provider(provider_str);
-    let cfg = buzz_agent_pkg::config::Config::for_discovery(agent_provider, api_key, host);
+    let cfg = nuxx_agent_pkg::config::Config::for_discovery(agent_provider, api_key, host);
 
     // Build a redaction env so the token never appears in surfaced errors.
     let token_for_redact = env_or_process_value(env, "DATABRICKS_TOKEN").unwrap_or_default();
     let redaction_env = redaction_env_with_value(env, "DATABRICKS_TOKEN", &token_for_redact);
 
-    let entries = match buzz_agent_pkg::discover_databricks_models(&cfg).await {
+    let entries = match nuxx_agent_pkg::discover_databricks_models(&cfg).await {
         Ok(e) => e,
-        Err(buzz_agent_pkg::AgentError::LlmAuth(_)) => {
+        Err(nuxx_agent_pkg::AgentError::LlmAuth(_)) => {
             // No token + no PKCE cache → fall through to subprocess.
             return Ok(None);
         }
@@ -1016,7 +1016,7 @@ pub async fn update_managed_agent(
 
 // ── Model normalization ───────────────────────────────────────────────────────
 
-/// Normalize raw `buzz-acp models --json` output into a typed DTO for the frontend.
+/// Normalize raw `nuxx-acp models --json` output into a typed DTO for the frontend.
 ///
 /// Merges models from both ACP paths (stable configOptions + unstable SessionModelState),
 /// deduplicates by ID (stable takes precedence), and returns a unified list.

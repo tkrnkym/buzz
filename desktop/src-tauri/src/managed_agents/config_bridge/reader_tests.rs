@@ -71,7 +71,7 @@ fn test_record() -> ManagedAgentRecord {
         auth_tag: None,
         relay_url: "ws://localhost:3000".to_string(),
         avatar_url: None,
-        acp_command: "buzz-acp".to_string(),
+        acp_command: "nuxx-acp".to_string(),
         agent_command: "goose".to_string(),
         agent_args: vec![],
         mcp_command: "".to_string(),
@@ -598,18 +598,18 @@ fn extra_env_var_skipped_when_already_in_file_config_extra() {
     );
 }
 
-// ── buzz-agent normalized env-var field tests ───────────────────────────────
+// ── nuxx-agent normalized env-var field tests ───────────────────────────────
 //
-// buzz-agent uses env vars (not a config file) for max_output_tokens and
+// nuxx-agent uses env vars (not a config file) for max_output_tokens and
 // context_limit. build_numeric_env_field must surface these as BuzzExplicit
 // when the env var is present in record.env_vars, and must not double-surface
 // them in the advanced tier.
 
-fn buzz_agent_runtime() -> &'static KnownAcpRuntime {
+fn nuxx_agent_runtime() -> &'static KnownAcpRuntime {
     &KnownAcpRuntime {
-        id: "buzz-agent",
+        id: "nuxx-agent",
         label: "Buzz Agent",
-        commands: &["buzz-agent"],
+        commands: &["nuxx-agent"],
         aliases: &[],
         avatar_url: "",
         mcp_command: None,
@@ -641,13 +641,13 @@ fn buzz_agent_runtime() -> &'static KnownAcpRuntime {
 }
 
 #[test]
-fn buzz_agent_max_output_tokens_from_env_is_buzz_explicit() {
+fn nuxx_agent_max_output_tokens_from_env_is_buzz_explicit() {
     let mut record = test_record();
     record.env_vars.insert(
         "BUZZ_AGENT_MAX_OUTPUT_TOKENS".to_string(),
         "8192".to_string(),
     );
-    let runtime = buzz_agent_runtime();
+    let runtime = nuxx_agent_runtime();
 
     let surface = read_config_surface(&record, Some(runtime), None, None);
 
@@ -662,13 +662,13 @@ fn buzz_agent_max_output_tokens_from_env_is_buzz_explicit() {
 }
 
 #[test]
-fn buzz_agent_context_limit_from_env_is_buzz_explicit() {
+fn nuxx_agent_context_limit_from_env_is_buzz_explicit() {
     let mut record = test_record();
     record.env_vars.insert(
         "BUZZ_AGENT_MAX_CONTEXT_TOKENS".to_string(),
         "100000".to_string(),
     );
-    let runtime = buzz_agent_runtime();
+    let runtime = nuxx_agent_runtime();
 
     let surface = read_config_surface(&record, Some(runtime), None, None);
 
@@ -683,10 +683,10 @@ fn buzz_agent_context_limit_from_env_is_buzz_explicit() {
 }
 
 #[test]
-fn buzz_agent_max_tokens_absent_when_no_env_var_or_file() {
-    // buzz-agent has no config file, and env var is not set.
+fn nuxx_agent_max_tokens_absent_when_no_env_var_or_file() {
+    // nuxx-agent has no config file, and env var is not set.
     let record = test_record();
-    let runtime = buzz_agent_runtime();
+    let runtime = nuxx_agent_runtime();
 
     let surface = read_config_surface(&record, Some(runtime), None, None);
 
@@ -701,7 +701,7 @@ fn buzz_agent_max_tokens_absent_when_no_env_var_or_file() {
 }
 
 #[test]
-fn buzz_agent_max_tokens_env_var_not_double_surfaced_in_advanced() {
+fn nuxx_agent_max_tokens_env_var_not_double_surfaced_in_advanced() {
     let mut record = test_record();
     record.env_vars.insert(
         "BUZZ_AGENT_MAX_OUTPUT_TOKENS".to_string(),
@@ -711,7 +711,7 @@ fn buzz_agent_max_tokens_env_var_not_double_surfaced_in_advanced() {
         "BUZZ_AGENT_MAX_CONTEXT_TOKENS".to_string(),
         "50000".to_string(),
     );
-    let runtime = buzz_agent_runtime();
+    let runtime = nuxx_agent_runtime();
 
     let surface = read_config_surface(&record, Some(runtime), None, None);
 
@@ -727,12 +727,12 @@ fn buzz_agent_max_tokens_env_var_not_double_surfaced_in_advanced() {
 }
 
 #[test]
-fn buzz_agent_thinking_effort_from_env_is_buzz_explicit() {
+fn nuxx_agent_thinking_effort_from_env_is_buzz_explicit() {
     let mut record = test_record();
     record
         .env_vars
         .insert("BUZZ_AGENT_THINKING_EFFORT".to_string(), "high".to_string());
-    let runtime = buzz_agent_runtime();
+    let runtime = nuxx_agent_runtime();
 
     let surface = read_config_surface(&record, Some(runtime), None, None);
 
@@ -747,13 +747,13 @@ fn buzz_agent_thinking_effort_from_env_is_buzz_explicit() {
 }
 
 #[test]
-fn buzz_agent_thinking_effort_env_var_not_double_surfaced_in_advanced() {
+fn nuxx_agent_thinking_effort_env_var_not_double_surfaced_in_advanced() {
     let mut record = test_record();
     record.env_vars.insert(
         "BUZZ_AGENT_THINKING_EFFORT".to_string(),
         "medium".to_string(),
     );
-    let runtime = buzz_agent_runtime();
+    let runtime = nuxx_agent_runtime();
 
     let surface = read_config_surface(&record, Some(runtime), None, None);
 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use tauri::AppHandle;
 
-use super::agent_env::build_buzz_agent_provider_defaults;
+use super::agent_env::build_nuxx_agent_provider_defaults;
 
 use crate::{
     managed_agents::{
@@ -552,7 +552,7 @@ pub fn spawn_agent_child(
     // Augment PATH for DMG launches so child processes can find:
     //   - bundled CLI via ~/.local/bin symlink
     //   - nvm-managed node/npm (nvm initializes only in interactive shells)
-    //   - bundled sidecars (buzz, buzz-acp, etc.) via exe parent (Contents/MacOS/)
+    //   - bundled sidecars (buzz, nuxx-acp, etc.) via exe parent (Contents/MacOS/)
     //   - runtimes (node, python, etc.) via login shell PATH
     let nvm_bin = dirs::home_dir()
         .as_deref()
@@ -601,16 +601,16 @@ pub fn spawn_agent_child(
     //
     // Build the effective env the agent would have at start-time, run the
     // readiness predicate, and if anything is missing, serialize the payload
-    // into BUZZ_ACP_SETUP_PAYLOAD.  buzz-acp detects this env var on startup
+    // into BUZZ_ACP_SETUP_PAYLOAD.  nuxx-acp detects this env var on startup
     // and enters the minimal setup-listener mode instead of the agent pool.
     //
     // SECURITY: BUZZ_ACP_SETUP_PAYLOAD is in RESERVED_ENV_KEYS so user env
     // cannot set it, but we also explicitly remove it after writing user env
     // to guard against the parent-process environment. We then set it only
     // when desktop has computed NotReady — the desktop is the sole readiness
-    // source and buzz-acp only transports the payload.
+    // source and nuxx-acp only transports the payload.
     //
-    // The JSON format mirrors `setup_mode::SetupPayload` in buzz-acp:
+    // The JSON format mirrors `setup_mode::SetupPayload` in nuxx-acp:
     //   { "agent_name": "...", "agent_pubkey": "...", "requirements": [{ "surface": "...", ... }] }
     //
     // `spawned_setup_mode` is captured outside the block so it can be stamped
@@ -714,8 +714,8 @@ pub fn spawn_agent_child(
         }
     }
     // Only emit BUZZ_ACP_IDLE_TIMEOUT when the user has explicitly set an
-    // override. When unset, the buzz-acp harness applies its own default
-    // (see `DEFAULT_IDLE_TIMEOUT_SECS` in crates/buzz-acp/src/config.rs),
+    // override. When unset, the nuxx-acp harness applies its own default
+    // (see `DEFAULT_IDLE_TIMEOUT_SECS` in crates/nuxx-acp/src/config.rs),
     // which is the single source of truth. The previously-emitted
     // `BUZZ_ACP_TURN_TIMEOUT` is deprecated upstream and was pinning every
     // agent to the desktop's stale default (320s), bypassing harness bumps.
@@ -778,7 +778,7 @@ pub fn spawn_agent_child(
     } else {
         command.env_remove(SESSION_TITLE_ENV_VAR);
     }
-    build_buzz_agent_provider_defaults(&mut command);
+    build_nuxx_agent_provider_defaults(&mut command);
     if let Some(meta) = runtime_meta {
         for (key, value) in runtime_metadata_env_vars(
             meta.model_env_var,
@@ -895,7 +895,7 @@ pub fn spawn_agent_child(
         command.process_group(0);
     }
     // Windows: suppress the harness console window. Without this a bare
-    // terminal pops for buzz-acp.exe and lingers (the app itself sets
+    // terminal pops for nuxx-acp.exe and lingers (the app itself sets
     // windows_subsystem="windows", but the spawned child does not inherit it).
     #[cfg(windows)]
     {
@@ -965,9 +965,9 @@ pub fn spawn_agent_child(
 
 fn child_rust_log_filter() -> String {
     match std::env::var("RUST_LOG") {
-        Ok(existing) if existing.contains("buzz_acp") => existing,
-        Ok(existing) if !existing.trim().is_empty() => format!("{existing},buzz_acp=info"),
-        _ => "buzz_acp=info".to_string(),
+        Ok(existing) if existing.contains("nuxx_acp") => existing,
+        Ok(existing) if !existing.trim().is_empty() => format!("{existing},nuxx_acp=info"),
+        _ => "nuxx_acp=info".to_string(),
     }
 }
 

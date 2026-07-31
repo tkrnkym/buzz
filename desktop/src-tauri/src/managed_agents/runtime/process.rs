@@ -6,10 +6,10 @@ use super::*;
 /// variants are listed because macOS `proc_name()` and Linux `/proc/comm`
 /// may report either form depending on how the binary was built.
 pub(crate) const KNOWN_AGENT_BINARIES: &[&str] = &[
-    "buzz-acp",
-    "buzz_acp",
-    "buzz-agent",
-    "buzz_agent",
+    "nuxx-acp",
+    "nuxx_acp",
+    "nuxx-agent",
+    "nuxx_agent",
     "claude-agent-acp",
     "claude_agent_acp",
     "claude-code-acp",
@@ -17,11 +17,11 @@ pub(crate) const KNOWN_AGENT_BINARIES: &[&str] = &[
     "codex-acp",
     "codex_acp",
     "goose",
-    // buzz-dev-mcp's multicall personalities (rg, tree, buzz,
+    // nuxx-dev-mcp's multicall personalities (rg, tree, buzz,
     // git-credential-nostr, git-sign-nostr) are short-lived per-tool-call
     // invocations — not listed here.
-    "buzz-dev-mcp",
-    "buzz_dev_mcp",
+    "nuxx-dev-mcp",
+    "nuxx_dev_mcp",
 ];
 
 /// Script interpreters that may host managed agent wrappers (e.g. npm shims).
@@ -307,7 +307,7 @@ fn sigterm_then_sigkill(pids: &[i32]) {
 }
 
 /// Resolve orphan candidate PIDs to their actual process group IDs, dedupe,
-/// and signal the groups. An orphaned grandchild (e.g. `goose` or `buzz-dev-mcp`)
+/// and signal the groups. An orphaned grandchild (e.g. `goose` or `nuxx-dev-mcp`)
 /// whose harness has exited retains the harness's PGID — signaling that PGID
 /// kills the entire orphaned subtree. Falls back to the candidate PID itself
 /// when PGID resolution fails (process may have exited between detection and

@@ -1,31 +1,31 @@
 [workspace]
 members = [
-    "crates/buzz-relay",
-    "crates/buzz-core",
-    "crates/buzz-conformance",
-    "crates/buzz-push-gateway",
-    "crates/buzz-db",
-    "crates/buzz-pubsub",
-    "crates/buzz-auth",
-    "crates/buzz-search",
-    "crates/buzz-audit",
-    "crates/buzz-acp",
-    "crates/buzz-agent",
+    "crates/nuxx-relay",
+    "crates/nuxx-core",
+    "crates/nuxx-conformance",
+    "crates/nuxx-push-gateway",
+    "crates/nuxx-db",
+    "crates/nuxx-pubsub",
+    "crates/nuxx-auth",
+    "crates/nuxx-search",
+    "crates/nuxx-audit",
+    "crates/nuxx-acp",
+    "crates/nuxx-agent",
     "crates/sprig",
-    "crates/buzz-test-client",
-    "crates/buzz-ws-client",
-    "crates/buzz-admin",
-    "crates/buzz-workflow",
-    "crates/buzz-media",
-    "crates/buzz-cli",
-    "crates/buzz-pairing-cli",
-    "crates/buzz-sdk",
-    "crates/buzz-persona",
+    "crates/nuxx-test-client",
+    "crates/nuxx-ws-client",
+    "crates/nuxx-admin",
+    "crates/nuxx-workflow",
+    "crates/nuxx-media",
+    "crates/nuxx-cli",
+    "crates/nuxx-pairing-cli",
+    "crates/nuxx-sdk",
+    "crates/nuxx-persona",
     "crates/git-credential-nostr",
     "crates/git-sign-nostr",
-    "crates/buzz-pair-relay",
-    "crates/buzz-relay-mesh",
-    "crates/buzz-dev-mcp",
+    "crates/nuxx-pair-relay",
+    "crates/nuxx-relay-mesh",
+    "crates/nuxx-dev-mcp",
     "examples/countdown-bot",
 ]
 exclude = ["desktop/src-tauri"]
@@ -64,7 +64,7 @@ nostr = { version = "0.44", features = ["nip44", "nip98"] }
 serde       = { version = "1", features = ["derive"] }
 postcard    = { version = "1", default-features = false, features = ["use-std"] }
 
-# Inter-relay mesh transport (buzz-relay-mesh)
+# Inter-relay mesh transport (nuxx-relay-mesh)
 iroh = { version = "1.0.0-rc.0", default-features = false, features = ["tls-ring"] }
 serde_json  = "1"
 serde_yaml  = "0.9"
@@ -118,23 +118,23 @@ url = "2"
 # Property-based testing (dev-only)
 proptest = "1"
 
-# MCP SDK (used by buzz-dev-mcp and buzz-agent)
+# MCP SDK (used by nuxx-dev-mcp and nuxx-agent)
 rmcp = { version = "1.1.0", features = ["server", "transport-io", "macros"] }
 schemars = { version = "1", default-features = false }
 
 # Internal crates
-buzz-core = { path = "crates/buzz-core" }
-buzz-conformance = { path = "crates/buzz-conformance" }
-buzz-db = { path = "crates/buzz-db" }
-buzz-auth = { path = "crates/buzz-auth" }
-buzz-pubsub = { path = "crates/buzz-pubsub" }
-buzz-search = { path = "crates/buzz-search" }
-buzz-audit = { path = "crates/buzz-audit" }
-buzz-workflow = { path = "crates/buzz-workflow" }
-buzz-media = { path = "crates/buzz-media" }
-buzz-sdk = { path = "crates/buzz-sdk" }
-buzz-ws-client = { path = "crates/buzz-ws-client" }
-buzz-relay-mesh = { path = "crates/buzz-relay-mesh" }
+nuxx-core = { path = "crates/nuxx-core" }
+nuxx-conformance = { path = "crates/nuxx-conformance" }
+nuxx-db = { path = "crates/nuxx-db" }
+nuxx-auth = { path = "crates/nuxx-auth" }
+nuxx-pubsub = { path = "crates/nuxx-pubsub" }
+nuxx-search = { path = "crates/nuxx-search" }
+nuxx-audit = { path = "crates/nuxx-audit" }
+nuxx-workflow = { path = "crates/nuxx-workflow" }
+nuxx-media = { path = "crates/nuxx-media" }
+nuxx-sdk = { path = "crates/nuxx-sdk" }
+nuxx-ws-client = { path = "crates/nuxx-ws-client" }
+nuxx-relay-mesh = { path = "crates/nuxx-relay-mesh" }
 
 # CI profile — builds the relay for desktop e2e. Dependencies keep full
 # release optimization (warm from main's cache; they carry the runtime hot

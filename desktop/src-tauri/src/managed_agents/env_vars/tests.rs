@@ -437,7 +437,7 @@ fn is_derived_key_matches_all_known_keys() {
 fn is_derived_key_is_case_insensitive() {
     assert!(is_derived_provider_model_key("goose_model"));
     assert!(is_derived_provider_model_key("Goose_Provider"));
-    assert!(is_derived_provider_model_key("buzz_agent_model"));
+    assert!(is_derived_provider_model_key("nuxx_agent_model"));
     assert!(is_derived_provider_model_key("BUZZ_AGENT_PROVIDER"));
 }
 

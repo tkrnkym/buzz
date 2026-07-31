@@ -85,22 +85,22 @@ fn marker_entry_is_namespaced_by_instance_id() {
 }
 
 #[test]
-fn buzz_agent_has_mcp_hooks() {
-    let p = known_acp_runtime("buzz-agent").expect("should resolve");
+fn nuxx_agent_has_mcp_hooks() {
+    let p = known_acp_runtime("nuxx-agent").expect("should resolve");
     assert!(p.mcp_hooks);
-    assert_eq!(p.mcp_command, Some("buzz-dev-mcp"));
+    assert_eq!(p.mcp_command, Some("nuxx-dev-mcp"));
 }
 
 #[test]
-fn buzz_agent_resolved_via_path() {
-    assert!(known_acp_runtime("/usr/local/bin/buzz-agent").is_some_and(|p| p.mcp_hooks));
+fn nuxx_agent_resolved_via_path() {
+    assert!(known_acp_runtime("/usr/local/bin/nuxx-agent").is_some_and(|p| p.mcp_hooks));
 }
 
 #[test]
 fn codex_has_mcp_command() {
     let p = known_acp_runtime("codex-acp").expect("should resolve");
     assert!(!p.mcp_hooks, "codex-acp does not handle MCP_HOOK_SERVERS");
-    assert_eq!(p.mcp_command, Some("buzz-dev-mcp"));
+    assert_eq!(p.mcp_command, Some("nuxx-dev-mcp"));
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn fixture(
         auth_tag,
         relay_url: "ws://localhost:3000".into(),
         avatar_url: None,
-        acp_command: "buzz-acp".into(),
+        acp_command: "nuxx-acp".into(),
         agent_command: "goose".into(),
         agent_command_override: None,
         agent_args: vec![],
@@ -546,7 +546,7 @@ fn runtime_metadata_env_vars_skips_provider_when_locked() {
 
 #[test]
 fn runtime_metadata_env_vars_injects_model_even_with_acp_model_switching() {
-    // buzz-agent has supports_acp_model_switching=true but we still inject
+    // nuxx-agent has supports_acp_model_switching=true but we still inject
     // the model env var because ACP model switching is post-bootstrap
     let vars = runtime_metadata_env_vars(
         Some("BUZZ_AGENT_MODEL"),
@@ -613,7 +613,7 @@ fn claude_spawn_uses_the_probed_cli_executable() {
     let original_path = std::env::var_os("PATH");
     std::env::set_var("PATH", temp.path());
 
-    let mut command = std::process::Command::new("buzz-acp");
+    let mut command = std::process::Command::new("nuxx-acp");
     super::configure_runtime_cli(&mut command, super::known_acp_runtime("claude-agent-acp"));
 
     if let Some(path) = original_path {
@@ -628,7 +628,7 @@ fn claude_spawn_uses_the_probed_cli_executable() {
 
 #[test]
 fn codex_spawn_does_not_set_a_claude_executable() {
-    let mut command = std::process::Command::new("buzz-acp");
+    let mut command = std::process::Command::new("nuxx-acp");
     super::configure_runtime_cli(&mut command, super::known_acp_runtime("codex-acp"));
     assert!(!command
         .get_envs()
@@ -708,7 +708,7 @@ fn grandchild_inherits_pgid_of_process_group_leader() {
     // Spawn a "harness" process in its own process group (mirrors
     // `command.process_group(0)` in the real spawn path). The harness
     // spawns an intermediate child which in turn spawns a grandchild.
-    // This mirrors the real tree: buzz-acp → goose → buzz-dev-mcp.
+    // This mirrors the real tree: nuxx-acp → goose → nuxx-dev-mcp.
     //
     // The intermediate `sh` backgrounds the grandchild and echoes its PID,
     // so the grandchild's ppid is the intermediate (not the harness).
@@ -1229,8 +1229,8 @@ fn minimal_record(pubkey: &str) -> crate::managed_agents::ManagedAgentRecord {
             "name": "test",
             "private_key_nsec": "nsec1fake",
             "relay_url": "",
-            "acp_command": "buzz-acp",
-            "agent_command": "buzz-agent",
+            "acp_command": "nuxx-acp",
+            "agent_command": "nuxx-agent",
             "agent_args": [],
             "mcp_command": "",
             "turn_timeout_seconds": 320,

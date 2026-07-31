@@ -82,7 +82,7 @@ pub(super) fn tombstone_managed_agent_pending(
             RetainedEvent,
         },
     };
-    use buzz_core_pkg::kind::KIND_MANAGED_AGENT;
+    use nuxx_core_pkg::kind::KIND_MANAGED_AGENT;
     use nostr::JsonUtil;
 
     const KIND_DELETE: u32 = 5;
@@ -138,7 +138,7 @@ pub(super) fn build_agent_archive_request(
     } else {
         let agent = nostr::PublicKey::from_hex(agent_pubkey)
             .map_err(|e| format!("invalid agent pubkey: {e}"))?;
-        let tag_json = buzz_sdk_pkg::nip_oa::compute_auth_tag(keys, &agent, "")
+        let tag_json = nuxx_sdk_pkg::nip_oa::compute_auth_tag(keys, &agent, "")
             .map_err(|e| format!("failed to build owner auth tag: {e}"))?;
         let parts: Vec<String> = serde_json::from_str(&tag_json)
             .map_err(|e| format!("failed to parse owner auth tag: {e}"))?;
@@ -175,7 +175,7 @@ pub(super) fn build_agent_archive_request(
 /// disk-authoritative delete.
 pub(super) fn archive_managed_agent_pending(app: &AppHandle, state: &AppState, agent_pubkey: &str) {
     use crate::managed_agents::retention::{open_retention_db, retain_event, RetainedEvent};
-    use buzz_core_pkg::kind::KIND_IA_ARCHIVE_REQUEST;
+    use nuxx_core_pkg::kind::KIND_IA_ARCHIVE_REQUEST;
     use nostr::JsonUtil;
 
     let result = (|| -> Result<(), String> {
@@ -585,7 +585,7 @@ pub async fn create_managed_agent(
     crate::managed_agents::validate_user_env_keys(&input.env_vars)?;
 
     // Validate & normalize the respond-to allowlist BEFORE any side effects.
-    // The harness has its own validator (buzz-acp/src/config.rs) but we want
+    // The harness has its own validator (nuxx-acp/src/config.rs) but we want
     // to catch malformed input at the boundary so the agent never tries to
     // start with a list that will crash it on launch. The mode/allowlist
     // pairing (and the definition-default fallback) is resolved later at the
@@ -666,12 +666,12 @@ pub async fn create_managed_agent(
     // No tokens are minted. Fail closed: bad auth tag → don't create agent.
     let auth_tag = {
         let owner_keys = state.signing_keys()?;
-        // Bridge nostr 0.37 → 0.36 (buzz-sdk) via hex round-trip.
+        // Bridge nostr 0.37 → 0.36 (nuxx-sdk) via hex round-trip.
         let compat_owner = nostr::Keys::parse(&owner_keys.secret_key().to_secret_hex())
             .map_err(|e| format!("failed to bridge owner keys: {e}"))?;
         let compat_agent = nostr::PublicKey::from_hex(&agent_keys.public_key().to_hex())
             .map_err(|e| format!("failed to bridge agent pubkey: {e}"))?;
-        let tag = buzz_sdk_pkg::nip_oa::compute_auth_tag(&compat_owner, &compat_agent, "")
+        let tag = nuxx_sdk_pkg::nip_oa::compute_auth_tag(&compat_owner, &compat_agent, "")
             .map_err(|e| format!("failed to compute NIP-OA auth tag: {e}"))?;
         Some(tag)
     };

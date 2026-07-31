@@ -345,10 +345,10 @@ pub fn run() {
     let builder = builder;
 
     let app = builder
-        .register_asynchronous_uri_scheme_protocol("buzz-media", |ctx, request, responder| {
+        .register_asynchronous_uri_scheme_protocol("nuxx-media", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn(async move {
-                let response = media_proxy::handle_buzz_media(&app, &request).await;
+                let response = media_proxy::handle_nuxx_media(&app, &request).await;
                 responder.respond(response);
             });
         })

@@ -68,9 +68,9 @@ pub async fn connect_acp_runtime(
 }
 
 fn discover_acp_auth_methods_blocking(runtime_id: &str) -> Result<AcpAuthMethodsResult, String> {
-    let output = run_buzz_acp_auth_command(runtime_id, ["auth-methods", "--json"])?;
+    let output = run_nuxx_acp_auth_command(runtime_id, ["auth-methods", "--json"])?;
     if !output.status.success() {
-        return Err(command_error("buzz-acp auth-methods", &output));
+        return Err(command_error("nuxx-acp auth-methods", &output));
     }
 
     serde_json::from_slice::<AcpAuthMethodsResult>(&output.stdout)
@@ -96,18 +96,18 @@ fn connect_acp_runtime_blocking(
         return Ok(ConnectAcpRuntimeResult { launched: true });
     }
 
-    let output = run_buzz_acp_auth_command(
+    let output = run_nuxx_acp_auth_command(
         &request.runtime_id,
         ["authenticate", "--method-id", request.method_id.as_str()],
     )?;
     if !output.status.success() {
-        return Err(command_error("buzz-acp authenticate", &output));
+        return Err(command_error("nuxx-acp authenticate", &output));
     }
 
     Ok(ConnectAcpRuntimeResult { launched: true })
 }
 
-fn run_buzz_acp_auth_command<const N: usize>(
+fn run_nuxx_acp_auth_command<const N: usize>(
     runtime_id: &str,
     args: [&str; N],
 ) -> Result<std::process::Output, String> {
@@ -120,14 +120,14 @@ fn run_buzz_acp_auth_command<const N: usize>(
         .ok_or_else(|| format!("{} ACP adapter is not installed", runtime.label))?;
 
     let acp_path = std::env::current_exe()
-        .map(|path| path.with_file_name(format!("buzz-acp{}", std::env::consts::EXE_SUFFIX)))
+        .map(|path| path.with_file_name(format!("nuxx-acp{}", std::env::consts::EXE_SUFFIX)))
         .ok()
         .filter(|path| path.exists())
-        .or_else(|| resolve_command("buzz-acp"))
-        .ok_or_else(|| "buzz-acp helper not found".to_string())?;
+        .or_else(|| resolve_command("nuxx-acp"))
+        .ok_or_else(|| "nuxx-acp helper not found".to_string())?;
 
     let augmented_path = auth_command_path();
-    run_buzz_acp_auth_command_with_paths(
+    run_nuxx_acp_auth_command_with_paths(
         &acp_path,
         adapter_command.0,
         &adapter_command.1,
@@ -136,7 +136,7 @@ fn run_buzz_acp_auth_command<const N: usize>(
     )
 }
 
-/// PATH for the buzz-acp auth helper child process.
+/// PATH for the nuxx-acp auth helper child process.
 ///
 /// Uses the augmented agent PATH so `#!/usr/bin/env node` adapter shims
 /// resolve the Buzz-managed Node runtime — the same PATH normal agent
@@ -173,7 +173,7 @@ fn append_inherited_path(augmented: Option<String>, inherited: Option<String>) -
         .or(Some(augmented))
 }
 
-fn run_buzz_acp_auth_command_with_paths<const N: usize>(
+fn run_nuxx_acp_auth_command_with_paths<const N: usize>(
     acp_path: &Path,
     adapter_name: &str,
     adapter_path: &Path,
@@ -198,7 +198,7 @@ fn run_buzz_acp_auth_command_with_paths<const N: usize>(
 
     command
         .output()
-        .map_err(|error| format!("failed to run buzz-acp auth helper: {error}"))
+        .map_err(|error| format!("failed to run nuxx-acp auth helper: {error}"))
 }
 
 fn command_error(label: &str, output: &std::process::Output) -> String {
@@ -363,7 +363,7 @@ fn spawn_without_stdio(mut command: Command) -> Result<(), String> {
 #[cfg(target_os = "macos")]
 fn launch_visible_terminal(argv: &[String]) -> Result<(), String> {
     let mut script = tempfile::Builder::new()
-        .prefix("buzz-auth-")
+        .prefix("nuxx-auth-")
         .suffix(".command")
         .tempfile()
         .map_err(|error| format!("failed to create terminal login script: {error}"))?;
@@ -462,7 +462,7 @@ fn shell_escape(arg: &str) -> String {
 mod tests {
     use super::{
         adapter_terminal_argv, append_inherited_path, is_claude_subscription_login,
-        run_buzz_acp_auth_command_with_paths, shell_escape, shell_join, uses_terminal_auth,
+        run_nuxx_acp_auth_command_with_paths, shell_escape, shell_join, uses_terminal_auth,
         windows_terminal_args, AcpAuthMethod,
     };
 
@@ -527,16 +527,16 @@ mod tests {
         fs::set_permissions(&adapter_path, fs::Permissions::from_mode(0o755))
             .expect("chmod adapter");
 
-        let acp_path = temp.path().join("buzz-acp");
+        let acp_path = temp.path().join("nuxx-acp");
         fs::write(&acp_path, "#!/bin/sh\nexec \"$BUZZ_ACP_AGENT_COMMAND\"\n")
-            .expect("write buzz-acp");
-        fs::set_permissions(&acp_path, fs::Permissions::from_mode(0o755)).expect("chmod buzz-acp");
+            .expect("write nuxx-acp");
+        fs::set_permissions(&acp_path, fs::Permissions::from_mode(0o755)).expect("chmod nuxx-acp");
 
         let augmented_path = std::env::join_paths([interpreter_dir.as_path()])
             .expect("join augmented PATH")
             .to_string_lossy()
             .into_owned();
-        let output = run_buzz_acp_auth_command_with_paths(
+        let output = run_nuxx_acp_auth_command_with_paths(
             &acp_path,
             "claude-agent-acp",
             &adapter_path,

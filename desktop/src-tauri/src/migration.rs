@@ -1059,7 +1059,7 @@ fn reconcile_legacy_command_names_in_file(path: &Path) {
             .map(str::to_string)
         {
             if acp_command == "sprout-acp" {
-                changed |= replace_command_field(obj, "acp_command", "buzz-acp".to_string());
+                changed |= replace_command_field(obj, "acp_command", "nuxx-acp".to_string());
             }
         }
 
@@ -1069,7 +1069,7 @@ fn reconcile_legacy_command_names_in_file(path: &Path) {
             .unwrap_or("")
             .to_string();
         if agent_command == "sprout-agent" {
-            agent_command = "buzz-agent".to_string();
+            agent_command = "nuxx-agent".to_string();
             changed |= replace_command_field(obj, "agent_command", agent_command.clone());
         }
 
@@ -1081,11 +1081,11 @@ fn reconcile_legacy_command_names_in_file(path: &Path) {
             match mcp_command.as_str() {
                 "sprout-dev-mcp" => {
                     changed |=
-                        replace_command_field(obj, "mcp_command", "buzz-dev-mcp".to_string());
+                        replace_command_field(obj, "mcp_command", "nuxx-dev-mcp".to_string());
                 }
                 "sprout-mcp" | "sprout-mcp-server" | "buzz-mcp-server" => {
-                    let replacement = if agent_command == "buzz-agent" {
-                        "buzz-dev-mcp"
+                    let replacement = if agent_command == "nuxx-agent" {
+                        "nuxx-dev-mcp"
                     } else {
                         ""
                     };
@@ -1114,25 +1114,25 @@ fn reconcile_legacy_persona_runtimes_in_file(path: &Path) {
                 .and_then(|v| v.as_str())
                 .unwrap_or("?"),
             runtime,
-            "buzz-agent",
+            "nuxx-agent",
         );
         obj.insert(
             "runtime".to_string(),
-            serde_json::Value::String("buzz-agent".to_string()),
+            serde_json::Value::String("nuxx-agent".to_string()),
         );
         true
     });
 }
 
 fn rewrite_legacy_persona_md_runtime(content: &str) -> Option<String> {
-    let (frontmatter, body) = buzz_persona_pkg::persona::split_frontmatter(content).ok()?;
+    let (frontmatter, body) = nuxx_persona_pkg::persona::split_frontmatter(content).ok()?;
     let mut value = serde_yaml::from_str::<serde_yaml::Value>(frontmatter).ok()?;
     let mapping = value.as_mapping_mut()?;
     let runtime = mapping.get_mut(serde_yaml::Value::String("runtime".to_string()))?;
     if runtime.as_str()? != "sprout-agent" {
         return None;
     }
-    *runtime = serde_yaml::Value::String("buzz-agent".to_string());
+    *runtime = serde_yaml::Value::String("nuxx-agent".to_string());
     let frontmatter = serde_yaml::to_string(&value).ok()?;
     Some(format!("---\n{frontmatter}---\n{body}"))
 }
@@ -1261,7 +1261,7 @@ fn reconcile_databricks_v1_to_v2_in_file(path: &Path, rewrite_v1_provider: bool)
             // Also clear the model field — a V1 model name (e.g. "dbrx-instruct")
             // on a V2 provider would shadow the baked DATABRICKS_MODEL at spawn time
             // (BUZZ_AGENT_MODEL from runtime_metadata_env_vars takes priority in
-            // buzz-agent config.rs). Clearing it lets the baked V2 default win.
+            // nuxx-agent config.rs). Clearing it lets the baked V2 default win.
             if obj.remove("model").is_some() {
                 eprintln!(
                     "buzz-desktop: databricks-v1-to-v2: {name:?}: cleared stale V1 model field",
