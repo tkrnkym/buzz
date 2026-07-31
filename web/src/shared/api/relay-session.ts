@@ -16,9 +16,10 @@
  * so open relays still work.
  *
  * Deliberately *not* here yet: stall watchdog, rate-limit gate, prioritized
- * reconnect-replay ordering, and CLOSED-driven recovery policy. Those exist in
- * `desktop/src/shared/api/relay*.ts` as pure TypeScript and should be lifted
- * rather than reinvented.
+ * reconnect-replay ordering, and CLOSED-driven recovery policy. The desktop
+ * client had all four as pure TypeScript; it has since been removed, so they
+ * are recoverable from git history (`desktop/src/shared/api/relay*.ts` before
+ * the client was deleted) rather than from the tree.
  */
 
 import { makeAuthEvent } from "nostr-tools/nip42";

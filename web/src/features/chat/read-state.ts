@@ -7,8 +7,8 @@
  * the relay operator holds ciphertext instead of a record of what each person has
  * read.
  *
- * Wire format matches the desktop client (`desktop/src/features/channels/
- * readState/`), so the two interoperate:
+ * Wire format is the one the desktop client established before it was removed,
+ * kept so existing read-state events stay readable:
  *
  *   kind:    30078
  *   tags:    ["d", "read-state:<32 hex>"], ["t", "read-state"]

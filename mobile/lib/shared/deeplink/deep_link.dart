@@ -5,7 +5,6 @@
 /// pasted to each other, so they cannot be rewritten and must keep resolving.
 /// Links are always *written* with [linkScheme].
 ///
-/// Mirrors the desktop handler in `desktop/src-tauri/src/deep_link.rs`:
 /// `nuxx://message?channel=<uuid>&id=<hex>[&thread=<hex>]` references a
 /// message (optionally inside a thread) in a channel. Required params that
 /// are missing or empty make the link invalid — the caller never sees a
@@ -100,8 +99,8 @@ class MessageDeepLink extends BuzzDeepLink {
 
 /// Build a canonical `nuxx://message` link for a channel message.
 ///
-/// Mirrors `desktop/src/features/messages/lib/messageLink.ts` so links copied
-/// or shared from mobile round-trip through every client's parser:
+/// Mirrors `web/src/features/chat/message-link.ts` so links copied or shared
+/// from mobile round-trip through every client's parser:
 /// `nuxx://message?channel=<uuid>&id=<eventId>[&thread=<rootId>]`.
 ///
 /// An empty [threadRootId] is treated as "no thread" so callers can pass
@@ -132,9 +131,8 @@ String buildMessageLink({
 
 /// Parse a `nuxx://message?…` URI into a [MessageDeepLink].
 ///
-/// Returns `null` for unrecognised schemes, non-`message` hosts (e.g.
-/// `buzz://connect` which is desktop-only), or links missing a non-empty
-/// `channel` or `id` param.
+/// Returns `null` for unrecognised schemes, non-`message` hosts, or links
+/// missing a non-empty `channel` or `id` param.
 MessageDeepLink? parseMessageDeepLink(Uri uri) {
   if (!isAcceptedLinkScheme(uri.scheme) || uri.host != 'message') return null;
 
