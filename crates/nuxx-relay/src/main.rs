@@ -85,11 +85,6 @@ const USAGE_METRICS_LOCK_KEY: i64 = 0x4255_5A5A_4D45_5452;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Before anything reads configuration: accept the pre-rename `NUXX_*`
-    // variables so an existing deployment's manifests keep working across the
-    // rollout. Warned about once, with the list, rather than per read.
-    let legacy_env = nuxx_core::env_compat::promote_legacy_env();
-
     // Install the ring CryptoProvider for rustls. Required before any rustls
     // TLS connection (rediss:// to ElastiCache, wss://, S3 over TLS): both
     // aws-lc-rs and ring are compiled in transitively, so rustls can't
@@ -136,15 +131,6 @@ async fn main() -> anyhow::Result<()> {
         }))
         .with(trace_context_lookup_layer)
         .init();
-
-    if !legacy_env.is_empty() {
-        tracing::warn!(
-            count = legacy_env.len(),
-            variables = %legacy_env.join(", "),
-            "using pre-rename NUXX_* environment variables; rename them to NUXX_* \
-             (the NUXX_* name wins where both are set)"
-        );
-    }
 
     // Log any exporter-build failure now that the subscriber is installed.
     if let telemetry::TracerInit::ExporterBuildFailed(ref e) = tracer_init {

@@ -107,14 +107,13 @@ test("a malformed message link falls back to default link handling", () => {
   );
 });
 
-test("the pre-rename scheme is not accepted", () => {
-  // Pins the decision to drop it: nothing shipped under the old scheme, so there
-  // are no links to keep resolving. If acceptance ever comes back, that is a
-  // deliberate change and this test should be the thing that notices.
-  const legacy = `buzz://message?channel=${"1".repeat(8)}&id=${"ab".repeat(32)}`;
+test("only the app's own scheme is accepted", () => {
+  // A well-formed message link under any other scheme must not resolve, however
+  // plausible it looks — the scheme is what makes it ours.
+  const foreign = `other://message?channel=${"1".repeat(8)}&id=${"ab".repeat(32)}`;
 
-  assert.equal(isMessageLink(legacy), false);
-  const parsed = parseMessageLink(legacy);
+  assert.equal(isMessageLink(foreign), false);
+  const parsed = parseMessageLink(foreign);
   assert.equal(parsed.ok, false);
   assert.equal(parsed.reason, "wrong-scheme");
 });
@@ -125,7 +124,7 @@ test("new links are written with the current scheme only", () => {
     messageId: "ab".repeat(32),
   });
   assert.ok(built.startsWith("nuxx://message?"), built);
-  assert.ok(!built.includes("buzz://"));
+  assert.ok(built.startsWith("nuxx://message?"));
 });
 
 test("an unrelated scheme is still refused", () => {

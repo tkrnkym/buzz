@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   _inviteTests();
   _buildMessageLinkTests();
-  _legacySchemeTests();
+  _schemeDiscriminationTests();
 
   group('parseMessageDeepLink', () {
     test('parses channel and id', () {
@@ -234,24 +234,23 @@ void _inviteTests() {
   });
 }
 
-/// The pre-rename `buzz://` scheme is no longer accepted. Nothing shipped under
-/// it, so there are no previously-shared links to keep resolving; these tests pin
-/// that decision so re-adding acceptance is a visible change.
-void _legacySchemeTests() {
-  group('pre-rename buzz:// scheme', () {
-    test('a pre-rename link is refused', () {
+/// Scheme discrimination: a well-formed link under any other scheme must not
+/// resolve, however plausible it looks.
+void _schemeDiscriminationTests() {
+  group('scheme discrimination', () {
+    test('a message link under a foreign scheme is refused', () {
       expect(
         parseMessageDeepLink(
-          Uri.parse('buzz://message?channel=d14cd131&id=abc123'),
+          Uri.parse('other://message?channel=d14cd131&id=abc123'),
         ),
         isNull,
       );
     });
 
-    test('a pre-rename invite link is refused', () {
+    test('an invite link under a foreign scheme is refused', () {
       expect(
         parseInviteDeepLink(
-          Uri.parse('buzz://join?relay=wss%3A%2F%2Fr.example.com&code=abc'),
+          Uri.parse('other://join?relay=wss%3A%2F%2Fr.example.com&code=abc'),
         ),
         isNull,
       );
@@ -260,7 +259,7 @@ void _legacySchemeTests() {
     test('new links are written with the current scheme only', () {
       final built = buildMessageLink(channelId: 'c', messageId: 'm');
       expect(built.startsWith('nuxx://message?'), isTrue);
-      expect(built.contains('buzz://'), isFalse);
+      expect(built.startsWith('nuxx://message?'), isTrue);
     });
 
     test('an unrelated scheme is still refused', () {

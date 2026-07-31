@@ -15,7 +15,6 @@ pub mod channel;
 /// body parse/serialize, envelope build/validate, head selection.
 pub mod engram;
 /// Backward compatibility for the pre-rename `NUXX_*` environment variables.
-pub mod env_compat;
 /// Relay-side error types.
 pub mod error;
 /// Relay-side event wrapper with verification tracking.

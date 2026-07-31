@@ -11,13 +11,8 @@ code style, PR process, architecture), see [CONTRIBUTING.md](CONTRIBUTING.md).
 This repository is the whole product for this fork: relay, web client, mobile
 app, CLI, and agent harness all live here.
 
-Upstream `block/buzz` fed four Block-internal repositories — a Buildkite
-pipeline for signed macOS/iOS builds, a CI pipeline pushing the relay image to
-an internal ECR, Terraform/ArgoCD for a staging cluster, and a Blox compute
-provider. **This fork has access to none of them.** They are named here only so
-their absence is not mistaken for something missing: the relay image publishes
-to `ghcr.io/tkrnkym/nuxx` from `.github/workflows/docker.yml`, and deployment is
-whatever you wire up in `deploy/`.
+Deployment is whatever you wire up in `deploy/`; the relay image publishes to
+`ghcr.io/tkrnkym/nuxx` from `.github/workflows/docker.yml`.
 
 See [RELEASING.md](RELEASING.md) for the release flows that do exist here.
 
