@@ -12,10 +12,13 @@ use serde::Deserialize;
 
 use crate::error::CliError;
 
-/// Tauri bundle identifier for the production desktop app. `dirs::data_dir()`
-/// joined with this segment matches `app.path().app_data_dir()` exactly
-/// (Tauri resolves app-data as the platform data dir plus the identifier).
-const PROD_BUNDLE_IDENTIFIER: &str = "xyz.block.nuxx.app";
+/// App-data subdirectory holding the channel-templates store.
+///
+/// This was the desktop app's Tauri bundle identifier, because that client wrote
+/// the store and `dirs::data_dir()` joined with the identifier is exactly where
+/// Tauri put it. That client is gone, so the default is now the CLI's own
+/// app-data directory; nothing writes the old path any more.
+const TEMPLATES_APP_DIR: &str = "nuxx";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelTemplateRecord {
@@ -61,11 +64,11 @@ fn default_visibility() -> String {
     "open".to_string()
 }
 
-/// Resolve the desktop app's `channel-templates.json` path.
+/// Resolve the `channel-templates.json` path.
 ///
-/// `override_path` (from `--templates-file`) always wins — useful for the dev
-/// store or tests. Otherwise defaults to the prod bundle's app-data dir:
-/// `<platform-data-dir>/xyz.block.nuxx.app/templates/channel-templates.json`.
+/// `override_path` (from `--templates-file`) always wins — useful for a store
+/// kept elsewhere, or for tests. Otherwise defaults to
+/// `<platform-data-dir>/nuxx/templates/channel-templates.json`.
 pub fn resolve_templates_path(override_path: Option<&str>) -> Result<PathBuf, CliError> {
     if let Some(p) = override_path {
         return Ok(PathBuf::from(p));
@@ -74,7 +77,7 @@ pub fn resolve_templates_path(override_path: Option<&str>) -> Result<PathBuf, Cl
         CliError::Other("could not resolve platform app-data directory".to_string())
     })?;
     Ok(data_dir
-        .join(PROD_BUNDLE_IDENTIFIER)
+        .join(TEMPLATES_APP_DIR)
         .join("templates")
         .join("channel-templates.json"))
 }
@@ -141,9 +144,9 @@ mod tests {
     }
 
     #[test]
-    fn resolve_templates_path_defaults_to_prod_bundle() {
+    fn resolve_templates_path_defaults_to_the_cli_app_dir() {
         let path = resolve_templates_path(None).unwrap();
-        assert!(path.ends_with("xyz.block.nuxx.app/templates/channel-templates.json"));
+        assert!(path.ends_with("nuxx/templates/channel-templates.json"));
     }
 
     #[test]

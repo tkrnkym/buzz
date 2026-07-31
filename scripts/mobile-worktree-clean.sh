@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Uninstalls stale worktree-suffixed Buzz debug builds from booted iOS
 # simulators and connected Android devices/emulators. Production installs
-# (com.nuxx.nuxxMobile / xyz.block.nuxx.mobile, no suffix) are never touched:
+# (ai.nuxx.mobile / ai.nuxx.mobile, no suffix) are never touched:
 # only identifiers with a worktree suffix appended after the production id
 # are matched. Run `just mobile-clean` (or this script directly); pass
 # --dry-run to list what would be removed without uninstalling.
 set -euo pipefail
 
-ios_prefix="com.nuxx.nuxxMobile."
-android_prefix="xyz.block.nuxx.mobile."
+ios_prefix="ai.nuxx.mobile."
+android_prefix="ai.nuxx.mobile."
 
 dry_run=0
 if [[ "${1:-}" == "--dry-run" ]]; then

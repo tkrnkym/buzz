@@ -1,4 +1,4 @@
-package xyz.block.nuxx.mobile
+package ai.nuxx.mobile
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

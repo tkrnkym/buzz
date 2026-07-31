@@ -8,27 +8,18 @@ code style, PR process, architecture), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Ecosystem
 
-Buzz spans five repos. This one (`block/buzz`) is the OSS source for the relay, web client, mobile, and CLI. The others handle internal builds and deployment:
+This repository is the whole product for this fork: relay, web client, mobile
+app, CLI, and agent harness all live here.
 
-| Repo | Purpose |
-|------|---------|
-| [block/buzz](https://github.com/block/buzz) | OSS source — relay, web client, mobile app, CLI, agent harness |
-| [squareup/sprout-releases](https://github.com/squareup/sprout-releases) | Buildkite pipeline producing Block-signed macOS + iOS builds with `-block` version suffix |
-| [squareup/sprout-oss](https://github.com/squareup/sprout-oss) | CI pipeline building the relay Docker image and pushing to internal ECR |
-| [squareup/block-coder-tf-stacks](https://github.com/squareup/block-coder-tf-stacks) | Terraform + ArgoCD deploying the relay to the staging Kubernetes cluster |
-| [squareup/sprout-backend-blox](https://github.com/squareup/sprout-backend-blox) | Backend provider script connecting Blox workstation agents to the relay |
+Upstream `block/buzz` fed four Block-internal repositories — a Buildkite
+pipeline for signed macOS/iOS builds, a CI pipeline pushing the relay image to
+an internal ECR, Terraform/ArgoCD for a staging cluster, and a Blox compute
+provider. **This fork has access to none of them.** They are named here only so
+their absence is not mistaken for something missing: the relay image publishes
+to `ghcr.io/tkrnkym/nuxx` from `.github/workflows/docker.yml`, and deployment is
+whatever you wire up in `deploy/`.
 
-```
-block/buzz (source)
-  ├─► sprout-releases    (mobile builds → Artifactory, GitHub, Mobile Releases)
-  ├─► sprout-oss         (relay Docker image → ECR)
-  │     └─► block-coder-tf-stacks  (Helm chart → ArgoCD → staging cluster)
-  └─── sprout-backend-blox         (Blox compute provider for agent launch)
-```
-
-See [RELEASING.md](RELEASING.md) for the release flows and
-[CONTRIBUTING.md § Ecosystem](CONTRIBUTING.md#ecosystem) for contributor
-access information.
+See [RELEASING.md](RELEASING.md) for the release flows that do exist here.
 
 ---
 
@@ -266,9 +257,9 @@ only the current set remains, otherwise reviewers still see the stale images:
 
 ```bash
 # List screenshot comments to find the stale one's id
-gh pr view <pr> --repo block/buzz --json comments \
+gh pr view <pr> --repo tkrnkym/buzz --json comments \
   --jq '.comments[] | select(.body | test("pr-<pr>--")) | {id, url}'
-gh api -X DELETE repos/block/buzz/issues/comments/<stale-comment-id>
+gh api -X DELETE repos/tkrnkym/buzz/issues/comments/<stale-comment-id>
 ```
 
 Branch cleanup when fully done: `git push origin --delete agent-screenshots/<username>`.

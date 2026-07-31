@@ -1,4 +1,4 @@
-package xyz.block.nuxx.mobile
+package ai.nuxx.mobile
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets

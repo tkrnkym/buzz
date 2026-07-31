@@ -353,7 +353,7 @@ fn parse_operator_api_origin(raw: &str) -> Result<String, ConfigError> {
     Ok(raw.trim_end_matches('/').to_string())
 }
 
-const DEFAULT_PUSH_GATEWAY_DELIVERY_URL: &str = "https://push.nuxx.xyz/v1/deliveries/apns";
+const DEFAULT_PUSH_GATEWAY_DELIVERY_URL: &str = "https://push.nuxx.ai/v1/deliveries/apns";
 
 fn parse_push_gateway_delivery_url(raw: &str) -> Result<url::Url, ConfigError> {
     let url = url::Url::parse(raw.trim()).map_err(|e| {
@@ -1506,14 +1506,14 @@ mod tests {
     #[test]
     fn pairing_relay_url_accepts_websocket_urls_and_rejects_http() {
         let _guard = ENV_MUTEX.lock().unwrap();
-        std::env::set_var("NUXX_PAIRING_RELAY_URL", "wss://pairing.nuxx.xyz");
+        std::env::set_var("NUXX_PAIRING_RELAY_URL", "wss://pairing.nuxx.ai");
         let config = Config::from_env().expect("config");
         assert_eq!(
             config.pairing_relay_url.as_deref(),
-            Some("wss://pairing.nuxx.xyz")
+            Some("wss://pairing.nuxx.ai")
         );
 
-        std::env::set_var("NUXX_PAIRING_RELAY_URL", "https://pairing.nuxx.xyz");
+        std::env::set_var("NUXX_PAIRING_RELAY_URL", "https://pairing.nuxx.ai");
         let result = Config::from_env();
         std::env::remove_var("NUXX_PAIRING_RELAY_URL");
         assert!(matches!(

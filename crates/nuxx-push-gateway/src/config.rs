@@ -102,7 +102,7 @@ impl Config {
             .parse::<url::Url>()
             .map_err(|_| ConfigError::Invalid("NUXX_PUSH_PUBLIC_DELIVERY_URL"))?;
         if public_delivery_url.scheme() != "https"
-            || public_delivery_url.host_str() != Some("push.nuxx.xyz")
+            || public_delivery_url.host_str() != Some("push.nuxx.ai")
             || public_delivery_url.port().is_some()
             || public_delivery_url.path() != "/v1/deliveries/apns"
             || public_delivery_url.query().is_some()
@@ -208,7 +208,7 @@ mod tests {
             ),
             (
                 "NUXX_PUSH_PUBLIC_DELIVERY_URL".into(),
-                "https://push.nuxx.xyz/v1/deliveries/apns".into(),
+                "https://push.nuxx.ai/v1/deliveries/apns".into(),
             ),
             (
                 "NUXX_PUSH_MAX_GRANT_LIFETIME_SECONDS".into(),

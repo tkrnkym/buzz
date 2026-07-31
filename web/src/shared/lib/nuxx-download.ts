@@ -1,10 +1,10 @@
-export const BUZZ_RELEASES_URL = "https://github.com/block/buzz/releases";
-const BUZZ_RELEASES_API_URL =
-  "https://api.github.com/repos/block/buzz/releases?per_page=10";
-const CACHE_KEY = "buzz.latestDownload.v1";
+export const NUXX_RELEASES_URL = "https://github.com/tkrnkym/buzz/releases";
+const NUXX_RELEASES_API_URL =
+  "https://api.github.com/repos/tkrnkym/buzz/releases?per_page=10";
+const CACHE_KEY = "nuxx.latestDownload.v1";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-export type BuzzDownloadPlatform = {
+export type NuxxDownloadPlatform = {
   operatingSystem: "linux" | "macos" | "windows" | "unknown";
   architecture: "arm64" | "x64" | "unknown";
 };
@@ -26,7 +26,7 @@ type UserAgentData = {
 function normalizeOperatingSystem(
   navigatorValue: Navigator,
   userAgentData?: UserAgentData,
-): BuzzDownloadPlatform["operatingSystem"] {
+): NuxxDownloadPlatform["operatingSystem"] {
   const userAgent = navigatorValue.userAgent.toLowerCase();
   const platform = (
     userAgentData?.platform ??
@@ -70,16 +70,16 @@ function normalizeOperatingSystem(
 
 function normalizeArchitecture(
   value: string,
-): BuzzDownloadPlatform["architecture"] {
+): NuxxDownloadPlatform["architecture"] {
   const normalized = value.toLowerCase();
   if (/arm|aarch64/.test(normalized)) return "arm64";
   if (/x86|x64|amd64|64/.test(normalized)) return "x64";
   return "unknown";
 }
 
-export async function detectBuzzDownloadPlatform(
+export async function detectNuxxDownloadPlatform(
   navigatorValue: Navigator,
-): Promise<BuzzDownloadPlatform> {
+): Promise<NuxxDownloadPlatform> {
   const userAgentData = (
     navigatorValue as Navigator & { userAgentData?: UserAgentData }
   ).userAgentData;
@@ -107,7 +107,7 @@ export async function detectBuzzDownloadPlatform(
   return { operatingSystem, architecture };
 }
 
-function assetPattern(platform: BuzzDownloadPlatform): RegExp | undefined {
+function assetPattern(platform: NuxxDownloadPlatform): RegExp | undefined {
   switch (platform.operatingSystem) {
     case "macos":
       if (platform.architecture === "arm64") return /_aarch64\.dmg$/i;
@@ -124,9 +124,9 @@ function assetPattern(platform: BuzzDownloadPlatform): RegExp | undefined {
   }
 }
 
-export function selectBuzzDownloadUrl(
+export function selectNuxxDownloadUrl(
   releases: GitHubRelease[],
-  platform: BuzzDownloadPlatform,
+  platform: NuxxDownloadPlatform,
 ): string | undefined {
   const pattern = assetPattern(platform);
   if (!pattern) return undefined;
@@ -139,13 +139,13 @@ export function selectBuzzDownloadUrl(
   return undefined;
 }
 
-export async function resolveBuzzDownloadUrlForPlatform(
-  platform: BuzzDownloadPlatform,
+export async function resolveNuxxDownloadUrlForPlatform(
+  platform: NuxxDownloadPlatform,
 ): Promise<string> {
   try {
     const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? "null") as {
       expiresAt: number;
-      platform: BuzzDownloadPlatform;
+      platform: NuxxDownloadPlatform;
       url: string;
     } | null;
     if (
@@ -161,15 +161,15 @@ export async function resolveBuzzDownloadUrlForPlatform(
   }
 
   try {
-    const response = await fetch(BUZZ_RELEASES_API_URL, {
+    const response = await fetch(NUXX_RELEASES_API_URL, {
       headers: { Accept: "application/vnd.github+json" },
     });
-    if (!response.ok) return BUZZ_RELEASES_URL;
-    const url = selectBuzzDownloadUrl(
+    if (!response.ok) return NUXX_RELEASES_URL;
+    const url = selectNuxxDownloadUrl(
       (await response.json()) as GitHubRelease[],
       platform,
     );
-    if (!url) return BUZZ_RELEASES_URL;
+    if (!url) return NUXX_RELEASES_URL;
     try {
       sessionStorage.setItem(
         CACHE_KEY,
@@ -184,12 +184,12 @@ export async function resolveBuzzDownloadUrlForPlatform(
     }
     return url;
   } catch {
-    return BUZZ_RELEASES_URL;
+    return NUXX_RELEASES_URL;
   }
 }
 
-export async function resolveBuzzDownloadUrl(): Promise<string> {
-  return resolveBuzzDownloadUrlForPlatform(
-    await detectBuzzDownloadPlatform(navigator),
+export async function resolveNuxxDownloadUrl(): Promise<string> {
+  return resolveNuxxDownloadUrlForPlatform(
+    await detectNuxxDownloadPlatform(navigator),
   );
 }

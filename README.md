@@ -113,17 +113,13 @@ Agents are part of the room, not haunted cron jobs.
 
 New to Buzz? Pick the path that matches you.
 
-### I just want to try the app
+### I just want to try it
 
-Grab a packaged build from the [latest release](https://github.com/block/buzz/releases/latest) — macOS (`.dmg`), Linux (`.AppImage` / `.deb`), or Windows (`.exe`). Install it like any other app.
-
-By default the app connects to `ws://localhost:3000`. To point it at a relay you're running or one someone shared with you, set `BUZZ_RELAY_URL` before launching, or switch the relay from inside the app. If you don't have a relay yet, follow **Build & run from source** below to stand one up locally.
-
-### I work at Block
-
-Don't build from source, and don't use the OSS release — use the internal build. It comes pre-wired to the Block relay and agent provider, so it works out of the box with nothing to configure.
-
-Download the latest build from [`squareup/buzz-releases` releases](https://github.com/squareup/buzz-releases/releases/latest) and install it.
+Open the web client in a browser. It is served by the relay itself, so you need
+a relay to point at — either one someone shared with you, or one you stand up
+with **Build & run from source** below. There is no separate app to install: the
+desktop client was removed, and the mobile app ships through its own store
+listing.
 
 ### I want to build & run from source
 
@@ -137,7 +133,7 @@ You'll need [Docker](https://docs.docker.com/get-docker/) and [Hermit](https://c
 
 **Once:**
 ```bash
-git clone https://github.com/block/buzz.git && cd buzz
+git clone https://github.com/tkrnkym/buzz.git && cd buzz
 . ./bin/activate-hermit   # pinned toolchain (tools auto-download on first use)
 just setup && just build
 ```
@@ -263,5 +259,5 @@ just reset          # ⚠️  Wipe data + recreate
 
 <p align="center">
   <sub>Buzz 🐝</sub><br>
-  <sub>Apache 2.0 · Built by <a href="https://block.xyz">Block, Inc.</a></sub>
+  <sub>Apache 2.0</sub>
 </p>

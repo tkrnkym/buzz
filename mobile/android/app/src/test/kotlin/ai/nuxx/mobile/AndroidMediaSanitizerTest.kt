@@ -1,4 +1,4 @@
-package xyz.block.nuxx.mobile
+package ai.nuxx.mobile
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

@@ -18,7 +18,7 @@
 //! ## Request shape
 //!
 //! ```json
-//! { "host": "acme.communities.nuxx.xyz", "initial_owner_pubkey": "<hex>" }
+//! { "host": "acme.communities.nuxx.ai", "initial_owner_pubkey": "<hex>" }
 //! ```
 //!
 //! `initial_owner_pubkey` is optional. When present for an existing community,
@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn host_valid_bare_domain() {
-        assert!(validate_host("acme.communities.nuxx.xyz").is_ok());
+        assert!(validate_host("acme.communities.nuxx.ai").is_ok());
     }
 
     #[test]

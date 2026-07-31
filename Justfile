@@ -361,7 +361,7 @@ bump-relay-version version:
     cargo update -p nuxx-relay
     echo "Bumped nuxx-relay to {{ version }} and regenerated Cargo.lock"
 
-# Open or update the relay release PR (ghcr.io/block/buzz image)
+# Open or update the relay release PR (ghcr.io/tkrnkym/nuxx image)
 release-relay *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail

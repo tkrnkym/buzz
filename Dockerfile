@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Public Buzz relay image — published as ghcr.io/block/buzz:<tag>.
+# Public Buzz relay image — published as ghcr.io/tkrnkym/nuxx:<tag>.
 #
 # Builds the `nuxx-relay` binary (Rust 1.95) and the `nuxx-web` static bundle
 # (pnpm + vite), then assembles them into a small debian-slim runtime with
@@ -126,9 +126,9 @@ FROM debian:${DEBIAN_VERSION}-slim AS runtime-base
 # one — without it GHCR keeps the image private even when the repo is public.
 LABEL org.opencontainers.image.title="Buzz" \
       org.opencontainers.image.description="WebSocket relay server for the Buzz communications platform" \
-      org.opencontainers.image.source="https://github.com/block/buzz" \
-      org.opencontainers.image.url="https://github.com/block/buzz" \
-      org.opencontainers.image.documentation="https://github.com/block/buzz#readme" \
+      org.opencontainers.image.source="https://github.com/tkrnkym/buzz" \
+      org.opencontainers.image.url="https://github.com/tkrnkym/buzz" \
+      org.opencontainers.image.documentation="https://github.com/tkrnkym/buzz#readme" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update \
