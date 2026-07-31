@@ -37,6 +37,16 @@ export const KIND_SYSTEM_MESSAGE = 40099;
 export const KIND_READ_STATE = 30078;
 
 /**
+ * Forum post and comment.
+ *
+ * Included here because both are full-text indexed by the relay, so a message
+ * search that omitted them would silently miss the long-form half of a
+ * community's writing.
+ */
+export const KIND_FORUM_POST = 45001;
+export const KIND_FORUM_COMMENT = 45003;
+
+/**
  * Relay-signed channel activity snapshot.
  *
  * One event carries the last-activity timestamp for a whole shard of channels,

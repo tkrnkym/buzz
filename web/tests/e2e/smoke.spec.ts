@@ -366,6 +366,8 @@ interface QueryFilter {
   since?: number;
   limit?: number;
   before_id?: string;
+  search?: string;
+  page?: number;
   "#h"?: string[];
 }
 
@@ -390,6 +392,8 @@ function mockRelay(
     typingEvents?: unknown[];
     /** Served to a `POST /query` carrying a scrollback cursor. */
     olderMessages?: unknown[];
+    /** Served to a NIP-50 search, by page number (1-based). */
+    searchPages?: Record<number, unknown[]>;
     /**
      * Hold back the OK for a read-state write, so a spec can advance a second
      * cursor while the first publish is still in flight.
@@ -404,6 +408,8 @@ function mockRelay(
   const queries: QueryFilter[][] = [];
   /** Cursors the client paged with, in order. */
   const historyRequests: { until: number; beforeId: string }[] = [];
+  /** Search filters the client sent, in order. */
+  const searchRequests: QueryFilter[] = [];
 
   const channelMetadata = {
     id: "a".repeat(64),
@@ -467,6 +473,7 @@ function mockRelay(
     subscriptions,
     queries,
     historyRequests,
+    searchRequests,
     install: async () => {
       await page.route("**/query", async (route) => {
         const body = JSON.parse(route.request().postData() ?? "{}") as {
@@ -481,6 +488,19 @@ function mockRelay(
             events.push(...(options.presenceEvents ?? []));
           } else if (filter.kinds?.includes(39007)) {
             events.push(...activitySnapshots());
+          } else if (filter.search) {
+            searchRequests.push(filter);
+            // The relay's p-gate rejects a search that names no kinds, so the
+            // mock does too — a client that stopped sending them would pass
+            // here and 403 in production.
+            if (!filter.kinds || filter.kinds.length === 0) {
+              await route.fulfill({
+                status: 403,
+                body: "restricted: kinds required",
+              });
+              return;
+            }
+            events.push(...(options.searchPages?.[filter.page ?? 1] ?? []));
           } else if (filter.before_id) {
             // A scrollback page. The relay requires `until` alongside
             // `before_id` and rejects one without the other, so the mock does
@@ -1142,6 +1162,127 @@ test("a channel read past its newest message shows no badge", async ({
 
   const nav = page.getByRole("navigation", { name: "Channels" });
   await expect(nav.getByText("Unread messages")).toHaveCount(0);
+});
+
+test("searching puts the query in the URL and lists ranked hits", async ({
+  page,
+}) => {
+  // Deliberately not in timestamp order: the relay returns FTS relevance order
+  // and the client must not re-sort it.
+  const relay = mockRelay(page, {
+    searchPages: {
+      1: [
+        {
+          id: "11".repeat(32),
+          pubkey: "e".repeat(64),
+          kind: 9,
+          created_at: 1_600_000_000,
+          tags: [["h", CHANNEL_UUID]],
+          content: "the deploy pipeline is green",
+          sig: "f".repeat(128),
+        },
+        {
+          id: "22".repeat(32),
+          pubkey: "e".repeat(64),
+          kind: 9,
+          created_at: 1_700_000_000,
+          tags: [["h", CHANNEL_UUID]],
+          content: "deploy notes for the release",
+          sig: "f".repeat(128),
+        },
+      ],
+    },
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByRole("searchbox", { name: /^Search/ }).fill("deploy");
+  await page.getByRole("searchbox", { name: /^Search/ }).press("Enter");
+
+  // In the URL, so the result set is linkable and survives a reload.
+  await expect(page).toHaveURL(/[?&]q=deploy/);
+
+  await expect(page.getByText("the deploy pipeline is green")).toBeVisible();
+  await expect(page.getByText("deploy notes for the release")).toBeVisible();
+
+  // Server ranking preserved: the older hit ranked first and stays first.
+  const rendered = await page.getByRole("listitem").allTextContents();
+  const first = rendered.findIndex((text) =>
+    text.includes("pipeline is green"),
+  );
+  const second = rendered.findIndex((text) => text.includes("notes for the"));
+  expect(first).toBeLessThan(second);
+
+  // Kinds are mandatory — an open-ended search 403s at the relay's p-gate.
+  expect(relay.searchRequests).not.toHaveLength(0);
+  expect(relay.searchRequests[0].kinds?.length ?? 0).toBeGreaterThan(0);
+  expect(relay.searchRequests[0].search).toBe("deploy");
+});
+
+test("a search inside a channel is narrowed on the server", async ({
+  page,
+}) => {
+  const relay = mockRelay(page, { searchPages: { 1: [] } });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByRole("searchbox", { name: /^Search/ }).fill("deploy");
+  await page.getByRole("searchbox", { name: /^Search/ }).press("Enter");
+
+  await expect(page.getByText(/No messages match/)).toBeVisible();
+  // Narrowing client-side would fill each page with hits from other channels
+  // and then discard most of them.
+  expect(relay.searchRequests[0]["#h"]).toEqual([CHANNEL_UUID]);
+});
+
+test("a result opens the message it points at", async ({ page }) => {
+  // A realistic id: 64 hex chars including letters. An all-digit id would parse
+  // as a JSON number, and the router quotes such a value so it round-trips —
+  // correct, but not the shape a reader would copy out of the address bar.
+  const HIT_ID = "3a".repeat(32);
+
+  const relay = mockRelay(page, {
+    searchPages: {
+      1: [
+        {
+          id: HIT_ID,
+          pubkey: "e".repeat(64),
+          kind: 9,
+          created_at: 1_700_000_000,
+          tags: [["h", CHANNEL_UUID]],
+          content: "the thing you were looking for",
+          sig: "f".repeat(128),
+        },
+      ],
+    },
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}?q=looking`);
+  // The href a reader could copy, before any client-side navigation.
+  await expect(
+    page.getByRole("link", { name: /the thing you were looking for/ }),
+  ).toHaveAttribute("href", `/c/${CHANNEL_UUID}?m=${HIT_ID}`);
+
+  await page.getByText("the thing you were looking for").click();
+
+  // Anchors the timeline on that message and drops `q`, so the URL does not
+  // claim to be both a search and a message view.
+  await expect(page).toHaveURL(new RegExp(`m=${HIT_ID}`));
+  await expect(page).not.toHaveURL(/[?&]q=/);
+});
+
+test("clearing the search returns to the timeline", async ({ page }) => {
+  const relay = mockRelay(page, { searchPages: { 1: [] } });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}?q=deploy`);
+  await expect(page.getByText(/No messages match/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Clear search" }).click();
+
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  await expect(page.getByText("hello from the mocked relay")).toBeVisible();
 });
 
 test("older history is paged in with a composite cursor", async ({ page }) => {

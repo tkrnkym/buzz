@@ -8,6 +8,8 @@ import {
 } from "@/features/chat/ui/MessageComposer";
 import { MessageTimeline } from "@/features/chat/ui/MessageTimeline";
 import { ReadStateNotice } from "@/features/chat/ui/ReadStateNotice";
+import { SearchBox } from "@/features/search/ui/SearchBox";
+import { SearchResults } from "@/features/search/ui/SearchResults";
 import { RelayStatus } from "@/features/chat/ui/RelayStatus";
 import { TypingIndicator } from "@/features/chat/ui/TypingIndicator";
 import {
@@ -25,7 +27,14 @@ function previewOf(content: string): string {
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine;
 }
 
-export function ChatPage({ channelId }: { channelId: string | null }) {
+export function ChatPage({
+  channelId,
+  query = "",
+}: {
+  channelId: string | null;
+  /** Active search, from the URL. Empty means the timeline is showing. */
+  query?: string;
+}) {
   const channels = useChannels();
   const timeline = useChannelMessages(channelId);
   const toggleReaction = useToggleReaction();
@@ -121,7 +130,11 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
         <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold">
-              {activeChannel ? `#${activeChannel.name}` : "Select a channel"}
+              {query
+                ? `Search${activeChannel ? ` in #${activeChannel.name}` : ""}`
+                : activeChannel
+                  ? `#${activeChannel.name}`
+                  : "Select a channel"}
             </h1>
             {activeChannel?.topic && (
               <p className="truncate text-2xs text-muted-foreground">
@@ -130,6 +143,7 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <SearchBox channelId={channelId} query={query} />
             <ReadStateNotice
               canSync={readState.canSync}
               error={readState.error}
@@ -138,7 +152,13 @@ export function ChatPage({ channelId }: { channelId: string | null }) {
           </div>
         </header>
 
-        {channelId ? (
+        {query ? (
+          <SearchResults
+            query={query}
+            channels={channels.data ?? []}
+            scopeChannelId={channelId}
+          />
+        ) : channelId ? (
           <>
             <MessageTimeline
               rows={timeline.rows}
