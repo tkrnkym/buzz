@@ -188,19 +188,26 @@ export function useSendMessage(channelId: string | null) {
     mutationFn: async (input: {
       content: string;
       thread?: { rootId: string; parentId: string };
+      /** NIP-92 `imeta` tags for attachments already uploaded. */
+      attachments?: string[][];
     }) => {
       if (!channelId) {
         throw new Error("No channel selected");
       }
       const trimmed = input.content.trim();
-      if (!trimmed) {
+      const attachments = input.attachments ?? [];
+      // An attachment is a message on its own: requiring text alongside it would
+      // mean a picture could not be posted without a caption.
+      if (!trimmed && attachments.length === 0) {
         throw new Error("Message is empty");
       }
-      return session.publish(
-        input.thread
-          ? buildReplyTemplate(channelId, trimmed, input.thread)
-          : buildMessageTemplate(channelId, trimmed),
-      );
+      const template = input.thread
+        ? buildReplyTemplate(channelId, trimmed, input.thread)
+        : buildMessageTemplate(channelId, trimmed);
+      return session.publish({
+        ...template,
+        tags: [...template.tags, ...attachments],
+      });
     },
     onSuccess: () => {
       // A first message in a channel can change what the sidebar should show.

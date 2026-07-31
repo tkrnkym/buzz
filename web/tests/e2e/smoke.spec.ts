@@ -1115,6 +1115,114 @@ test("a channel read past its newest message shows no badge", async ({
   await expect(nav.getByText("Unread messages")).toHaveCount(0);
 });
 
+test("attaching a file uploads it and publishes its imeta", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  // The relay authorizes an upload for one exact file: the X-SHA-256 header and
+  // the kind:24242 auth event's `x` tag must agree, or it is rejected. The mock
+  // enforces that, so a client that signs for different bytes than it sends
+  // fails here rather than in production.
+  let uploadRequest: { sha256: string | undefined; authX: string | undefined } =
+    { sha256: undefined, authX: undefined };
+  await page.route("**/upload", async (route) => {
+    const headers = route.request().headers();
+    const auth = headers.authorization ?? "";
+    const authEvent = JSON.parse(
+      Buffer.from(auth.replace(/^Nostr /, ""), "base64").toString("utf8"),
+    ) as { kind: number; tags: string[][]; content: string };
+
+    uploadRequest = {
+      sha256: headers["x-sha-256"],
+      authX: authEvent.tags.find((tag) => tag[0] === "x")?.[1],
+    };
+
+    expect(route.request().method()).toBe("PUT");
+    expect(authEvent.kind).toBe(24242);
+    expect(authEvent.tags).toContainEqual(["t", "upload"]);
+    // BUD-11 requires a non-empty reason and the relay rejects a blank one.
+    expect(authEvent.content.trim().length).toBeGreaterThan(0);
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        url: "https://relay.test/media/cat.png",
+        sha256: uploadRequest.sha256,
+        size: 5,
+        type: "image/png",
+        uploaded: 1_700_000_000,
+        dim: "800x600",
+      }),
+    });
+  });
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page
+    .getByRole("textbox", { name: /^Message #/ })
+    .waitFor({ state: "visible" });
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "cat.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("hello"),
+  });
+
+  // The attachment is uploaded on pick, not on send: a send that had to upload
+  // first would fail the message along with the transfer.
+  await expect(
+    page.getByRole("button", { name: "Remove cat.png" }),
+  ).toBeVisible();
+  expect(uploadRequest.sha256).toBe(uploadRequest.authX);
+  expect(uploadRequest.sha256).toMatch(/^[0-9a-f]{64}$/);
+
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect
+    .poll(() => relay.published.some((e) => (e as { kind: number }).kind === 9))
+    .toBe(true);
+  const message = relay.published.find(
+    (e) => (e as { kind: number }).kind === 9,
+  ) as { tags: string[][]; content: string };
+
+  const imeta = message.tags.find((tag) => tag[0] === "imeta");
+  expect(imeta).toBeDefined();
+  expect(imeta).toContain("url https://relay.test/media/cat.png");
+  // Without `dim` the timeline jumps when the image decodes.
+  expect(imeta).toContain("dim 800x600");
+  // And the URL must reach the body, because the renderer keys imeta off the
+  // URL it finds there — a tag alone renders nothing.
+  expect(message.content).toContain("https://relay.test/media/cat.png");
+});
+
+test("a refused upload keeps the message and says why", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.route("**/upload", async (route) => {
+    await route.fulfill({ status: 413, body: "too big" });
+  });
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: /^Message #/ });
+  await composer.fill("look at this");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "big.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("x"),
+  });
+
+  // Actionable, not a status code.
+  await expect(page.getByText(/too large/i)).toBeVisible();
+  // The typed text survives, and nothing half-attached is left behind to be
+  // published as a broken link.
+  await expect(composer).toHaveValue("look at this");
+  await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+});
+
 test("a typing indicator appears and clears when the message lands", async ({
   page,
 }) => {
