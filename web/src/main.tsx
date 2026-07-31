@@ -22,6 +22,13 @@ const queryClient = new QueryClient({
   },
 });
 
+// Standalone demo (GitHub Pages): swap the relay for the in-browser mock
+// before anything mounts. Dynamic import keeps it out of production bundles.
+if (import.meta.env.VITE_MOCK_RELAY === "1") {
+  const { enableMockRelay } = await import("@/mock/mock-relay");
+  enableMockRelay();
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

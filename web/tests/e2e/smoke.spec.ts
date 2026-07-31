@@ -34,7 +34,7 @@ test("invite requires age and legal consent before opening Nuxx", async ({
 
   const ageConfirmation = page.getByLabel("I am 18 years of age or older.");
   const agreementConfirmation = page.getByLabel(
-    "I agree to the Nuxx Terms of Service and Privacy Policy.",
+    "I agree to the channels.nuxx.ai Terms of Service and Privacy Policy.",
   );
   const acceptInvite = page.getByRole("button", {
     name: "Accept invite in Nuxx",
@@ -63,7 +63,8 @@ test("invite requires age and legal consent before opening Nuxx", async ({
   await page
     .locator("label")
     .filter({
-      hasText: "I agree to the Nuxx Terms of Service and Privacy Policy.",
+      hasText:
+        "I agree to the channels.nuxx.ai Terms of Service and Privacy Policy.",
     })
     .click({ position: { x: 8, y: 8 } });
   await expect(agreementConfirmation).toBeChecked();
@@ -157,6 +158,271 @@ test("invite can enroll a NIP-07 identity for browser access", async ({
   await expect(page).toHaveURL("/");
   expect(claimObserved).toBe(true);
 });
+
+interface QueryFilter {
+  kinds?: number[];
+  authors?: string[];
+  since?: number;
+  limit?: number;
+  before_id?: string;
+  search?: string;
+  page?: number;
+  "#h"?: string[];
+}
+
+function mockRelay(
+  page: import("@playwright/test").Page,
+  options: {
+    extraMessages?: unknown[];
+    auxEvents?: unknown[];
+    /**
+     * Channel id -> last-activity unix seconds, served as kind:39007 activity
+     * snapshots. Delivered both to the initial `POST /query` and live over the
+     * subscription, which is how the relay serves them.
+     */
+    channelActivity?: Record<string, number>;
+    /** Served to the kind:20001 presence read over `POST /query`. */
+    presenceEvents?: unknown[];
+    /** Extra kind:39000 metadata, for rooms beyond the default one. */
+    extraChannels?: unknown[];
+    /** Served to the kind:30078 read-state read. */
+    readStateEvents?: unknown[];
+    /** Served to the kind:20002 typing subscription. */
+    typingEvents?: unknown[];
+    /** Served to a `POST /query` carrying a scrollback cursor. */
+    olderMessages?: unknown[];
+    /** Served to a NIP-50 search, by page number (1-based). */
+    searchPages?: Record<number, unknown[]>;
+    /**
+     * Hold back the OK for a read-state write, so a spec can advance a second
+     * cursor while the first publish is still in flight.
+     */
+    delayReadStateOkMs?: number;
+  } = {},
+) {
+  const published: unknown[][] = [];
+  /** Every REQ filter the client opened, so a spec can assert what it did not. */
+  const subscriptions: QueryFilter[] = [];
+  /** Every `POST /query` body, as an array of filters per request. */
+  const queries: QueryFilter[][] = [];
+  /** Cursors the client paged with, in order. */
+  const historyRequests: { until: number; beforeId: string }[] = [];
+  /** Search filters the client sent, in order. */
+  const searchRequests: QueryFilter[] = [];
+
+  const channelMetadata = {
+    id: "a".repeat(64),
+    pubkey: "b".repeat(64),
+    kind: 39000,
+    created_at: 1_700_000_000,
+    tags: [
+      ["d", "11111111-1111-1111-1111-111111111111"],
+      ["name", "general"],
+      ["about", "Everything else"],
+      ["public"],
+      ["closed"],
+      ["t", "stream"],
+      ["topic", "ship it"],
+    ],
+    content: "",
+    sig: "c".repeat(128),
+  };
+
+  const message = {
+    id: "d".repeat(64),
+    pubkey: "e".repeat(64),
+    kind: 9,
+    created_at: 1_700_000_100,
+    tags: [["h", "11111111-1111-1111-1111-111111111111"]],
+    content: "hello from the mocked relay",
+    sig: "f".repeat(128),
+  };
+
+  /**
+   * Build the kind:39007 snapshots for the seeded activity.
+   *
+   * Sharded the way the relay shards, so a spec that seeds two channels
+   * exercises the merge across shards rather than a single event — replacing
+   * instead of merging would pass a one-shard test and lose badges in real use.
+   */
+  const activitySnapshots = () => {
+    const byShard = new Map<number, Record<string, number>>();
+    for (const [channelId, at] of Object.entries(
+      options.channelActivity ?? {},
+    )) {
+      // Same rule as `shard_of` in nuxx-core: the UUID's last bytes, mod the
+      // shard count.
+      const shard =
+        Number.parseInt(channelId.replace(/-/g, "").slice(-8), 16) % 16;
+      byShard.set(shard, { ...(byShard.get(shard) ?? {}), [channelId]: at });
+    }
+    return [...byShard].map(([shard, channels]) => ({
+      id: `39007${shard}`.padEnd(64, "0"),
+      pubkey: "b".repeat(64),
+      kind: 39007,
+      created_at: 1_900_000_000,
+      tags: [["d", `activity:${shard}`]],
+      content: JSON.stringify({ shard, channels }),
+      sig: "f".repeat(128),
+    }));
+  };
+
+  return {
+    published,
+    subscriptions,
+    queries,
+    historyRequests,
+    searchRequests,
+    install: async () => {
+      await page.route("**/query", async (route) => {
+        const body = JSON.parse(route.request().postData() ?? "{}") as {
+          filters?: QueryFilter[];
+        };
+        const filters = body.filters ?? [];
+        queries.push(filters);
+
+        const events: unknown[] = [];
+        for (const filter of filters) {
+          if (filter.kinds?.includes(20001)) {
+            events.push(...(options.presenceEvents ?? []));
+          } else if (filter.kinds?.includes(39007)) {
+            events.push(...activitySnapshots());
+          } else if (filter.search) {
+            searchRequests.push(filter);
+            // The relay's p-gate rejects a search that names no kinds, so the
+            // mock does too — a client that stopped sending them would pass
+            // here and 403 in production.
+            if (!filter.kinds || filter.kinds.length === 0) {
+              await route.fulfill({
+                status: 403,
+                body: "restricted: kinds required",
+              });
+              return;
+            }
+            events.push(...(options.searchPages?.[filter.page ?? 1] ?? []));
+          } else if (filter.before_id) {
+            // A scrollback page. The relay requires `until` alongside
+            // `before_id` and rejects one without the other, so the mock does
+            // too — a client that sent a half cursor would pass otherwise.
+            if (filter.until === undefined) {
+              await route.fulfill({
+                status: 400,
+                body: "before_id requires until",
+              });
+              return;
+            }
+            historyRequests.push({
+              until: filter.until,
+              beforeId: filter.before_id,
+            });
+            events.push(...(options.olderMessages ?? []));
+          }
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(events),
+        });
+      });
+
+      await page.routeWebSocket(
+        (url) => url.protocol === "ws:" || url.protocol === "wss:",
+        (ws) => {
+          // Nuxx relays always challenge before serving anything.
+          ws.send(JSON.stringify(["AUTH", "challenge-from-mock"]));
+
+          ws.onMessage((raw) => {
+            const frame = JSON.parse(String(raw));
+            const [verb] = frame;
+
+            if (verb === "AUTH") {
+              ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
+              return;
+            }
+
+            if (verb === "EVENT") {
+              published.push(frame[1]);
+              const delay =
+                frame[1].kind === 30078 ? (options.delayReadStateOkMs ?? 0) : 0;
+              if (delay > 0) {
+                setTimeout(
+                  () => ws.send(JSON.stringify(["OK", frame[1].id, true, ""])),
+                  delay,
+                );
+                return;
+              }
+              ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
+              // Echo it back on the live subscription, as a relay would.
+              ws.send(JSON.stringify(["EVENT", "s1", frame[1]]));
+              return;
+            }
+
+            if (verb === "REQ") {
+              const [, subId, filter] = frame;
+              subscriptions.push(filter);
+              if (filter.kinds.includes(39000)) {
+                ws.send(JSON.stringify(["EVENT", subId, channelMetadata]));
+                for (const extra of options.extraChannels ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
+              } else if (filter.kinds.includes(30078)) {
+                for (const readState of options.readStateEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, readState]));
+                }
+              } else if (filter.kinds.includes(9) && filter["#h"]) {
+                // Echo the requested channel back on the `h` tag so a spec that
+                // opens two rooms sees each one's own timeline.
+                ws.send(
+                  JSON.stringify([
+                    "EVENT",
+                    subId,
+                    {
+                      ...message,
+                      // Real event ids are 64 hex chars; the channel UUID's
+                      // dashes would make this an id no relay could emit, and a
+                      // spec asserting on cursor shape would fail on the
+                      // fixture rather than on the client.
+                      id: `${filter["#h"][0]}`
+                        .replace(/-/g, "")
+                        .padEnd(64, "0")
+                        .slice(0, 64),
+                      tags: [["h", filter["#h"][0]]],
+                    },
+                  ]),
+                );
+                for (const extra of options.extraMessages ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, extra]));
+                }
+              } else if (filter.kinds.includes(39007)) {
+                // Live badge updates. The relay never stores these, so a real
+                // subscription only carries what happens after it opens — the
+                // initial picture comes from `POST /query`. The mock replays the
+                // seeded state here anyway, so a spec that breaks the query path
+                // cannot be rescued by the socket without the query assertions
+                // noticing.
+                for (const snapshot of activitySnapshots()) {
+                  ws.send(JSON.stringify(["EVENT", subId, snapshot]));
+                }
+              } else if (filter.kinds.includes(20002)) {
+                for (const typing of options.typingEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, typing]));
+                }
+              } else if (filter.kinds.includes(7)) {
+                // The #e-keyed auxiliary read: reactions and NIP-09 deletes,
+                // neither of which carries an `h` tag.
+                for (const aux of options.auxEvents ?? []) {
+                  ws.send(JSON.stringify(["EVENT", subId, aux]));
+                }
+              }
+              ws.send(JSON.stringify(["EOSE", subId]));
+            }
+          });
+        },
+      );
+    },
+  };
+}
 
 test("chat lists channels from kind:39000 metadata", async ({ page }) => {
   const relay = mockRelay(page);

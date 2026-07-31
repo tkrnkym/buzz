@@ -4,6 +4,8 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  // "/" locally and behind the relay; "/<repo>/" for GitHub Pages builds.
+  base: process.env.VITE_BASE || "/",
   plugins: [
     tanstackRouter({
       target: "react",

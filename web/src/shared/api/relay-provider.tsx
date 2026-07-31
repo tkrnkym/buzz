@@ -19,9 +19,17 @@ import {
 import {
   RelaySession,
   type RelayConnectionState,
+  type RelaySessionOptions,
 } from "@/shared/api/relay-session";
 import { relayWsUrl } from "@/shared/lib/relay-url";
 import { resolveSigner } from "@/shared/lib/signer";
+
+declare global {
+  interface Window {
+    /** Installed by the standalone demo (`mock/mock-relay.ts`) before mount. */
+    __NUXX_MOCK_SOCKET_FACTORY__?: RelaySessionOptions["socketFactory"];
+  }
+}
 
 const RelaySessionContext = createContext<RelaySession | null>(null);
 
@@ -34,7 +42,14 @@ export function RelaySessionProvider({
 }) {
   const resolvedUrl = url ?? relayWsUrl();
   const session = useMemo(
-    () => new RelaySession({ url: resolvedUrl, signer: resolveSigner() }),
+    () =>
+      new RelaySession({
+        url: resolvedUrl,
+        signer: resolveSigner(),
+        // Present only in the standalone demo build (set by enableMockRelay
+        // before the first render); undefined everywhere else.
+        socketFactory: window.__NUXX_MOCK_SOCKET_FACTORY__,
+      }),
     [resolvedUrl],
   );
 
