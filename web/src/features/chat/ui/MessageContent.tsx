@@ -5,6 +5,7 @@ import {
   isMessageLink,
   resolveMessageLinkRenderTarget,
 } from "@/features/chat/message-link";
+import { useMentionLabels } from "@/features/profile/use-mention-labels";
 import { Markdown, type LinkRenderer } from "@/shared/ui/markdown/Markdown";
 import type { ImetaEntry } from "@/shared/ui/markdown/parse-imeta";
 
@@ -12,8 +13,9 @@ import type { ImetaEntry } from "@/shared/ui/markdown/parse-imeta";
  * Chat-side composition of the markdown primitive.
  *
  * This is where app knowledge lives: `nuxx://message` links become in-app
- * navigation, and everything else falls through to the primitive's default
- * handling. The renderer itself stays feature-agnostic.
+ * navigation, `@Name` chips against the people this client knows, and
+ * everything else falls through to the primitive's default handling. The
+ * renderer itself stays feature-agnostic.
  */
 export function MessageContent({
   content,
@@ -22,6 +24,7 @@ export function MessageContent({
   content: string;
   imeta?: Map<string, ImetaEntry>;
 }) {
+  const { labels, isSelfMention } = useMentionLabels();
   const renderLink = useCallback<LinkRenderer>(({ href, label, children }) => {
     const target = resolveMessageLinkRenderTarget({ href, label });
     if (target.kind === "none") {
@@ -68,6 +71,8 @@ export function MessageContent({
       preserveUrl={isMessageLink}
       renderLink={renderLink}
       imeta={imeta}
+      mentionLabels={labels}
+      isSelfMention={isSelfMention}
     />
   );
 }

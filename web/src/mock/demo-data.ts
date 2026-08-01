@@ -15,6 +15,7 @@
 
 import {
   KIND_NIP29_DELETE_EVENT,
+  KIND_NIP29_GROUP_MEMBERS,
   KIND_NIP29_GROUP_METADATA,
   KIND_PRESENCE_UPDATE,
   KIND_PROFILE,
@@ -232,6 +233,55 @@ export const CHANNELS: NostrEvent[] = [
   dmChannel(CH_DM, [MISAKI, KEN]),
 ];
 
+/**
+ * A channel's member list, as NIP-29 kind:39002 — keyed by the channel id in `d`
+ * and carrying the role in the fourth slot of each `p` tag.
+ *
+ * These are what the mention autocomplete and the DM picker read: the client has
+ * no user-search endpoint, so who a reader can address is exactly who shares a
+ * channel with them.
+ */
+function memberList(
+  channelId: string,
+  members: [pubkey: string, role: string][],
+): NostrEvent {
+  return event(
+    `members:${channelId}`,
+    KIND_NIP29_GROUP_MEMBERS,
+    RELAY,
+    ago(60 * 24 * 30),
+    "",
+    [
+      ["d", channelId],
+      ...members.map(([pubkey, role]) => ["p", pubkey, "", role]),
+    ],
+  );
+}
+
+export const MEMBER_LISTS: NostrEvent[] = [
+  memberList(CH_GENERAL, [
+    [MISAKI, "owner"],
+    [KEN, "admin"],
+    [AYA, "member"],
+  ]),
+  memberList(CH_DEV, [
+    [MISAKI, "admin"],
+    [KEN, "member"],
+  ]),
+  memberList(CH_DESIGN, [
+    [AYA, "admin"],
+    [MISAKI, "member"],
+  ]),
+  memberList(CH_RANDOM, [
+    [KEN, "member"],
+    [AYA, "member"],
+  ]),
+  memberList(CH_ANNOUNCE, [
+    [MISAKI, "owner"],
+    [RELAY, "admin"],
+  ]),
+];
+
 /** The thread root in #general, replied to three times. */
 const THREAD_ROOT = "gen-4";
 
@@ -263,12 +313,16 @@ export const MESSAGES: NostrEvent[] = [
     ago(176),
     "昨日の件、リリースブランチを切りました。`release/0.4` です",
   ),
+  // A mention: the `@田中 健` in the body is what every client renders, and the
+  // `p` tag is what actually notifies him. The chip only appears because his
+  // kind:0 name is known — an unresolved `@name` stays plain text.
   message(
     "gen-3",
     CH_GENERAL,
     MISAKI,
     ago(174),
-    "取り込み漏れがあったら今日中に教えてください",
+    "@田中 健 取り込み漏れがあったら今日中に教えてください",
+    [["p", KEN]],
   ),
   message(
     "gen-4",
@@ -551,6 +605,7 @@ export const OLDER_MESSAGES: NostrEvent[] = Array.from(
 export const SEEDED: NostrEvent[] = [
   ...PROFILES,
   ...CHANNELS,
+  ...MEMBER_LISTS,
   ...MESSAGES,
   ...SYSTEM_MESSAGES,
   ...REACTIONS,

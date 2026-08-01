@@ -321,6 +321,7 @@ export function ChatPage({
             <MessageComposer
               channelId={channelId}
               channelName={activeLabel ?? channelId}
+              channelParticipants={activeChannel?.participantPubkeys}
               isDm={isDm}
               onCancelReply={onCloseThread}
               onComposing={typing.announce}

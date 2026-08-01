@@ -1,9 +1,19 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useCallback, useRef, useState } from "react";
 import { Paperclip, X } from "lucide-react";
 
-import { useSendMessage } from "@/features/chat/use-chat";
+import { useMyPubkey, useSendMessage } from "@/features/chat/use-chat";
 import { formatBytes } from "@/features/chat/upload";
 import { useUpload } from "@/features/chat/use-upload";
+import { useDirectory } from "@/features/directory/use-directory";
+import { UserPicker } from "@/features/directory/ui/UserPicker";
+import {
+  activeMentionQuery,
+  applyMention,
+  mentionRecipients,
+  mentionTags,
+  survivingMentions,
+} from "@/features/messages/lib/mentions";
+import { useProfiles } from "@/features/profile/profile-store";
 import { useUserLabels } from "@/features/profile/use-user-label";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -21,6 +31,7 @@ const EMPTY_PUBKEYS: string[] = [];
 export function MessageComposer({
   channelId,
   channelName,
+  channelParticipants,
   isDm = false,
   replyTo,
   onCancelReply,
@@ -29,6 +40,8 @@ export function MessageComposer({
 }: {
   channelId: string;
   channelName: string;
+  /** A DM's participants, who are addressed whether or not the text names them. */
+  channelParticipants?: string[];
   /** A DM is addressed by a person's name, not by a hashed channel name. */
   isDm?: boolean;
   replyTo: ReplyTarget | null;
@@ -42,6 +55,52 @@ export function MessageComposer({
   const sendMessage = useSendMessage(channelId);
   const upload = useUpload();
   const fileInput = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const myPubkey = useMyPubkey();
+  const directory = useDirectory();
+  const directoryProfiles = useProfiles([]);
+  /**
+   * Mentions inserted through the picker, with the label each one wrote.
+   *
+   * Kept here rather than derived from the text on send: two people can share a
+   * display name, so parsing `@Name` back to a pubkey is ambiguous. What the
+   * author *chose* is unambiguous, and `survivingMentions` drops any whose text
+   * they then deleted.
+   */
+  const insertedMentions = useRef<{ pubkey: string; label: string }[]>([]);
+  const [mention, setMention] = useState<{
+    query: string;
+    from: number;
+  } | null>(null);
+  const pickerKeyHandler = useRef<((event: KeyboardEvent) => boolean) | null>(
+    null,
+  );
+
+  const syncMentionQuery = useCallback((value: string, caret: number) => {
+    setMention(activeMentionQuery(value, caret));
+  }, []);
+
+  const pickMention = useCallback(
+    (entry: { pubkey: string; label: string }) => {
+      const input = inputRef.current;
+      if (!mention || !input) return;
+      const caret = input.selectionStart ?? draft.length;
+      const next = applyMention(draft, mention.from, caret, entry.label);
+      insertedMentions.current = [
+        ...insertedMentions.current,
+        { pubkey: entry.pubkey, label: entry.label },
+      ];
+      setDraft(next.text);
+      setMention(null);
+      // Restore the caret after React has written the new value, or the browser
+      // puts it at the end and the author types into the wrong place.
+      requestAnimationFrame(() => {
+        input.focus();
+        input.setSelectionRange(next.caret, next.caret);
+      });
+    },
+    [draft, mention],
+  );
   // The person being replied to. `labelOf`, so replying to yourself reads
   // "Reply to You" rather than repeating your own name back at you.
   const { labelOf } = useUserLabels(
@@ -70,12 +129,22 @@ export function MessageComposer({
     ) {
       return;
     }
+    const recipients = mentionRecipients({
+      channelParticipants,
+      explicitMentions: survivingMentions(content, insertedMentions.current),
+      isDm,
+      senderPubkey: myPubkey,
+    });
+
     // Clear only after the relay accepts: a rejected send must not lose the
     // author's text or make them upload again.
     sendMessage.mutate(
       {
         content,
-        attachments: upload.attachments.map((attachment) => attachment.imeta),
+        attachments: [
+          ...upload.attachments.map((attachment) => attachment.imeta),
+          ...mentionTags(recipients),
+        ],
         ...(replyTo
           ? { thread: { rootId: replyTo.rootId, parentId: replyTo.parentId } }
           : {}),
@@ -84,6 +153,8 @@ export function MessageComposer({
         onSuccess: (event) => {
           setDraft("");
           upload.clear();
+          insertedMentions.current = [];
+          setMention(null);
           onSent({
             pubkey: event.pubkey,
             threadHeadId: replyTo?.parentId ?? null,
@@ -151,6 +222,22 @@ export function MessageComposer({
         </ul>
       )}
 
+      {mention && (
+        <div className="relative">
+          <UserPicker
+            className="absolute bottom-1 left-0 w-72"
+            emptyLabel="Nobody here matches that."
+            entries={directory}
+            onPick={pickMention}
+            profiles={directoryProfiles}
+            query={mention.query}
+            registerKeyHandler={(handler) => {
+              pickerKeyHandler.current = handler;
+            }}
+          />
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <input
           ref={fileInput}
@@ -174,16 +261,40 @@ export function MessageComposer({
           <Paperclip aria-hidden className="size-4" />
         </Button>
         <Input
+          ref={inputRef}
           value={draft}
           onChange={(changeEvent) => {
-            setDraft(changeEvent.target.value);
-            if (changeEvent.target.value.trim()) {
+            const value = changeEvent.target.value;
+            setDraft(value);
+            syncMentionQuery(
+              value,
+              changeEvent.target.selectionStart ?? value.length,
+            );
+            if (value.trim()) {
               onComposing(
                 replyTo
                   ? { rootId: replyTo.rootId, parentId: replyTo.parentId }
                   : undefined,
               );
             }
+          }}
+          onKeyDown={(keyEvent) => {
+            // The picker moves its own highlight but never takes focus: pulling
+            // focus off the field to arrow through a list would interrupt typing.
+            if (mention && pickerKeyHandler.current?.(keyEvent.nativeEvent)) {
+              keyEvent.preventDefault();
+              return;
+            }
+            if (mention && keyEvent.key === "Escape") {
+              keyEvent.preventDefault();
+              setMention(null);
+            }
+          }}
+          // Clicking elsewhere in the text can move the caret out of the `@`
+          // token, which should close the picker.
+          onSelect={(selectEvent) => {
+            const target = selectEvent.target as HTMLInputElement;
+            syncMentionQuery(target.value, target.selectionStart ?? 0);
           }}
           placeholder={label}
           aria-label={label}

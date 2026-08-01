@@ -201,6 +201,8 @@ function mockRelay(
     delayReadStateOkMs?: number;
     /** kind:0 metadata served for a profile lookup. */
     profileEvents?: unknown[];
+    /** kind:39002 member lists, from which the directory is built. */
+    memberEvents?: unknown[];
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -315,6 +317,8 @@ function mockRelay(
                 (event) => (event as { kind: number }).kind === 0,
               ),
             );
+          } else if (filter.kinds?.includes(39002)) {
+            events.push(...(options.memberEvents ?? []));
           } else if (filter.kinds?.includes(20001)) {
             events.push(...(options.presenceEvents ?? []));
           } else if (filter.kinds?.includes(39007)) {
@@ -1007,10 +1011,12 @@ test("opening a DM publishes kind:41010 with only p tags", async ({ page }) => {
 
   await page.goto("/");
   await page.getByTestId("open-new-dm").click();
-  // Split on anything non-hex, so a pasted list works however it is separated.
-  await page
-    .getByTestId("new-dm-pubkeys")
-    .fill(`${"a".repeat(64)}, ${"b".repeat(64)}`);
+  // The pasted-key path stays first-class: someone who shares no channel with
+  // the reader is not in the directory and cannot be searched for.
+  for (const key of ["a".repeat(64), "b".repeat(64)]) {
+    await page.getByTestId("new-dm-search").fill(key);
+    await page.getByTestId("new-dm-add-pubkey").click();
+  }
   await page.getByTestId("new-dm-submit").click();
 
   const opened = relay.published.find(
@@ -1031,13 +1037,151 @@ test("a DM cannot be opened without a whole public key", async ({ page }) => {
 
   await page.goto("/");
   await page.getByTestId("open-new-dm").click();
-  await page.getByTestId("new-dm-pubkeys").fill("alice");
+  await page.getByTestId("new-dm-search").fill("alice");
+  // Not a whole key and not anyone in the directory: nothing to add, so there is
+  // nobody to open a conversation with.
+  await expect(page.getByTestId("new-dm-add-pubkey")).toHaveCount(0);
   await expect(page.getByTestId("new-dm-submit")).toBeDisabled();
   expect(
     relay.published.filter(
       (event) => (event as { kind: number }).kind === 41010,
     ),
   ).toEqual([]);
+});
+
+/** A kind:39002 member list, which is where the directory comes from. */
+function memberList(channelId: string, members: [string, string][]) {
+  return {
+    id: `39002${channelId.replace(/-/g, "")}`.padEnd(64, "0").slice(0, 64),
+    pubkey: "b".repeat(64),
+    kind: 39002,
+    created_at: 1_700_000_000,
+    tags: [
+      ["d", channelId],
+      ...members.map(([pubkey, role]) => ["p", pubkey, "", role]),
+    ],
+    content: "",
+    sig: "f".repeat(128),
+  };
+}
+
+const MENTIONABLE = "e".repeat(64);
+
+/** Directory fixtures: one member with a profile, in the default channel. */
+function directoryOptions() {
+  return {
+    memberEvents: [
+      memberList(CHANNEL_UUID, [
+        [MENTIONABLE, "admin"],
+        [MY_PUBKEY, "member"],
+      ]),
+    ],
+    profileEvents: [
+      {
+        id: "0c".repeat(32),
+        pubkey: MENTIONABLE,
+        kind: 0,
+        created_at: 1_700_000_000,
+        tags: [],
+        content: JSON.stringify({ display_name: "Erin Example", name: "erin" }),
+        sig: "f".repeat(128),
+      },
+    ],
+  };
+}
+
+test("a mention completes from the directory and publishes a p tag", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, directoryOptions());
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  // The handle finds the display name: an author types what they remember.
+  await composer.fill("@eri");
+  await page.getByTestId("user-picker-Erin Example").click();
+  await expect(composer).toHaveValue("@Erin Example ");
+
+  await composer.fill("@Erin Example please look");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content.includes("please look"),
+  ) as { tags: string[][] };
+  // The `p` tag is what notifies, and it carries the pubkey the author chose
+  // rather than a name parsed back out of the text.
+  expect(sent.tags).toContainEqual(["p", MENTIONABLE]);
+});
+
+test("a mention deleted before sending notifies nobody", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, directoryOptions());
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("@eri");
+  await page.getByTestId("user-picker-Erin Example").click();
+  // The author thinks better of it and removes the name.
+  await composer.fill("never mind");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content === "never mind",
+  ) as { tags: string[][] };
+  expect(sent.tags.every((tag) => tag[0] !== "p")).toBe(true);
+});
+
+test("a known name renders as a mention chip, an unknown one does not", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    extraMessages: [
+      markdownMessage("b", "@Erin Example and @Nobody Here", [
+        ["p", MENTIONABLE],
+      ]),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.locator("[data-mention]")).toHaveCount(1);
+  await expect(page.locator("[data-mention]")).toHaveText("@Erin Example");
+  // A chip asserts this client resolved a person; an unknown handle stays text.
+  await expect(page.getByText("@Nobody Here")).toBeVisible();
+});
+
+test("a DM addresses its participants even when the text names nobody", async ({
+  page,
+}) => {
+  const DM_UUID = "22222222-2222-2222-2222-222222222222";
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraChannels: [dmChannel(DM_UUID)] });
+  await relay.install();
+
+  await page.goto(`/c/${DM_UUID}`);
+  await page
+    .getByRole("textbox", { name: /^Message / })
+    .fill("just between us");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content === "just between us",
+  ) as { tags: string[][] };
+  // The other participant, and not the sender: a client that tagged its own
+  // author would badge every conversation the moment it spoke in one.
+  expect(sent.tags).toContainEqual(["p", MENTIONABLE]);
+  expect(sent.tags).not.toContainEqual(["p", MY_PUBKEY]);
 });
 
 test("an edit and a tombstone from the relay both reach the timeline", async ({
