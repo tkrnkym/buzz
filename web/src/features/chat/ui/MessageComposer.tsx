@@ -13,6 +13,7 @@ import {
 } from "@/features/emoji/emoji-model";
 import { EmojiPicker } from "@/features/emoji/ui/EmojiPicker";
 import { useEmojiCatalog } from "@/features/emoji/use-emoji";
+import { useDraft } from "@/features/messages/use-draft";
 import {
   activeMentionQuery,
   applyMention,
@@ -58,7 +59,17 @@ export function MessageComposer({
   /** Called once a message lands, so this author stops showing as typing. */
   onSent: (input: { pubkey: string; threadHeadId: string | null }) => void;
 }) {
-  const [draft, setDraft] = useState("");
+  // The composer's text lives in `useDraft`: it survives a channel switch and a
+  // reload, and stays in this browser rather than becoming an event — see
+  // `lib/drafts.ts` for why.
+  const {
+    text: draft,
+    setText: updateDraft,
+    clear: clearDraft,
+  } = useDraft({
+    channelId,
+    threadRootId: replyTo?.rootId ?? null,
+  });
   const sendMessage = useSendMessage(channelId);
   const upload = useUpload();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -90,6 +101,15 @@ export function MessageComposer({
     null,
   );
 
+  /**
+   * The text as it stands right now.
+   *
+   * Read by the upload handler, which resumes after an await: the `draft` it
+   * closed over when the file was picked is not what the author has typed since.
+   */
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
   const syncQueries = useCallback((value: string, caret: number) => {
     const mentionAt = activeMentionQuery(value, caret);
     setMention(mentionAt);
@@ -109,7 +129,7 @@ export function MessageComposer({
             text: `${draft.slice(0, caret)}${text}${draft.slice(caret)}`,
             caret: caret + text.length,
           };
-      setDraft(next.text);
+      updateDraft(next.text);
       setEmojiQuery(null);
       setEmojiOpen(false);
       requestAnimationFrame(() => {
@@ -117,7 +137,7 @@ export function MessageComposer({
         input?.setSelectionRange(next.caret, next.caret);
       });
     },
-    [draft, emojiQuery],
+    [draft, emojiQuery, updateDraft],
   );
 
   const pickMention = useCallback(
@@ -130,7 +150,7 @@ export function MessageComposer({
         ...insertedMentions.current,
         { pubkey: entry.pubkey, label: entry.label },
       ];
-      setDraft(next.text);
+      updateDraft(next.text);
       setMention(null);
       setEmojiQuery(null);
       // Restore the caret after React has written the new value, or the browser
@@ -140,7 +160,7 @@ export function MessageComposer({
         input.setSelectionRange(next.caret, next.caret);
       });
     },
-    [draft, mention],
+    [draft, mention, updateDraft],
   );
   // The person being replied to. `labelOf`, so replying to yourself reads
   // "Reply to You" rather than repeating your own name back at you.
@@ -155,7 +175,8 @@ export function MessageComposer({
     // The renderer keys `imeta` off the URL in the body, so an attachment that
     // never reaches the text is invisible however complete its tag is.
     if (markdown) {
-      setDraft((current) => (current ? `${current}\n${markdown}` : markdown));
+      const current = draftRef.current;
+      updateDraft(current ? `${current}\n${markdown}` : markdown);
     }
   };
 
@@ -195,7 +216,9 @@ export function MessageComposer({
       },
       {
         onSuccess: (event) => {
-          setDraft("");
+          // Only on success: a rejected send has to leave the text where the
+          // author can still see it.
+          clearDraft();
           upload.clear();
           insertedMentions.current = [];
           setMention(null);
@@ -334,7 +357,7 @@ export function MessageComposer({
           value={draft}
           onChange={(changeEvent) => {
             const value = changeEvent.target.value;
-            setDraft(value);
+            updateDraft(value);
             syncQueries(
               value,
               changeEvent.target.selectionStart ?? value.length,

@@ -1309,6 +1309,73 @@ test("a DM addresses its participants even when the text names nobody", async ({
   expect(sent.tags).not.toContainEqual(["p", MY_PUBKEY]);
 });
 
+test("an unsent draft survives a channel switch and a reload", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const other = "22222222-2222-2222-2222-222222222222";
+  const relay = mockRelay(page, {
+    extraChannels: [
+      {
+        ...dmChannel(other),
+        tags: [
+          ["d", other],
+          ["name", "random"],
+          ["public"],
+          ["closed"],
+          ["t", "stream"],
+        ],
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page
+    .getByRole("textbox", { name: "Message #general" })
+    .fill("half a thought");
+  // The sidebar says where unsent text is — a reader who wandered off needs to
+  // find it again without opening every room.
+  await expect(page.getByTestId("channel-draft-general")).toBeHidden();
+
+  await page.getByTestId("channel-random").click();
+  const otherComposer = page.getByRole("textbox", { name: "Message #random" });
+  // Each room's draft is its own: the text does not follow the reader.
+  await expect(otherComposer).toHaveValue("");
+  await expect(page.getByTestId("channel-draft-general")).toBeVisible();
+
+  await page.reload();
+  await page.getByTestId("channel-general").click();
+  await expect(
+    page.getByRole("textbox", { name: "Message #general" }),
+  ).toHaveValue("half a thought");
+
+  // Nothing was published: a draft is not a message, and half-written text is
+  // the last thing that should reach an event store other clients read.
+  expect(
+    relay.published.filter((event) => (event as { kind: number }).kind === 9),
+  ).toEqual([]);
+});
+
+test("sending clears the draft, and a failed send keeps it", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("this one goes out");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(composer).toHaveValue("");
+
+  await page.reload();
+  await expect(
+    page.getByRole("textbox", { name: "Message #general" }),
+  ).toHaveValue("");
+});
+
 test("an edit and a tombstone from the relay both reach the timeline", async ({
   page,
 }) => {

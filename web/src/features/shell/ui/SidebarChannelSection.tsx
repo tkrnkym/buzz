@@ -6,6 +6,7 @@ import {
   Hash,
   Lock,
   MoreHorizontal,
+  Pencil,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -90,6 +91,8 @@ function UnreadDot({ channelName }: { channelName: string }) {
 }
 
 export interface ChannelRowActions {
+  /** Whether this room holds unsent text, so the reader can find it again. */
+  hasDraft: (channelId: string) => boolean;
   isMuted: (channelId: string) => boolean;
   isStarred: (channelId: string) => boolean;
   onCopyLink: (channel: Channel) => void;
@@ -204,6 +207,17 @@ export function SidebarChannelSection({
                           profiles={rowActions.profiles}
                         />
                         <span className="min-w-0 flex-1 truncate">{label}</span>
+                        {rowActions.hasDraft(channel.id) && !isActive && (
+                          // A pencil rather than a dot: an unread badge means
+                          // someone else wrote something, and a draft means the
+                          // reader did — conflating them would send them into
+                          // the wrong room looking for the wrong thing.
+                          <Pencil
+                            aria-label="Unsent draft"
+                            className="size-3.5 shrink-0 text-sidebar-foreground/45"
+                            data-testid={`channel-draft-${label}`}
+                          />
+                        )}
                         {isMuted && (
                           <BellOff
                             aria-label="Muted"

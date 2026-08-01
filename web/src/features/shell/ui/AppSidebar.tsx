@@ -13,6 +13,7 @@ import {
   useLeaveChannel,
   useOpenDm,
 } from "@/features/channels/use-channel-ops";
+import { useDraftChannels } from "@/features/messages/use-draft";
 import { useProfiles } from "@/features/profile/profile-store";
 import { SearchBox } from "@/features/search/ui/SearchBox";
 import {
@@ -115,8 +116,11 @@ export function AppSidebar({
     [channels, dms, unread],
   );
 
+  const draftChannels = useDraftChannels();
+
   const rowActions = useMemo<ChannelRowActions>(
     () => ({
+      hasDraft: (channelId: string) => draftChannels.has(channelId),
       isMuted: mutes.has,
       isStarred: stars.has,
       labelFor,
@@ -148,6 +152,7 @@ export function AppSidebar({
       onToggleStar: stars.toggle,
     }),
     [
+      draftChannels,
       activeChannelId,
       labelFor,
       leaveChannel,
