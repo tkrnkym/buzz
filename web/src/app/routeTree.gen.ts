@@ -12,6 +12,7 @@ import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
 import { Route as settingsRouteImport } from "./routes/settings";
 import { Route as homeRouteImport } from "./routes/home";
 import { Route as cRouteImport } from "./routes/c";
+import { Route as browseRouteImport } from "./routes/browse";
 import { Route as indexRouteImport } from "./routes/index";
 import { Route as chatDotchannelIdRouteImport } from "./routes/chat.$channelId";
 import { Route as reposDotrepoIdDotblobDotsplatRouteImport } from "./routes/repos.$repoId.blob.$";
@@ -50,6 +51,11 @@ const cRoute = cRouteImport.update({
   path: "/c",
   getParentRoute: () => shellRoute,
 } as any);
+const browseRoute = browseRouteImport.update({
+  id: "/browse",
+  path: "/browse",
+  getParentRoute: () => shellRoute,
+} as any);
 const indexRoute = indexRouteImport.update({
   id: "/",
   path: "/",
@@ -70,6 +76,7 @@ const reposDotrepoIdDotblobDotsplatRoute =
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
   "/repos": typeof reposRoute;
+  "/browse": typeof browseRoute;
   "/c": typeof cRoute;
   "/home": typeof homeRoute;
   "/settings": typeof settingsRoute;
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/repos": typeof reposRoute;
   "/": typeof indexRoute;
+  "/browse": typeof browseRoute;
   "/c": typeof cRoute;
   "/home": typeof homeRoute;
   "/settings": typeof settingsRoute;
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   "/_shell": typeof shellRouteWithChildren;
   "/repos": typeof reposRoute;
   "/_shell/": typeof indexRoute;
+  "/_shell/browse": typeof browseRoute;
   "/_shell/c": typeof cRoute;
   "/_shell/home": typeof homeRoute;
   "/_shell/settings": typeof settingsRoute;
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/repos"
+    | "/browse"
     | "/c"
     | "/home"
     | "/settings"
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
   to:
     | "/repos"
     | "/"
+    | "/browse"
     | "/c"
     | "/home"
     | "/settings"
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | "/_shell"
     | "/repos"
     | "/_shell/"
+    | "/_shell/browse"
     | "/_shell/c"
     | "/_shell/home"
     | "/_shell/settings"
@@ -198,6 +210,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof cRouteImport;
       parentRoute: typeof shellRoute;
     };
+    "/_shell/browse": {
+      id: "/_shell/browse";
+      path: "/browse";
+      fullPath: "/browse";
+      preLoaderRoute: typeof browseRouteImport;
+      parentRoute: typeof shellRoute;
+    };
     "/_shell/": {
       id: "/_shell/";
       path: "/";
@@ -224,6 +243,7 @@ declare module "@tanstack/react-router" {
 
 interface shellRouteChildren {
   indexRoute: typeof indexRoute;
+  browseRoute: typeof browseRoute;
   cRoute: typeof cRoute;
   homeRoute: typeof homeRoute;
   settingsRoute: typeof settingsRoute;
@@ -232,6 +252,7 @@ interface shellRouteChildren {
 
 const shellRouteChildren: shellRouteChildren = {
   indexRoute: indexRoute,
+  browseRoute: browseRoute,
   cRoute: cRoute,
   homeRoute: homeRoute,
   settingsRoute: settingsRoute,

@@ -1309,6 +1309,91 @@ test("a DM addresses its participants even when the text names nobody", async ({
   expect(sent.tags).not.toContainEqual(["p", MY_PUBKEY]);
 });
 
+test("the channel browser lists open rooms this reader is not in", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const openId = "33333333-3333-3333-3333-333333333333";
+  const secretId = "44444444-4444-4444-4444-444444444444";
+  const browsable = (id: string, name: string, extra: string[][] = []) => ({
+    id: id.replace(/-/g, "").padEnd(64, "0").slice(0, 64),
+    pubkey: "b".repeat(64),
+    kind: 39000,
+    created_at: 1_700_000_600,
+    tags: [
+      ["d", id],
+      ["name", name],
+      ["about", `${name} room`],
+      ["closed"],
+      ["t", "stream"],
+      ...extra,
+    ],
+    content: "",
+    sig: "c".repeat(128),
+  });
+  const relay = mockRelay(page, {
+    extraChannels: [
+      browsable(openId, "release", [["public"]]),
+      browsable(secretId, "secret", [["private"]]),
+    ],
+    // The reader is in #general only.
+    memberEvents: [memberList(CHANNEL_UUID, [[MY_PUBKEY, "member"]])],
+  });
+  await relay.install();
+
+  await page.goto("/browse");
+  await expect(page.getByTestId("browse-channel-release")).toBeVisible();
+  // Already joined, so it is not on offer.
+  await expect(
+    page.getByTestId("browse-available").getByText("general"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByTestId("browse-joined").getByText("general"),
+  ).toBeVisible();
+  // Private: its metadata is visible but the relay would refuse the join, and a
+  // button that fails is worse than no button.
+  await expect(page.getByTestId("browse-channel-secret")).toHaveCount(0);
+
+  await page.getByTestId("browse-search").fill("release");
+  await expect(page.getByTestId("browse-channel-release")).toBeVisible();
+  await page.getByTestId("browse-search").fill("nothing matches this");
+  await expect(page.getByTestId("browse-available-empty")).toBeVisible();
+});
+
+test("joining from the browser publishes kind:9021", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const openId = "33333333-3333-3333-3333-333333333333";
+  const relay = mockRelay(page, {
+    extraChannels: [
+      {
+        id: openId.replace(/-/g, "").padEnd(64, "0").slice(0, 64),
+        pubkey: "b".repeat(64),
+        kind: 39000,
+        created_at: 1_700_000_600,
+        tags: [
+          ["d", openId],
+          ["name", "release"],
+          ["public"],
+          ["closed"],
+          ["t", "stream"],
+        ],
+        content: "",
+        sig: "c".repeat(128),
+      },
+    ],
+    memberEvents: [memberList(CHANNEL_UUID, [[MY_PUBKEY, "member"]])],
+  });
+  await relay.install();
+
+  await page.goto("/browse");
+  await page.getByTestId("browse-join-release").click();
+
+  const join = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9021,
+  ) as { tags: string[][] };
+  expect(join.tags).toEqual([["h", openId]]);
+});
+
 test("an unsent draft survives a channel switch and a reload", async ({
   page,
 }) => {

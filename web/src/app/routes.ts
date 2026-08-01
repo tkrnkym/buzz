@@ -7,6 +7,7 @@ export const routes = rootRoute("root.tsx", [
   // both down and rebuild them on every click.
   layout("shell", "shell.tsx", [
     index("index.tsx"),
+    route("/browse", "browse.tsx"),
     route("/c", "c.tsx"),
     route("/c/$channelId", "chat.$channelId.tsx"),
     route("/home", "home.tsx"),

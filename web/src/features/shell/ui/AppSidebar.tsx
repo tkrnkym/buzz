@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FolderGit2, Inbox, MessageSquare, Plus } from "lucide-react";
+import { Compass, FolderGit2, Inbox, MessageSquare, Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -249,6 +249,14 @@ export function AppSidebar({
               <Link to="/">
                 <MessageSquare className="size-4" />
                 <span>Channels</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Browse channels">
+              <Link to="/browse">
+                <Compass className="size-4" />
+                <span>Browse</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
