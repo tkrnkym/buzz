@@ -19,9 +19,12 @@ import type { ImetaEntry } from "@/shared/ui/markdown/parse-imeta";
  */
 export function MessageContent({
   content,
+  emojiUrls,
   imeta,
 }: {
   content: string;
+  /** NIP-30 definitions carried by the event, keyed by bare shortcode. */
+  emojiUrls?: Map<string, string>;
   imeta?: Map<string, ImetaEntry>;
 }) {
   const { labels, isSelfMention } = useMentionLabels();
@@ -70,6 +73,7 @@ export function MessageContent({
       // the link renderer can act on it.
       preserveUrl={isMessageLink}
       renderLink={renderLink}
+      emojiUrls={emojiUrls}
       imeta={imeta}
       mentionLabels={labels}
       isSelfMention={isSelfMention}

@@ -17,6 +17,7 @@ import {
   useToggleReaction,
 } from "@/features/chat/use-chat";
 import { usePresence, useTyping } from "@/features/chat/use-presence";
+import { useEmojiCatalog } from "@/features/emoji/use-emoji";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
 import { useProfiles } from "@/features/profile/profile-store";
@@ -51,6 +52,7 @@ export function ChatPage({
   const editMessage = useEditMessage(channelId);
   const deleteMessage = useDeleteMessage(channelId);
   const typing = useTyping(channelId);
+  const emojiCatalog = useEmojiCatalog();
   const myPubkey = useMyPubkey();
   // Only the authors on screen: presence is read per-author, so asking about
   // everyone would grow the query with the community rather than the viewport.
@@ -224,7 +226,12 @@ export function ChatPage({
   const rowActions = useMemo<MessageRowActions>(
     () => ({
       statusOf: presence.statusOf,
-      onToggleReaction: (input) => toggleReaction.mutate(input),
+      emojiCatalog,
+      onToggleReaction: ({ definition, ...input }) =>
+        toggleReaction.mutate({
+          ...input,
+          ...(definition ? { customEmojiUrl: definition.url } : {}),
+        }),
       onReply,
       onOpenThread,
       onCopyLink,
@@ -254,6 +261,7 @@ export function ChatPage({
     }),
     [
       presence.statusOf,
+      emojiCatalog,
       profiles,
       toggleReaction.mutate,
       toggleReaction.isPending,

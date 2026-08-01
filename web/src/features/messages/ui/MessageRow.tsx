@@ -13,6 +13,7 @@ import {
   resolveUserLabel,
   type ProfileLookup,
 } from "@/features/profile/profile-model";
+import type { CustomEmoji, EmojiCatalog } from "@/features/emoji/emoji-model";
 import { cn } from "@/shared/lib/cn";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
@@ -22,10 +23,14 @@ const GUTTER = "w-9";
 export interface MessageRowActions {
   /** Presence for an author, or null when unknown. */
   statusOf: (pubkey: string) => string | null;
+  /** The workspace emoji palette, for the reaction picker. */
+  emojiCatalog: EmojiCatalog;
   onToggleReaction: (input: {
     messageId: string;
     emoji: string;
     myReactionId?: string;
+    /** A custom emoji's definition, which the kind:7 has to carry. */
+    definition?: CustomEmoji;
   }) => void;
   onReply: (row: TimelineRow) => void;
   onOpenThread: (rootId: string) => void;
@@ -166,7 +171,11 @@ export function MessageRow({
           />
         ) : (
           <div className="break-words">
-            <MessageContent content={row.content} imeta={message.imeta} />
+            <MessageContent
+              content={row.content}
+              emojiUrls={message.emoji}
+              imeta={message.imeta}
+            />
             {/* On a continuation the "(edited)" marker has no header to live in,
                 so it trails the body instead of being dropped. */}
             {isContinuation && row.edited && (
@@ -202,10 +211,11 @@ export function MessageRow({
         <MessageActionBar
           canManage={isMine}
           disabled={actions.pending}
+          emojiCatalog={actions.emojiCatalog}
           onCopyLink={() => actions.onCopyLink(row)}
           onDelete={() => actions.onDelete(row)}
           onEdit={() => setEditing(true)}
-          onReact={(emoji) => {
+          onReact={(emoji, definition) => {
             const existing = row.reactions.find(
               (reaction) => reaction.emoji === emoji,
             );
@@ -213,6 +223,7 @@ export function MessageRow({
               messageId: message.id,
               emoji,
               myReactionId: existing?.mine ? existing.myReactionId : undefined,
+              ...(definition ? { definition } : {}),
             });
           }}
           onReply={() => actions.onReply(row)}

@@ -1,11 +1,18 @@
 import { type FormEvent, useCallback, useRef, useState } from "react";
-import { Paperclip, X } from "lucide-react";
+import { Paperclip, Smile, X } from "lucide-react";
 
 import { useMyPubkey, useSendMessage } from "@/features/chat/use-chat";
 import { formatBytes } from "@/features/chat/upload";
 import { useUpload } from "@/features/chat/use-upload";
 import { useDirectory } from "@/features/directory/use-directory";
 import { UserPicker } from "@/features/directory/ui/UserPicker";
+import {
+  activeEmojiQuery,
+  applyEmoji,
+  emojiTagsForContent,
+} from "@/features/emoji/emoji-model";
+import { EmojiPicker } from "@/features/emoji/ui/EmojiPicker";
+import { useEmojiCatalog } from "@/features/emoji/use-emoji";
 import {
   activeMentionQuery,
   applyMention,
@@ -59,6 +66,13 @@ export function MessageComposer({
   const myPubkey = useMyPubkey();
   const directory = useDirectory();
   const directoryProfiles = useProfiles([]);
+  const emojiCatalog = useEmojiCatalog();
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  /** The `:name` token being typed, which completes without opening the grid. */
+  const [emojiQuery, setEmojiQuery] = useState<{
+    query: string;
+    from: number;
+  } | null>(null);
   /**
    * Mentions inserted through the picker, with the label each one wrote.
    *
@@ -76,9 +90,35 @@ export function MessageComposer({
     null,
   );
 
-  const syncMentionQuery = useCallback((value: string, caret: number) => {
-    setMention(activeMentionQuery(value, caret));
+  const syncQueries = useCallback((value: string, caret: number) => {
+    const mentionAt = activeMentionQuery(value, caret);
+    setMention(mentionAt);
+    // A mention wins: `@` and `:` cannot both be the token under the caret, and
+    // showing two floating lists at once would be a guess about which.
+    setEmojiQuery(mentionAt ? null : activeEmojiQuery(value, caret));
   }, []);
+
+  /** Insert text at the caret, or replace the `:name` token if one is open. */
+  const insertEmoji = useCallback(
+    (text: string) => {
+      const input = inputRef.current;
+      const caret = input?.selectionStart ?? draft.length;
+      const next = emojiQuery
+        ? applyEmoji(draft, emojiQuery.from, caret, text.replace(/:/g, ""))
+        : {
+            text: `${draft.slice(0, caret)}${text}${draft.slice(caret)}`,
+            caret: caret + text.length,
+          };
+      setDraft(next.text);
+      setEmojiQuery(null);
+      setEmojiOpen(false);
+      requestAnimationFrame(() => {
+        input?.focus();
+        input?.setSelectionRange(next.caret, next.caret);
+      });
+    },
+    [draft, emojiQuery],
+  );
 
   const pickMention = useCallback(
     (entry: { pubkey: string; label: string }) => {
@@ -92,6 +132,7 @@ export function MessageComposer({
       ];
       setDraft(next.text);
       setMention(null);
+      setEmojiQuery(null);
       // Restore the caret after React has written the new value, or the browser
       // puts it at the end and the author types into the wrong place.
       requestAnimationFrame(() => {
@@ -144,6 +185,9 @@ export function MessageComposer({
         attachments: [
           ...upload.attachments.map((attachment) => attachment.imeta),
           ...mentionTags(recipients),
+          // NIP-30 requires the definition to travel with the event: a reader
+          // whose client has never seen the author's set still has to render it.
+          ...emojiTagsForContent(content, emojiCatalog),
         ],
         ...(replyTo
           ? { thread: { rootId: replyTo.rootId, parentId: replyTo.parentId } }
@@ -155,6 +199,7 @@ export function MessageComposer({
           upload.clear();
           insertedMentions.current = [];
           setMention(null);
+          setEmojiQuery(null);
           onSent({
             pubkey: event.pubkey,
             threadHeadId: replyTo?.parentId ?? null,
@@ -238,6 +283,16 @@ export function MessageComposer({
         </div>
       )}
 
+      {(emojiOpen || emojiQuery) && (
+        <div className="relative">
+          <EmojiPicker
+            catalog={emojiCatalog}
+            className="absolute bottom-1 left-0"
+            onPick={(choice) => insertEmoji(choice.text)}
+          />
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <input
           ref={fileInput}
@@ -260,13 +315,27 @@ export function MessageComposer({
         >
           <Paperclip aria-hidden className="size-4" />
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Add an emoji"
+          data-testid="open-emoji-picker"
+          disabled={sendMessage.isPending}
+          onClick={() => {
+            setEmojiQuery(null);
+            setEmojiOpen((open) => !open);
+          }}
+        >
+          <Smile aria-hidden className="size-4" />
+        </Button>
         <Input
           ref={inputRef}
           value={draft}
           onChange={(changeEvent) => {
             const value = changeEvent.target.value;
             setDraft(value);
-            syncMentionQuery(
+            syncQueries(
               value,
               changeEvent.target.selectionStart ?? value.length,
             );
@@ -285,16 +354,17 @@ export function MessageComposer({
               keyEvent.preventDefault();
               return;
             }
-            if (mention && keyEvent.key === "Escape") {
+            if (keyEvent.key === "Escape" && (mention || emojiQuery)) {
               keyEvent.preventDefault();
               setMention(null);
+              setEmojiQuery(null);
             }
           }}
           // Clicking elsewhere in the text can move the caret out of the `@`
           // token, which should close the picker.
           onSelect={(selectEvent) => {
             const target = selectEvent.target as HTMLInputElement;
-            syncMentionQuery(target.value, target.selectionStart ?? 0);
+            syncQueries(target.value, target.selectionStart ?? 0);
           }}
           placeholder={label}
           aria-label={label}

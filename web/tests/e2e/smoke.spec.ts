@@ -203,6 +203,8 @@ function mockRelay(
     profileEvents?: unknown[];
     /** kind:39002 member lists, from which the directory is built. */
     memberEvents?: unknown[];
+    /** kind:30030 emoji sets, from which the palette is built. */
+    emojiEvents?: unknown[];
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -315,6 +317,15 @@ function mockRelay(
               ...(options.profileEvents ?? []),
               ...published.filter(
                 (event) => (event as { kind: number }).kind === 0,
+              ),
+            );
+          } else if (filter.kinds?.includes(30030)) {
+            // Plus anything published this session, so a set the spec saves is
+            // the one the picker then offers.
+            events.push(
+              ...(options.emojiEvents ?? []),
+              ...published.filter(
+                (event) => (event as { kind: number }).kind === 30030,
               ),
             );
           } else if (filter.kinds?.includes(39002)) {
@@ -1157,6 +1168,120 @@ test("a known name renders as a mention chip, an unknown one does not", async ({
   await expect(page.locator("[data-mention]")).toHaveText("@Erin Example");
   // A chip asserts this client resolved a person; an unknown handle stays text.
   await expect(page.getByText("@Nobody Here")).toBeVisible();
+});
+
+/** A kind:30030 emoji set, which is where the palette comes from. */
+function emojiSet(pubkey: string, entries: [string, string][]) {
+  return {
+    id: `30030${pubkey}`.padEnd(64, "0").slice(0, 64),
+    pubkey,
+    kind: 30030,
+    created_at: 1_700_000_000,
+    tags: [
+      ["d", "nuxx"],
+      ...entries.map(([code, url]) => ["emoji", code, url]),
+    ],
+    content: "",
+    sig: "f".repeat(128),
+  };
+}
+
+const SHIPIT_URL = "https://example.com/shipit.png";
+
+test("a custom emoji completes in the composer and travels with the message", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    emojiEvents: [emojiSet(MENTIONABLE, [["shipit", SHIPIT_URL]])],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("ready :shi");
+  await page.getByTestId("emoji-shipit").click();
+  await expect(composer).toHaveValue("ready :shipit: ");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content.includes(":shipit:"),
+  ) as { tags: string[][] };
+  // NIP-30: the definition travels with the event, or a client that has never
+  // seen the author's set renders the literal text.
+  expect(sent.tags).toContainEqual(["emoji", "shipit", SHIPIT_URL]);
+});
+
+test("a defined shortcode renders as an image, an undefined one as text", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [
+      markdownMessage("c", "shipping :shipit: not :nope:", [
+        ["emoji", "shipit", SHIPIT_URL],
+      ]),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const emoji = page.locator("img[data-emoji]");
+  await expect(emoji).toHaveCount(1);
+  await expect(emoji).toHaveAttribute("src", SHIPIT_URL);
+  // An undefined shortcode is left exactly as the author typed it.
+  await expect(page.getByText(":nope:")).toBeVisible();
+});
+
+test("a custom reaction carries its definition", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    emojiEvents: [emojiSet(MENTIONABLE, [["shipit", SHIPIT_URL]])],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByText("hello from the mocked relay").hover();
+  await page.getByTestId("open-reaction-picker").click();
+  await page.getByTestId("emoji-shipit").click();
+
+  const reaction = relay.published.find(
+    (event) => (event as { kind: number }).kind === 7,
+  ) as { content: string; tags: string[][] };
+  expect(reaction.content).toBe(":shipit:");
+  // A kind:7 whose content is a shortcode and which carries no `emoji` tag is a
+  // pill every other client draws as literal text.
+  expect(reaction.tags).toContainEqual(["emoji", "shipit", SHIPIT_URL]);
+});
+
+test("adding a custom emoji publishes the whole kind:30030 set", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    emojiEvents: [emojiSet(MY_PUBKEY, [["wave", "https://example.com/w.png"]])],
+  });
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("emoji-shortcode").fill("shipit");
+  await page.getByTestId("emoji-url").fill(SHIPIT_URL);
+  await page.getByTestId("add-emoji").click();
+
+  const set = relay.published.find(
+    (event) => (event as { kind: number }).kind === 30030,
+  ) as { tags: string[][] };
+  // The set is addressable, so the published event is the whole new state —
+  // the existing emoji has to be republished alongside the new one.
+  expect(set.tags).toEqual([
+    ["d", "nuxx"],
+    ["emoji", "wave", "https://example.com/w.png"],
+    ["emoji", "shipit", SHIPIT_URL],
+  ]);
 });
 
 test("a DM addresses its participants even when the text names nobody", async ({

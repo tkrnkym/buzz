@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { useMyPubkey } from "@/features/chat/use-chat";
+import { EmojiSettings } from "@/features/emoji/ui/EmojiSettings";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import { usePublishProfile } from "@/features/profile/use-profile";
@@ -185,6 +186,13 @@ export function SettingsPage() {
                 </p>
               </div>
             </form>
+          </Section>
+
+          <Section
+            description="Emoji you publish yourself. Everyone in your channels can use them, and what you see is the union of everyone's — nobody owns the shortcode namespace."
+            title="Custom emoji"
+          >
+            <EmojiSettings />
           </Section>
 
           <Section

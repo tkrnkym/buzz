@@ -63,6 +63,31 @@ export interface Message {
    * `imeta` tag, so the common case allocates nothing.
    */
   imeta?: Map<string, ImetaEntry>;
+  /**
+   * NIP-30 custom emoji defined by this event, keyed by bare shortcode.
+   *
+   * Read from the event rather than from the reader's palette: the definition
+   * travels with the message, which is what lets a client that has never seen
+   * the author's set render `:shortcode:` at all.
+   */
+  emoji?: Map<string, string>;
+}
+
+/**
+ * NIP-30 `["emoji", shortcode, url]` tags, keyed by shortcode.
+ *
+ * An entry missing either half is dropped: a shortcode with no URL has nothing
+ * to render, and a URL with no shortcode has nothing to match in the text.
+ */
+function parseEmojiTags(tags: string[][]): Map<string, string> {
+  const urls = new Map<string, string>();
+  for (const tag of tags) {
+    if (tag[0] !== "emoji" || !tag[1] || !tag[2]) continue;
+    // First definition wins, so a duplicate tag cannot change what the text
+    // already meant further up the message.
+    if (!urls.has(tag[1])) urls.set(tag[1], tag[2]);
+  }
+  return urls;
 }
 
 function firstTag(event: NostrEvent, name: string): string | undefined {
@@ -193,6 +218,7 @@ export function eventToMessage(event: NostrEvent): Message | null {
   if (!CHANNEL_TIMELINE_CONTENT_KINDS.includes(event.kind)) return null;
   const { rootId, parentId } = parseThreadRefs(event);
   const imeta = parseImetaTags(event.tags);
+  const emoji = parseEmojiTags(event.tags);
   return {
     id: event.id,
     pubkey: event.pubkey,
@@ -202,6 +228,7 @@ export function eventToMessage(event: NostrEvent): Message | null {
     rootId,
     parentId,
     ...(imeta.size > 0 ? { imeta } : {}),
+    ...(emoji.size > 0 ? { emoji } : {}),
   };
 }
 
@@ -369,15 +396,29 @@ export const MAX_REACTION_EMOJI_LENGTH = 64;
 export function buildReactionTemplate(
   targetEventId: string,
   emoji: string,
+  /**
+   * A NIP-30 custom emoji's URL, when `emoji` is `:shortcode:`.
+   *
+   * Required for a custom reaction to render anywhere else: a kind:7 whose
+   * content is `:shipit:` and which carries no `emoji` tag is a pill every other
+   * client draws as the literal text.
+   */
+  customEmojiUrl?: string,
 ): { kind: number; tags: string[][]; content: string } {
   if ([...emoji].length > MAX_REACTION_EMOJI_LENGTH) {
     throw new Error(
       `Reaction emoji must be at most ${MAX_REACTION_EMOJI_LENGTH} characters`,
     );
   }
+  const shortcode = /^:([a-z0-9_]+):$/.exec(emoji)?.[1];
   return {
     kind: KIND_REACTION,
-    tags: [["e", targetEventId]],
+    tags: [
+      ["e", targetEventId],
+      ...(shortcode && customEmojiUrl
+        ? [["emoji", shortcode, customEmojiUrl]]
+        : []),
+    ],
     content: emoji,
   };
 }

@@ -338,11 +338,17 @@ export function useToggleReaction() {
       messageId: string;
       emoji: string;
       myReactionId?: string;
+      /** A NIP-30 custom emoji's URL, carried on the kind:7 so others render it. */
+      customEmojiUrl?: string;
     }) =>
       session.publish(
         input.myReactionId
           ? buildReactionWithdrawalTemplate(input.myReactionId)
-          : buildReactionTemplate(input.messageId, input.emoji),
+          : buildReactionTemplate(
+              input.messageId,
+              input.emoji,
+              input.customEmojiUrl,
+            ),
       ),
   });
 }

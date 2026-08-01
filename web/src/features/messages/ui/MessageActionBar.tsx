@@ -7,15 +7,17 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import type { CustomEmoji, EmojiCatalog } from "@/features/emoji/emoji-model";
+import { EmojiPicker } from "@/features/emoji/ui/EmojiPicker";
 import { cn } from "@/shared/lib/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 /**
- * Emoji offered for one-click reaction.
+ * Emoji offered for one-click reaction, without opening the picker.
  *
- * A fixed set rather than a full picker: a picker needs the custom-emoji module
- * (NIP-30 packs), and any emoji already on a message can still be toggled from
- * its pill.
+ * A fixed row rather than a frequency list: "most used" changes what is under
+ * the cursor from one message to the next, which makes a one-click control into
+ * something you have to read first.
  */
 export const QUICK_REACTIONS = ["👍", "🎉", "✅", "👀", "❤️"];
 
@@ -71,6 +73,7 @@ function Action({
 export function MessageActionBar({
   canManage,
   disabled,
+  emojiCatalog,
   onCopyLink,
   onDelete,
   onEdit,
@@ -80,10 +83,18 @@ export function MessageActionBar({
 }: {
   canManage: boolean;
   disabled?: boolean;
+  /** The workspace palette, offered alongside the Unicode grid. */
+  emojiCatalog: EmojiCatalog;
   onCopyLink: () => void;
   onDelete: () => void;
   onEdit: () => void;
-  onReact: (emoji: string) => void;
+  /**
+   * React with an emoji.
+   *
+   * A custom one arrives with its definition, because a kind:7 carrying
+   * `:shortcode:` and no `emoji` tag is a reaction nobody else can render.
+   */
+  onReact: (emoji: string, definition?: CustomEmoji) => void;
   onReply: () => void;
   /** Emoji already on the message, which the quick row omits. */
   reactedEmojis: string[];
@@ -128,26 +139,14 @@ export function MessageActionBar({
           <SmilePlus />
         </Action>
         {pickerOpen && (
-          <div
-            className="absolute right-0 top-full z-20 mt-1 flex gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-md"
-            data-testid="reaction-picker"
-          >
-            {QUICK_REACTIONS.map((emoji) => (
-              <button
-                aria-label={`React with ${emoji}`}
-                className={ACTION_CLASS}
-                disabled={disabled}
-                key={emoji}
-                onClick={() => {
-                  onReact(emoji);
-                  setPickerOpen(false);
-                }}
-                type="button"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+          <EmojiPicker
+            catalog={emojiCatalog}
+            className="absolute right-0 top-full z-20 mt-1"
+            onPick={(choice) => {
+              onReact(choice.text, choice.emoji);
+              setPickerOpen(false);
+            }}
+          />
         )}
       </div>
 

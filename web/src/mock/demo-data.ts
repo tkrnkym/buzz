@@ -14,6 +14,7 @@
  */
 
 import {
+  KIND_EMOJI_SET,
   KIND_NIP29_DELETE_EVENT,
   KIND_NIP29_GROUP_MEMBERS,
   KIND_NIP29_GROUP_METADATA,
@@ -224,6 +225,50 @@ function systemMessage(
   );
 }
 
+/**
+ * NIP-30 custom emoji for the demo.
+ *
+ * Inline SVG data URIs rather than hosted images: the demo is served under a
+ * policy that blocks every external host, so a remote picture would render as a
+ * broken image — and the point here is to show that a shortcode resolves, not to
+ * ship artwork.
+ *
+ * Published by the personas themselves, because that is the actual data model:
+ * there is no server-side registry, and the palette a reader sees is the union
+ * of everyone's sets.
+ */
+function emojiSet(pubkey: string, entries: [string, string][]): NostrEvent {
+  return event(
+    `emoji:${pubkey}`,
+    KIND_EMOJI_SET,
+    pubkey,
+    ago(60 * 24 * 20),
+    "",
+    [["d", "nuxx"], ...entries.map(([code, url]) => ["emoji", code, url])],
+  );
+}
+
+/**
+ * Same-origin URLs, absolutized.
+ *
+ * A `data:` URI would be simpler, but react-markdown's `defaultUrlTransform`
+ * blanks any scheme outside http/https/mailto before a renderer sees it — the
+ * right default for user content, and one a real emoji URL (a Blossom
+ * `https://…`) already satisfies. Served from `public/` rather than imported, so
+ * Vite cannot inline a small SVG into the very `data:` URI this avoids.
+ */
+const emojiUrl = (file: string) =>
+  new URL(`${import.meta.env.BASE_URL}demo-emoji/${file}`, window.location.href)
+    .href;
+
+const SHIPIT_URL = emojiUrl("shipit.svg");
+const LGTM_URL = emojiUrl("lgtm.svg");
+
+export const EMOJI_SETS: NostrEvent[] = [
+  emojiSet(KEN, [["shipit", SHIPIT_URL]]),
+  emojiSet(AYA, [["lgtm", LGTM_URL]]),
+];
+
 export const CHANNELS: NostrEvent[] = [
   channel(CH_GENERAL, "general", "全体連絡と雑多な相談", "今週は金曜リリース"),
   channel(CH_DEV, "dev", "実装の相談", "relay と web"),
@@ -409,6 +454,14 @@ export const MESSAGES: NostrEvent[] = [
     ago(292),
     "なるほど、それで二重に購読してるのか",
   ),
+  // A custom emoji, with its definition on the event — that is what NIP-30
+  // requires, and what lets a client that has never seen Ken's set render it.
+  message("dev-4", CH_DEV, KEN, ago(288), "直したのでマージします :shipit:", [
+    ["emoji", "shipit", SHIPIT_URL],
+  ]),
+  message("dev-5", CH_DEV, AYA, ago(284), ":lgtm: 確認しました", [
+    ["emoji", "lgtm", LGTM_URL],
+  ]),
 
   // --- #design ---
   message(
@@ -606,6 +659,7 @@ export const SEEDED: NostrEvent[] = [
   ...PROFILES,
   ...CHANNELS,
   ...MEMBER_LISTS,
+  ...EMOJI_SETS,
   ...MESSAGES,
   ...SYSTEM_MESSAGES,
   ...REACTIONS,

@@ -65,6 +65,16 @@ export const KIND_READ_STATE = 30078;
 export const KIND_USER_STATUS = 30315;
 
 /**
+ * NIP-30 custom emoji: a member's preferred list, and their named sets.
+ *
+ * There is no server-side registry. Each member signs their own set, and the
+ * workspace palette is the union of everyone's — a view computed on read rather
+ * than stored state.
+ */
+export const KIND_EMOJI_LIST = 10030;
+export const KIND_EMOJI_SET = 30030;
+
+/**
  * Forum post and comment.
  *
  * Included here because both are full-text indexed by the relay, so a message
