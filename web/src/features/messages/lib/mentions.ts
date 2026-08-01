@@ -45,22 +45,13 @@ export function activeMentionQuery(
 }
 
 /**
- * Replace the `@` token at `from` with a completed mention.
+ * The text a completed mention writes over the `@` token.
  *
- * A trailing space is added so the next keystroke does not re-open the
+ * The trailing space matters: without it the next keystroke re-opens the
  * autocomplete against the name that was just accepted.
  */
-export function applyMention(
-  text: string,
-  from: number,
-  caret: number,
-  label: string,
-): { text: string; caret: number } {
-  const inserted = `@${label} `;
-  return {
-    text: text.slice(0, from) + inserted + text.slice(caret),
-    caret: from + inserted.length,
-  };
+export function mentionInsertText(label: string): string {
+  return `@${label} `;
 }
 
 /**

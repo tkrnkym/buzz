@@ -3,7 +3,7 @@ import test from "node:test";
 
 import {
   activeMentionQuery,
-  applyMention,
+  mentionInsertText,
   findMentionSpans,
   mentionRecipients,
   mentionTags,
@@ -49,22 +49,6 @@ test("only the text before the caret is considered", () => {
   assert.deepEqual(activeMentionQuery("@ke and more", 3), {
     query: "ke",
     from: 0,
-  });
-});
-
-test("accepting a mention replaces the token and leaves a space", () => {
-  // Without the trailing space the next keystroke re-opens the autocomplete
-  // against the name just accepted.
-  assert.deepEqual(applyMention("hi @ke", 3, 6, "田中 健"), {
-    text: "hi @田中 健 ",
-    caret: 9,
-  });
-});
-
-test("accepting a mention keeps the text after the caret", () => {
-  assert.deepEqual(applyMention("hi @ke rest", 3, 6, "Ken"), {
-    text: "hi @Ken  rest",
-    caret: 8,
   });
 });
 
@@ -191,4 +175,9 @@ test("spans come back in reading order", () => {
 test("no known names means no spans", () => {
   assert.deepEqual(findMentionSpans("@Alice", []), []);
   assert.deepEqual(findMentionSpans("", ["Alice"]), []);
+});
+
+test("a completed mention ends with a space", () => {
+  // Without it the next keystroke re-opens the picker against the accepted name.
+  assert.equal(mentionInsertText("田中 健"), "@田中 健 ");
 });

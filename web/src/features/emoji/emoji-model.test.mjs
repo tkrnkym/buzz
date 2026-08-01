@@ -3,7 +3,7 @@ import test from "node:test";
 
 import {
   activeEmojiQuery,
-  applyEmoji,
+  emojiInsertText,
   buildEmojiCatalog,
   buildEmojiFilters,
   buildEmojiSetTemplate,
@@ -169,13 +169,6 @@ test("two characters are needed before completing", () => {
   assert.deepEqual(activeEmojiQuery("say :wa", 7), { query: "wa", from: 4 });
 });
 
-test("completing writes a closed shortcode and a trailing space", () => {
-  assert.deepEqual(applyEmoji("say :wa", 4, 7, "wave"), {
-    text: "say :wave: ",
-    caret: 11,
-  });
-});
-
 test("the reader's own set is one addressable event", () => {
   const template = buildEmojiSetTemplate([
     {
@@ -190,4 +183,8 @@ test("the reader's own set is one addressable event", () => {
     ["d", MY_EMOJI_SET_D_TAG],
     ["emoji", "wave", "https://example.com/w.png"],
   ]);
+});
+
+test("a completed emoji is closed and followed by a space", () => {
+  assert.equal(emojiInsertText("wave"), ":wave: ");
 });

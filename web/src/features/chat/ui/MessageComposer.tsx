@@ -8,15 +8,20 @@ import { useDirectory } from "@/features/directory/use-directory";
 import { UserPicker } from "@/features/directory/ui/UserPicker";
 import {
   activeEmojiQuery,
-  applyEmoji,
+  emojiInsertText,
   emojiTagsForContent,
 } from "@/features/emoji/emoji-model";
 import { EmojiPicker } from "@/features/emoji/ui/EmojiPicker";
 import { useEmojiCatalog } from "@/features/emoji/use-emoji";
+import { serializeToMarkdown } from "@/features/messages/lib/markdown-serializer";
+import {
+  RichComposerEditor,
+  type RichEditorHandle,
+} from "@/features/messages/ui/RichComposerEditor";
 import { useDraft } from "@/features/messages/use-draft";
 import {
   activeMentionQuery,
-  applyMention,
+  mentionInsertText,
   mentionRecipients,
   mentionTags,
   survivingMentions,
@@ -24,7 +29,6 @@ import {
 import { useProfiles } from "@/features/profile/profile-store";
 import { useUserLabels } from "@/features/profile/use-user-label";
 import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
 
 export interface ReplyTarget {
   rootId: string;
@@ -73,7 +77,7 @@ export function MessageComposer({
   const sendMessage = useSendMessage(channelId);
   const upload = useUpload();
   const fileInput = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<RichEditorHandle | null>(null);
   const myPubkey = useMyPubkey();
   const directory = useDirectory();
   const directoryProfiles = useProfiles([]);
@@ -102,65 +106,56 @@ export function MessageComposer({
   );
 
   /**
-   * The text as it stands right now.
+   * Re-read the token under the caret from the editor.
    *
-   * Read by the upload handler, which resumes after an await: the `draft` it
-   * closed over when the file was picked is not what the author has typed since.
+   * Both autocompletes work on the plain text of the block the caret is in.
+   * That is the honest unit: a mention cannot span a paragraph, and reading the
+   * whole document would make an `@` two blocks up look like the one being
+   * typed.
    */
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-
-  const syncQueries = useCallback((value: string, caret: number) => {
-    const mentionAt = activeMentionQuery(value, caret);
+  const syncQueries = useCallback(() => {
+    const context = editorRef.current?.caretContext();
+    if (!context) return;
+    const mentionAt = activeMentionQuery(context.text, context.caret);
     setMention(mentionAt);
     // A mention wins: `@` and `:` cannot both be the token under the caret, and
     // showing two floating lists at once would be a guess about which.
-    setEmojiQuery(mentionAt ? null : activeEmojiQuery(value, caret));
+    setEmojiQuery(
+      mentionAt ? null : activeEmojiQuery(context.text, context.caret),
+    );
   }, []);
 
-  /** Insert text at the caret, or replace the `:name` token if one is open. */
+  /** Insert at the caret, replacing the `:name` token if one is open. */
   const insertEmoji = useCallback(
     (text: string) => {
-      const input = inputRef.current;
-      const caret = input?.selectionStart ?? draft.length;
-      const next = emojiQuery
-        ? applyEmoji(draft, emojiQuery.from, caret, text.replace(/:/g, ""))
-        : {
-            text: `${draft.slice(0, caret)}${text}${draft.slice(caret)}`,
-            caret: caret + text.length,
-          };
-      updateDraft(next.text);
+      const editor = editorRef.current;
+      if (!editor) return;
+      if (emojiQuery) {
+        const caret = editor.caretContext().caret;
+        editor.replaceRange(emojiQuery.from, caret, text);
+      } else {
+        editor.insert(text);
+      }
       setEmojiQuery(null);
       setEmojiOpen(false);
-      requestAnimationFrame(() => {
-        input?.focus();
-        input?.setSelectionRange(next.caret, next.caret);
-      });
     },
-    [draft, emojiQuery, updateDraft],
+    [emojiQuery],
   );
 
   const pickMention = useCallback(
     (entry: { pubkey: string; label: string }) => {
-      const input = inputRef.current;
-      if (!mention || !input) return;
-      const caret = input.selectionStart ?? draft.length;
-      const next = applyMention(draft, mention.from, caret, entry.label);
+      const editor = editorRef.current;
+      if (!mention || !editor) return;
+      const caret = editor.caretContext().caret;
+      editor.replaceRange(mention.from, caret, mentionInsertText(entry.label));
       insertedMentions.current = [
         ...insertedMentions.current,
         { pubkey: entry.pubkey, label: entry.label },
       ];
-      updateDraft(next.text);
       setMention(null);
       setEmojiQuery(null);
-      // Restore the caret after React has written the new value, or the browser
-      // puts it at the end and the author types into the wrong place.
-      requestAnimationFrame(() => {
-        input.focus();
-        input.setSelectionRange(next.caret, next.caret);
-      });
     },
-    [draft, mention, updateDraft],
+    [mention],
   );
   // The person being replied to. `labelOf`, so replying to yourself reads
   // "Reply to You" rather than repeating your own name back at you.
@@ -174,14 +169,11 @@ export function MessageComposer({
     const markdown = await upload.attach(file);
     // The renderer keys `imeta` off the URL in the body, so an attachment that
     // never reaches the text is invisible however complete its tag is.
-    if (markdown) {
-      const current = draftRef.current;
-      updateDraft(current ? `${current}\n${markdown}` : markdown);
-    }
+    if (markdown) editorRef.current?.insert(markdown);
   };
 
-  const submit = (submitEvent: FormEvent) => {
-    submitEvent.preventDefault();
+  const submit = (submitEvent?: FormEvent) => {
+    submitEvent?.preventDefault();
     const content = draft.trim();
     // An attachment is a message on its own; requiring a caption would mean a
     // picture could not be posted without one.
@@ -219,6 +211,7 @@ export function MessageComposer({
           // Only on success: a rejected send has to leave the text where the
           // author can still see it.
           clearDraft();
+          editorRef.current?.clear();
           upload.clear();
           insertedMentions.current = [];
           setMention(null);
@@ -311,7 +304,13 @@ export function MessageComposer({
           <EmojiPicker
             catalog={emojiCatalog}
             className="absolute bottom-1 left-0"
-            onPick={(choice) => insertEmoji(choice.text)}
+            onPick={(choice) =>
+              insertEmoji(
+                choice.emoji
+                  ? emojiInsertText(choice.emoji.shortcode)
+                  : choice.text,
+              )
+            }
           />
         </div>
       )}
@@ -352,17 +351,19 @@ export function MessageComposer({
         >
           <Smile aria-hidden className="size-4" />
         </Button>
-        <Input
-          ref={inputRef}
-          value={draft}
-          onChange={(changeEvent) => {
-            const value = changeEvent.target.value;
-            updateDraft(value);
-            syncQueries(
-              value,
-              changeEvent.target.selectionStart ?? value.length,
-            );
-            if (value.trim()) {
+        <RichComposerEditor
+          ariaLabel={label}
+          // Remounted when the composer is re-pointed, so the editor is seeded
+          // with the draft belonging to the room it now writes into.
+          key={`${channelId}:${replyTo?.rootId ?? ""}`}
+          disabled={sendMessage.isPending}
+          handleRef={editorRef}
+          initialMarkdown={draft}
+          onChange={({ editor }) => {
+            const markdown = serializeToMarkdown(editor.getJSON());
+            updateDraft(markdown);
+            syncQueries();
+            if (markdown.trim()) {
               onComposing(
                 replyTo
                   ? { rootId: replyTo.rootId, parentId: replyTo.parentId }
@@ -372,27 +373,18 @@ export function MessageComposer({
           }}
           onKeyDown={(keyEvent) => {
             // The picker moves its own highlight but never takes focus: pulling
-            // focus off the field to arrow through a list would interrupt typing.
-            if (mention && pickerKeyHandler.current?.(keyEvent.nativeEvent)) {
-              keyEvent.preventDefault();
-              return;
-            }
+            // focus off the field to arrow through a list would interrupt
+            // typing, and in a rich editor it would also drop the selection.
+            if (mention && pickerKeyHandler.current?.(keyEvent)) return true;
             if (keyEvent.key === "Escape" && (mention || emojiQuery)) {
-              keyEvent.preventDefault();
               setMention(null);
               setEmojiQuery(null);
+              return true;
             }
+            return false;
           }}
-          // Clicking elsewhere in the text can move the caret out of the `@`
-          // token, which should close the picker.
-          onSelect={(selectEvent) => {
-            const target = selectEvent.target as HTMLInputElement;
-            syncQueries(target.value, target.selectionStart ?? 0);
-          }}
+          onSubmit={() => submit()}
           placeholder={label}
-          aria-label={label}
-          autoComplete="off"
-          disabled={sendMessage.isPending}
         />
         <Button
           type="submit"

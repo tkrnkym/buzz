@@ -652,7 +652,7 @@ test("sending a message publishes kind:9 with the channel h tag", async ({
   await page.getByRole("button", { name: "Send" }).click();
 
   // The composer clears only after the relay OKs the event.
-  await expect(composer).toHaveValue("");
+  await expect(composer).toHaveText("");
   await expect(page.getByText("sent from the browser")).toBeVisible();
 
   // Read state publishes on the same stream, so scope to the message kind.
@@ -710,6 +710,63 @@ function markdownMessage(id: string, content: string, tags: string[][] = []) {
     sig: "f".repeat(128),
   };
 }
+
+test("Enter sends and Shift+Enter is a line break", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.click();
+  await composer.pressSequentially("first");
+  await page.keyboard.press("Shift+Enter");
+  await composer.pressSequentially("second");
+  // Still unsent: Shift+Enter is a line break, not a send.
+  expect(
+    relay.published.filter((event) => (event as { kind: number }).kind === 9),
+  ).toEqual([]);
+
+  await page.keyboard.press("Enter");
+
+  await expect
+    .poll(() =>
+      relay.published.some((event) => (event as { kind: number }).kind === 9),
+    )
+    .toBe(true);
+  const sent = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9,
+  ) as { content: string };
+  // One newline, which the renderer turns into a line break — not a paragraph
+  // split, and not two separate messages.
+  expect(sent.content).toBe("first\nsecond");
+});
+
+test("markdown shorthand becomes markup and serializes back", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.click();
+  // Typed as shorthand, applied as marks by the editor's input rules.
+  await composer.pressSequentially("**bold** and `code`");
+  await expect(composer.locator("strong")).toHaveText("bold");
+  await expect(composer.locator("code")).toHaveText("code");
+
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      relay.published.some((event) => (event as { kind: number }).kind === 9),
+    )
+    .toBe(true);
+  const sent = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9,
+  ) as { content: string };
+  // The event carries markdown, because that is what every other client reads.
+  expect(sent.content).toBe("**bold** and `code`");
+});
 
 test("message content renders markdown", async ({ page }) => {
   const relay = mockRelay(page, {
@@ -1113,7 +1170,7 @@ test("a mention completes from the directory and publishes a p tag", async ({
   // The handle finds the display name: an author types what they remember.
   await composer.fill("@eri");
   await page.getByTestId("user-picker-Erin Example").click();
-  await expect(composer).toHaveValue("@Erin Example ");
+  await expect(composer).toHaveText("@Erin Example");
 
   await composer.fill("@Erin Example please look");
   await page.getByRole("button", { name: "Send" }).click();
@@ -1202,7 +1259,7 @@ test("a custom emoji completes in the composer and travels with the message", as
   const composer = page.getByRole("textbox", { name: "Message #general" });
   await composer.fill("ready :shi");
   await page.getByTestId("emoji-shipit").click();
-  await expect(composer).toHaveValue("ready :shipit: ");
+  await expect(composer).toHaveText("ready :shipit:");
   await page.getByRole("button", { name: "Send" }).click();
 
   const sent = relay.published.find(
@@ -1426,14 +1483,14 @@ test("an unsent draft survives a channel switch and a reload", async ({
   await page.getByTestId("channel-random").click();
   const otherComposer = page.getByRole("textbox", { name: "Message #random" });
   // Each room's draft is its own: the text does not follow the reader.
-  await expect(otherComposer).toHaveValue("");
+  await expect(otherComposer).toHaveText("");
   await expect(page.getByTestId("channel-draft-general")).toBeVisible();
 
   await page.reload();
   await page.getByTestId("channel-general").click();
   await expect(
     page.getByRole("textbox", { name: "Message #general" }),
-  ).toHaveValue("half a thought");
+  ).toHaveText("half a thought");
 
   // Nothing was published: a draft is not a message, and half-written text is
   // the last thing that should reach an event store other clients read.
@@ -1453,12 +1510,12 @@ test("sending clears the draft, and a failed send keeps it", async ({
   const composer = page.getByRole("textbox", { name: "Message #general" });
   await composer.fill("this one goes out");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(composer).toHaveValue("");
+  await expect(composer).toHaveText("");
 
   await page.reload();
   await expect(
     page.getByRole("textbox", { name: "Message #general" }),
-  ).toHaveValue("");
+  ).toHaveText("");
 });
 
 test("an edit and a tombstone from the relay both reach the timeline", async ({
@@ -2652,7 +2709,7 @@ test("a refused upload keeps the message and says why", async ({ page }) => {
   await expect(page.getByText(/too large/i)).toBeVisible();
   // The typed text survives, and nothing half-attached is left behind to be
   // published as a broken link.
-  await expect(composer).toHaveValue("look at this");
+  await expect(composer).toHaveText("look at this");
   await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0);
 });
 

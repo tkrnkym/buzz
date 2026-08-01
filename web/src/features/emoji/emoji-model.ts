@@ -209,18 +209,14 @@ export function activeEmojiQuery(
   return { query, from: at };
 }
 
-/** Replace the `:name` token at `from` with a completed `:shortcode:`. */
-export function applyEmoji(
-  text: string,
-  from: number,
-  caret: number,
-  shortcode: string,
-): { text: string; caret: number } {
-  const inserted = `:${shortcode}: `;
-  return {
-    text: text.slice(0, from) + inserted + text.slice(caret),
-    caret: from + inserted.length,
-  };
+/**
+ * The text a completed emoji writes over the `:name` token.
+ *
+ * Closed and followed by a space, so the shortcode is complete the moment it is
+ * accepted and the next keystroke does not re-open the picker against it.
+ */
+export function emojiInsertText(shortcode: string): string {
+  return `:${shortcode}: `;
 }
 
 /**
