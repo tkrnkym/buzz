@@ -2,7 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
 import type { TimelineRow } from "@/features/chat/timeline";
 import { buildThreadSummaries } from "@/features/messages/lib/thread-summary";
-import { buildTimelineItems } from "@/features/messages/lib/timeline-items";
+import {
+  buildTimelineItems,
+  groupItemsByDay,
+} from "@/features/messages/lib/timeline-items";
 import { DayDivider } from "@/features/messages/ui/DayDivider";
 import {
   MessageRow,
@@ -43,8 +46,8 @@ export function MessageTimeline({
    */
   const prependAnchor = useRef<number | null>(null);
 
-  const items = useMemo(
-    () => buildTimelineItems({ rows, firstUnreadMessageId }),
+  const days = useMemo(
+    () => groupItemsByDay(buildTimelineItems({ rows, firstUnreadMessageId })),
     [rows, firstUnreadMessageId],
   );
   const threadSummaries = useMemo(() => buildThreadSummaries(rows), [rows]);
@@ -131,36 +134,37 @@ export function MessageTimeline({
         </div>
       )}
 
-      <ul className="flex flex-col pb-2">
-        {/* `if`-and-return rather than a switch: TypeScript narrows the union
-            just as well, and every path visibly returns an element. */}
-        {items.map((item) => {
-          if (item.kind === "day-divider") {
-            return (
-              <DayDivider
-                headingTimestamp={item.headingTimestamp}
-                key={item.key}
-              />
-            );
-          }
-          if (item.kind === "unread-divider") {
-            return <UnreadDivider key={item.key} unreadCount={unreadCount} />;
-          }
-          if (item.kind === "system-group") {
-            return <SystemMessageGroup key={item.key} rows={item.rows} />;
-          }
-          return (
-            <MessageRow
-              actions={actions}
-              isContinuation={item.isContinuation}
-              isFollowedByContinuation={item.isFollowedByContinuation}
-              key={item.key}
-              row={item.row}
-              threadSummary={threadSummaries.get(item.row.message.id)}
-            />
-          );
-        })}
-      </ul>
+      {/* One list per day, so the day heading can stick *inside* its own day.
+          Flat siblings would all pin at the same offset and stack up. */}
+      {days.map((day) => (
+        <section key={day.key}>
+          <DayDivider headingTimestamp={day.headingTimestamp} />
+          <ul className="flex flex-col pb-2">
+            {/* `if`-and-return rather than a switch: TypeScript narrows the
+                union just as well, and every path visibly returns an element. */}
+            {day.items.map((item) => {
+              if (item.kind === "unread-divider") {
+                return (
+                  <UnreadDivider key={item.key} unreadCount={unreadCount} />
+                );
+              }
+              if (item.kind === "system-group") {
+                return <SystemMessageGroup key={item.key} rows={item.rows} />;
+              }
+              return (
+                <MessageRow
+                  actions={actions}
+                  isContinuation={item.isContinuation}
+                  isFollowedByContinuation={item.isFollowedByContinuation}
+                  key={item.key}
+                  row={item.row}
+                  threadSummary={threadSummaries.get(item.row.message.id)}
+                />
+              );
+            })}
+          </ul>
+        </section>
+      ))}
       <div ref={bottomRef} />
     </div>
   );

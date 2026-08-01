@@ -414,6 +414,16 @@ function mockRelay(
                 }
               } else if (filter.kinds.includes(9) && filter["#h"]) {
                 messageSubs.push({ subId, channelId: filter["#h"][0] });
+                /**
+                 * Serve a fixture only if the filter actually named its kind.
+                 *
+                 * A relay would. The mock did not, which meant a client that
+                 * forgot to subscribe to edits or tombstones still saw them here
+                 * and failed only in production — which is exactly what happened
+                 * with kinds 40003 and 9005.
+                 */
+                const wanted = (event: unknown) =>
+                  filter.kinds.includes((event as { kind: number }).kind);
                 // Echo the requested channel back on the `h` tag so a spec that
                 // opens two rooms sees each one's own timeline.
                 ws.send(
@@ -435,7 +445,9 @@ function mockRelay(
                   ]),
                 );
                 for (const extra of options.extraMessages ?? []) {
-                  ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  if (wanted(extra)) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
                 }
               } else if (filter.kinds.includes(39007)) {
                 // Live badge updates. The relay never stores these, so a real
@@ -1026,6 +1038,94 @@ test("a DM cannot be opened without a whole public key", async ({ page }) => {
       (event) => (event as { kind: number }).kind === 41010,
     ),
   ).toEqual([]);
+});
+
+test("an edit and a tombstone from the relay both reach the timeline", async ({
+  page,
+}) => {
+  // Both carry an `h` tag, so both belong on the channel subscription. Naming
+  // only the content kinds renders a timeline that looks complete and silently
+  // ignores every edit and every removal — which is what this client did.
+  const target = markdownMessage("1", "before the edit");
+  const doomed = markdownMessage("2", "about to go");
+  const relay = mockRelay(page, {
+    extraMessages: [
+      target,
+      doomed,
+      {
+        id: "ed".repeat(32),
+        pubkey: target.pubkey,
+        kind: 40003,
+        created_at: 1_700_000_400,
+        tags: [
+          ["h", CHANNEL_UUID],
+          ["e", target.id],
+        ],
+        content: "after the edit",
+        sig: "f".repeat(128),
+      },
+      {
+        id: "de".repeat(32),
+        pubkey: doomed.pubkey,
+        kind: 9005,
+        created_at: 1_700_000_500,
+        tags: [
+          ["h", CHANNEL_UUID],
+          ["e", doomed.id],
+        ],
+        content: "",
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  await expect(page.getByText("after the edit")).toBeVisible();
+  await expect(page.getByText("before the edit")).toHaveCount(0);
+  await expect(page.getByText("(edited)").first()).toBeVisible();
+
+  await expect(page.getByText("Message deleted")).toBeVisible();
+  await expect(page.getByText("about to go")).toHaveCount(0);
+
+  // And the subscription that carried them named its kinds, as the relay's
+  // p-gate requires.
+  const channelSubs = relay.subscriptions.filter(
+    (filter) => filter.kinds?.includes(9) && filter["#h"],
+  );
+  expect(channelSubs.length).toBeGreaterThan(0);
+  for (const filter of channelSubs) {
+    expect(filter.kinds).toContain(40003);
+    expect(filter.kinds).toContain(9005);
+  }
+});
+
+test("each day heading is scoped to its own day", async ({ page }) => {
+  // Flat sticky siblings all pin at the same offset, so a second day's heading
+  // covers the first instead of pushing it away.
+  const yesterday = Math.floor(Date.now() / 1000) - 26 * 60 * 60;
+  const relay = mockRelay(page, {
+    extraMessages: [
+      { ...markdownMessage("1", "older day"), created_at: yesterday },
+      {
+        ...markdownMessage("2", "newer day"),
+        created_at: Math.floor(Date.now() / 1000) - 60,
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("newer day")).toBeVisible();
+
+  const headings = page.getByTestId("message-timeline-day-divider");
+  const labels = await headings.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("data-day-label")),
+  );
+  // Distinct days, each with its own heading — not one heading repeated.
+  expect(new Set(labels).size).toBe(labels.length);
+  expect(labels).toContain("Today");
 });
 
 test("a message is attributed to its author's display name", async ({

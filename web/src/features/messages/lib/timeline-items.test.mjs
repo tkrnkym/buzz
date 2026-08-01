@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   SYSTEM_GROUP_WINDOW_SECONDS,
   buildTimelineItems,
+  groupItemsByDay,
 } from "@/features/messages/lib/timeline-items";
 import { MESSAGE_GROUPING_WINDOW_SECONDS } from "@/features/messages/lib/message-grouping";
 
@@ -261,4 +262,52 @@ test("every key in the stream is unique", () => {
   });
   const keys = items.map((item) => item.key);
   assert.equal(new Set(keys).size, keys.length);
+});
+
+test("day groups scope each heading to its own day", () => {
+  // Flat siblings all stick at the same offset, so a second day's heading would
+  // pin on top of the first instead of pushing it away.
+  const groups = groupItemsByDay(
+    buildTimelineItems({
+      rows: [
+        row("m1", ALICE, DAY_ONE),
+        row("m2", ALICE, DAY_ONE + 30),
+        row("m3", BOB, DAY_TWO),
+      ],
+    }),
+  );
+  assert.equal(groups.length, 2);
+  assert.deepEqual(
+    groups[0].items.map((item) => item.row.message.id),
+    ["m1", "m2"],
+  );
+  assert.deepEqual(
+    groups[1].items.map((item) => item.row.message.id),
+    ["m3"],
+  );
+  assert.equal(groups[0].headingTimestamp, DAY_ONE);
+});
+
+test("a day group carries the dividers and system rows inside it", () => {
+  const groups = groupItemsByDay(
+    buildTimelineItems({
+      rows: [
+        row("m1", ALICE, DAY_ONE),
+        row("s1", ALICE, DAY_ONE + 10, { system: true }),
+        row("m2", BOB, DAY_ONE + 20),
+      ],
+      firstUnreadMessageId: "m2",
+    }),
+  );
+  assert.equal(groups.length, 1);
+  assert.deepEqual(kinds(groups[0].items), [
+    "message",
+    "system-group",
+    "unread-divider",
+    "message",
+  ]);
+});
+
+test("an empty stream produces no day groups", () => {
+  assert.deepEqual(groupItemsByDay([]), []);
 });

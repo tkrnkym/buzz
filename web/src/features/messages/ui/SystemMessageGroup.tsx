@@ -1,8 +1,10 @@
 import { Info } from "lucide-react";
 
+import { useMemo } from "react";
+
 import type { TimelineRow } from "@/features/chat/timeline";
 import { MessageTimestamp } from "@/features/messages/ui/MessageTimestamp";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { useUserLabels } from "@/features/profile/use-user-label";
 
 interface SystemPayload {
   type: string;
@@ -36,12 +38,15 @@ function parsePayload(content: string): SystemPayload | null {
  * act on, not an empty row. A payload that is not JSON at all falls back to its
  * raw content for the same reason.
  */
-function describe(row: TimelineRow): string {
+function describe(
+  row: TimelineRow,
+  nameOf: (pubkey: string) => string,
+): string {
   const payload = parsePayload(row.content);
   if (!payload) return row.content;
 
-  const actor = payload.actor ? truncatePubkey(payload.actor) : null;
-  const target = payload.target ? truncatePubkey(payload.target) : null;
+  const actor = payload.actor ? nameOf(payload.actor) : null;
+  const target = payload.target ? nameOf(payload.target) : null;
 
   switch (payload.type) {
     case "member_joined":
@@ -78,6 +83,22 @@ function describe(row: TimelineRow): string {
  * `timeline-items.ts`.
  */
 export function SystemMessageGroup({ rows }: { rows: TimelineRow[] }) {
+  // The people a notice is about are not necessarily message authors, so they
+  // have to be requested here rather than relying on the timeline's set.
+  const mentioned = useMemo(
+    () =>
+      rows.flatMap((row) => {
+        const payload = parsePayload(row.content);
+        return [payload?.actor, payload?.target].filter(
+          (pubkey): pubkey is string => typeof pubkey === "string",
+        );
+      }),
+    [rows],
+  );
+  // `nameOf`, not `labelOf`: "You added Alice" is right in prose, but "You
+  // joined" beside a timestamp reads as a bug when it was months ago.
+  const { nameOf } = useUserLabels(mentioned);
+
   return (
     <li className="flex gap-2 px-4 py-1" data-testid="system-message-group">
       <span className="flex w-9 shrink-0 justify-center pt-0.5 text-muted-foreground/60">
@@ -89,7 +110,9 @@ export function SystemMessageGroup({ rows }: { rows: TimelineRow[] }) {
             className="flex items-baseline gap-2 text-2xs text-muted-foreground"
             key={row.message.id}
           >
-            <span className="min-w-0 flex-1 truncate">{describe(row)}</span>
+            <span className="min-w-0 flex-1 truncate">
+              {describe(row, nameOf)}
+            </span>
             <MessageTimestamp createdAt={row.message.createdAt} hideDayPeriod />
           </li>
         ))}

@@ -98,21 +98,24 @@ export const CHANNEL_TIMELINE_CONTENT_KINDS = [
 ];
 
 /**
- * Auxiliary kinds that modify an existing timeline row rather than adding one.
+ * Everything an `#h`-scoped channel subscription must ask for.
  *
- * These carry only an `e` tag — no `h` — so they are unreachable from an
- * `#h`-scoped channel filter and must be fetched by `#e` reference against the
- * message ids already on screen.
+ * The content kinds plus the two modifiers that *do* carry an `h` tag: an edit
+ * (40003) and the Nuxx tombstone (9005). Leaving them out is invisible — the
+ * timeline renders, it just never applies anyone's edit or removal — which is
+ * exactly what this client did until it was noticed.
  */
-export const CHANNEL_AUX_EVENT_KINDS = [
-  KIND_REACTION,
-  KIND_DELETION,
-  KIND_NIP29_DELETE_EVENT,
+export const CHANNEL_H_SCOPED_KINDS = [
+  ...CHANNEL_TIMELINE_CONTENT_KINDS,
   KIND_STREAM_MESSAGE_EDIT,
+  KIND_NIP29_DELETE_EVENT,
 ];
 
-/** Everything a live channel subscription needs: content plus aux. */
-export const CHANNEL_EVENT_KINDS = [
-  ...CHANNEL_TIMELINE_CONTENT_KINDS,
-  ...CHANNEL_AUX_EVENT_KINDS,
-];
+/**
+ * Modifiers that carry only an `e` tag, never an `h`.
+ *
+ * A reaction (`nuxx-sdk::build_reaction`) and a NIP-09 deletion both omit the
+ * channel, so no `#h` subscription can reach them: they have to be fetched by
+ * `#e` against the message ids already on screen.
+ */
+export const CHANNEL_E_SCOPED_KINDS = [KIND_REACTION, KIND_DELETION];

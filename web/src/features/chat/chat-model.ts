@@ -8,6 +8,8 @@
 import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
 
 import {
+  CHANNEL_E_SCOPED_KINDS,
+  CHANNEL_H_SCOPED_KINDS,
   CHANNEL_TIMELINE_CONTENT_KINDS,
   KIND_DELETION,
   KIND_NIP29_DELETE_EVENT,
@@ -203,13 +205,20 @@ export function eventToMessage(event: NostrEvent): Message | null {
   };
 }
 
-/** Historical + live filter for one channel's timeline. */
+/**
+ * Historical + live filter for one channel's timeline.
+ *
+ * Asks for the modifiers that carry an `h` tag as well as the content kinds —
+ * see `CHANNEL_H_SCOPED_KINDS`. A filter naming only the content kinds renders a
+ * timeline that looks complete and silently ignores every edit and every
+ * tombstone.
+ */
 export function buildChannelTimelineFilter(
   channelId: string,
   limit: number,
 ): NostrFilter {
   return {
-    kinds: CHANNEL_TIMELINE_CONTENT_KINDS,
+    kinds: CHANNEL_H_SCOPED_KINDS,
     "#h": [channelId],
     limit,
   };
@@ -247,7 +256,7 @@ export function buildChannelHistoryFilter(
   cursor: HistoryCursor,
 ): NostrFilter {
   return {
-    kinds: CHANNEL_TIMELINE_CONTENT_KINDS,
+    kinds: CHANNEL_H_SCOPED_KINDS,
     "#h": [channelId],
     limit,
     until: cursor.createdAt,
@@ -293,7 +302,7 @@ export function chunkIds(
  */
 export function buildReactionFilter(messageIds: string[]): NostrFilter {
   return {
-    kinds: [KIND_REACTION, KIND_DELETION],
+    kinds: CHANNEL_E_SCOPED_KINDS,
     "#e": messageIds,
     limit: MAX_AUX_LIMIT,
   };
