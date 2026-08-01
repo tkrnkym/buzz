@@ -66,7 +66,9 @@ export function ThreadPanel({
       <ThreadHeader onClose={onClose} replyCount={replies.length} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <ul className="flex flex-col pb-2">
+        {/* A plain container, not a list: `MessageRow` renders a `div` so the
+            virtualized channel timeline can supply its own `li` wrapper. */}
+        <div className="flex flex-col pb-2">
           {/* The root always gets the full treatment — it is the subject, and a
               grouped root would have no visible author. Its own thread summary
               is suppressed: the panel *is* the thread. */}
@@ -77,7 +79,7 @@ export function ThreadPanel({
             key={root.message.id}
             row={root}
           />
-        </ul>
+        </div>
 
         {replies.length > 0 && (
           <>
@@ -89,7 +91,7 @@ export function ThreadPanel({
               {replies.length === 1 ? "1 reply" : `${replies.length} replies`}
               <span className="h-px flex-1 bg-border" />
             </div>
-            <ul className="flex flex-col pb-2">
+            <div className="flex flex-col pb-2">
               {replies.map((reply, index) => {
                 const previous = index > 0 ? replies[index - 1] : null;
                 // Same grouping rule as the channel, so a message does not
@@ -124,7 +126,7 @@ export function ThreadPanel({
                   />
                 );
               })}
-            </ul>
+            </div>
           </>
         )}
       </div>

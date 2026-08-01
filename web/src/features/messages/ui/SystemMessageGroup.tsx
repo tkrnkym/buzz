@@ -100,7 +100,7 @@ export function SystemMessageGroup({ rows }: { rows: TimelineRow[] }) {
   const { nameOf } = useUserLabels(mentioned);
 
   return (
-    <li className="flex gap-2 px-4 py-1" data-testid="system-message-group">
+    <div className="flex gap-2 px-4 py-1" data-testid="system-message-group">
       <span className="flex w-9 shrink-0 justify-center pt-0.5 text-muted-foreground/60">
         <Info aria-hidden className="size-3.5" />
       </span>
@@ -117,6 +117,6 @@ export function SystemMessageGroup({ rows }: { rows: TimelineRow[] }) {
           </li>
         ))}
       </ul>
-    </li>
+    </div>
   );
 }

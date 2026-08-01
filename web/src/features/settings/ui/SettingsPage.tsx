@@ -1,11 +1,12 @@
 import { Monitor, Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useMyPubkey } from "@/features/chat/use-chat";
 import { EmojiSettings } from "@/features/emoji/ui/EmojiSettings";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
+import { useAvatarUpload } from "@/features/profile/use-avatar-upload";
 import { usePublishProfile } from "@/features/profile/use-profile";
 import { useMyProfile } from "@/features/profile/use-profile";
 import { useTheme } from "@/shared/theme/ThemeProvider";
@@ -49,6 +50,8 @@ function Section({
  * else on this page is worthless if it is signed by a key that disappears.
  */
 export function SettingsPage() {
+  const avatarUpload = useAvatarUpload();
+  const avatarInput = useRef<HTMLInputElement>(null);
   const pubkey = useMyPubkey();
   const profile = useMyProfile();
   const profiles = useProfiles(pubkey ? [pubkey] : []);
@@ -60,6 +63,13 @@ export function SettingsPage() {
   const [name, setName] = useState("");
   const [about, setAbout] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+
+  /** Upload a picked picture and put its URL in the field. */
+  const onPickAvatar = async (file: File | undefined) => {
+    if (!file) return;
+    const url = await avatarUpload.upload(file);
+    if (url) setAvatarUrl(url);
+  };
 
   // Seed the form from the loaded profile. kind:0 is replaceable, so a submit
   // sends the whole object — a form that started empty would silently clear
@@ -97,10 +107,60 @@ export function SettingsPage() {
                   pubkey={pubkey}
                 />
               )}
-              <p className="text-2xs text-muted-foreground">
-                The picture comes from a URL — this client has no upload for it
-                yet.
-              </p>
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    accept="image/*"
+                    aria-label="Upload a picture"
+                    className="sr-only"
+                    onChange={(event) => {
+                      void onPickAvatar(event.target.files?.[0]);
+                      // Reset so picking the same file again still fires.
+                      event.target.value = "";
+                    }}
+                    ref={avatarInput}
+                    type="file"
+                  />
+                  <button
+                    className="rounded-md border border-border px-2.5 py-1.5 text-2xs font-medium hover:bg-accent disabled:opacity-60"
+                    data-testid="upload-avatar"
+                    disabled={avatarUpload.isUploading}
+                    onClick={() => avatarInput.current?.click()}
+                    type="button"
+                  >
+                    {avatarUpload.isUploading ? "Uploading…" : "Upload picture"}
+                  </button>
+                  {avatarUrl && (
+                    <button
+                      className="rounded-md px-2 py-1.5 text-2xs text-muted-foreground hover:text-foreground"
+                      data-testid="remove-avatar"
+                      onClick={() => setAvatarUrl("")}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <p className="text-2xs text-muted-foreground">
+                  {/* The upload only fills the field — kind:0 is one event
+                      carrying every field, so a picture is saved with the rest
+                      of the form rather than on its own. */}
+                  Stored on the relay's media host. Saved when you save the
+                  profile.
+                </p>
+                {avatarUpload.error && (
+                  <p className="text-2xs text-destructive">
+                    {avatarUpload.error}{" "}
+                    <button
+                      className="underline"
+                      onClick={avatarUpload.dismissError}
+                      type="button"
+                    >
+                      Dismiss
+                    </button>
+                  </p>
+                )}
+              </div>
             </div>
 
             <form

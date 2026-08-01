@@ -2434,29 +2434,118 @@ test("paging in history keeps the reader where they were", async ({ page }) => {
   await page.goto(`/c/${CHANNEL_UUID}`);
   await expect(page.getByText("recent message 39")).toBeVisible();
 
-  const scroller = page.locator("div.overflow-y-auto").first();
-  await scroller.evaluate((el) => {
-    el.scrollTop = 0;
+  const scroller = page.getByTestId("message-timeline");
+  const loadOlder = page.getByRole("button", {
+    name: "Load older messages",
+  });
+  // The row the reader is on. Asserting on `scrollHeight - scrollTop` would be
+  // asserting on an estimate: with a virtualized list the scroll height is
+  // derived from the sizes measured so far and moves as more are measured.
+  const anchor = page.getByText("recent message 0");
+
+  // Scroll up and click in one retried step. Separating them is racy: the
+  // timeline lands on the newest message by measuring as it goes, so a scroll
+  // issued mid-settle is corrected back and the button leaves the viewport
+  // between the check and the click.
+  await expect
+    .poll(
+      async () => {
+        await scroller.evaluate((el) => {
+          el.scrollTop = 0;
+        });
+        if (!(await loadOlder.isVisible())) return false;
+        await loadOlder.click({ timeout: 1_000 }).catch(() => {});
+        return page.getByText("older message 39").isVisible();
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+
+  // Still on screen: forty rows were pushed in above it without moving it.
+  await expect(anchor).toBeInViewport();
+  // And demonstrably not at the bottom, which is the failure this guards
+  // against — following the tail on row count would land there.
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+
+test("an uploaded picture fills the profile field and is saved with it", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.route("**/upload", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        url: "https://relay.test/media/face.png",
+        sha256: "a".repeat(64),
+        size: 5,
+        type: "image/png",
+        uploaded: 1_700_000_000,
+      }),
+    });
   });
 
-  const before = await scroller.evaluate((el) => ({
-    fromBottom: el.scrollHeight - el.scrollTop,
-  }));
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Upload a picture" }).setInputFiles({
+    name: "face.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("hello"),
+  });
 
-  await page.getByRole("button", { name: "Load older messages" }).click();
-  await expect(page.getByText("older message 39")).toBeVisible();
+  // The upload only fills the field. kind:0 carries every field in one event,
+  // so publishing here would save a half-finished profile.
+  await expect(page.getByTestId("settings-avatar-url")).toHaveValue(
+    "https://relay.test/media/face.png",
+  );
+  expect(
+    relay.published.filter((event) => (event as { kind: number }).kind === 0),
+  ).toEqual([]);
 
-  const after = await scroller.evaluate((el) => ({
-    fromBottom: el.scrollHeight - el.scrollTop,
-    scrollTop: el.scrollTop,
-  }));
+  await page.getByTestId("settings-display-name").fill("Picture Person");
+  await page.getByTestId("save-profile").click();
 
-  // Distance from the bottom is what a prepend leaves unchanged, so restoring it
-  // puts the reader back on the same row.
-  expect(Math.abs(after.fromBottom - before.fromBottom)).toBeLessThan(4);
-  // And they are demonstrably not at the bottom, which is the failure this
-  // guards against.
-  expect(after.scrollTop).toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      relay.published.some((event) => (event as { kind: number }).kind === 0),
+    )
+    .toBe(true);
+  const profile = relay.published.find(
+    (event) => (event as { kind: number }).kind === 0,
+  ) as { content: string };
+  expect(JSON.parse(profile.content).picture).toBe(
+    "https://relay.test/media/face.png",
+  );
+});
+
+test("a picture the relay will not store is refused before the upload", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  let uploaded = false;
+  await page.route("**/upload", async (route) => {
+    uploaded = true;
+    await route.fulfill({ status: 500, body: "should not be reached" });
+  });
+
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Upload a picture" }).setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("not an image"),
+  });
+
+  await expect(
+    page.getByText("That is not an image the relay will store."),
+  ).toBeVisible();
+  // Rejected locally: sending it only to be refused would cost the transfer.
+  expect(uploaded).toBe(false);
 });
 
 test("attaching a file uploads it and publishes its imeta", async ({

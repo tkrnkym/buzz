@@ -100,13 +100,13 @@ export function MessageRow({
     // A tombstone is shown rather than the row vanishing: a reader following a
     // reply needs to see that the parent existed and was removed.
     return (
-      <li className="flex gap-2 px-4 py-1">
+      <div className="flex gap-2 px-4 py-1">
         <span aria-hidden className={cn(GUTTER, "shrink-0")} />
         <p className="text-sm italic text-muted-foreground">
           Message deleted
           {row.deletedReason ? ` — ${row.deletedReason}` : ""}
         </p>
-      </li>
+      </div>
     );
   }
 
@@ -122,7 +122,9 @@ export function MessageRow({
   });
 
   return (
-    <li
+    // A `div`, not an `li`: the virtualizer supplies the list item wrapper, and
+    // nesting one here would put an `li` inside an `li`.
+    <div
       className={cn(
         "group/message relative flex gap-2 px-4 hover:bg-accent/40",
         isContinuation ? "pt-0.5" : "pt-2",
@@ -230,6 +232,6 @@ export function MessageRow({
           reactedEmojis={row.reactions.map((reaction) => reaction.emoji)}
         />
       )}
-    </li>
+    </div>
   );
 }

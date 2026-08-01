@@ -142,39 +142,3 @@ export function buildTimelineItems({
 
   return items;
 }
-
-/** One day's worth of the stream: its divider, and everything under it. */
-export interface TimelineDayGroup {
-  key: string;
-  headingTimestamp: number;
-  items: Exclude<TimelineItem, { kind: "day-divider" }>[];
-}
-
-/**
- * Fold the flat stream into day groups.
- *
- * Purely so the day heading can be `position: sticky` *within its own day*.
- * Flat siblings all stick at the same offset, so a second day's heading pins on
- * top of the first instead of pushing it away, and a reader scrolling through
- * history sees a growing stack of dates. Scoping each heading to a container
- * that ends where its day ends is what makes it scroll off.
- *
- * Anything before the first divider is impossible — the builder always emits one
- * ahead of the first row — so a leading item without a day is dropped rather
- * than given an invented date.
- */
-export function groupItemsByDay(items: TimelineItem[]): TimelineDayGroup[] {
-  const groups: TimelineDayGroup[] = [];
-  for (const item of items) {
-    if (item.kind === "day-divider") {
-      groups.push({
-        key: item.key,
-        headingTimestamp: item.headingTimestamp,
-        items: [],
-      });
-      continue;
-    }
-    groups[groups.length - 1]?.items.push(item);
-  }
-  return groups;
-}
