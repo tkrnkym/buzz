@@ -4,6 +4,7 @@ import {
   Bell,
   Bot,
   Compass,
+  FileText,
   FolderGit2,
   FolderKanban,
   Inbox,
@@ -309,6 +310,18 @@ export function AppSidebar({
               <Link to="/workflows">
                 <Zap className="size-4" />
                 <span>Workflows</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={view === "forum"}
+              tooltip="Forum"
+            >
+              <Link to="/forum">
+                <FileText className="size-4" />
+                <span>Forum</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

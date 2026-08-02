@@ -18,6 +18,7 @@ import {
 } from "@/features/chat/use-chat";
 import { usePresence, useTyping } from "@/features/chat/use-presence";
 import { useEmojiCatalog } from "@/features/emoji/use-emoji";
+import { HuddleBar } from "@/features/huddle/ui/HuddleBar";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
 import { useProfiles } from "@/features/profile/profile-store";
@@ -325,6 +326,7 @@ export function ChatPage({
               rows={timeline.rows}
               unreadCount={unreadMarker.unreadCount}
             />
+            <HuddleBar />
             <TypingIndicator typists={typing.typists} />
             <MessageComposer
               channelId={channelId}

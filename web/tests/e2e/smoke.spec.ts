@@ -2911,3 +2911,59 @@ test("a signer without NIP-44 is told unread sync is unavailable", async ({
     )
     .toBe(0);
 });
+
+/**
+ * The mock-up screens.
+ *
+ * These have no relay data path yet, so the real build shows an honest "not
+ * connected" panel. That is the behaviour worth guarding: the failure mode is
+ * shipping invented projects and agents to someone pointed at a real relay.
+ */
+const SHOWCASE_ROUTES = [
+  ["/agents", "エージェント"],
+  ["/projects", "プロジェクト"],
+  ["/workflows", "ワークフロー"],
+  ["/pulse", "Pulse"],
+  ["/reminders", "リマインダー"],
+  ["/forum", "フォーラム"],
+] as const;
+
+for (const [path, what] of SHOWCASE_ROUTES) {
+  test(`${path} says it is not connected rather than showing invented data`, async ({
+    page,
+  }) => {
+    const relay = mockRelay(page);
+    await relay.install();
+
+    await page.goto(path);
+    await expect(page.getByTestId("showcase-not-wired")).toBeVisible();
+    await expect(
+      page.getByText(`${what}はまだ接続されていません`),
+    ).toBeVisible();
+  });
+}
+
+test("the sidebar reaches every section, and lights only the current one", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/agents");
+  // The old `startsWith` chain defaulted to "chat", so every new section lit
+  // the Channels item up as if the reader were in a room.
+  await expect(
+    page
+      .getByRole("link", { name: "Agents" })
+      .and(page.locator("[data-active=true]")),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("link", { name: "Channels" })
+      .and(page.locator("[data-active=true]")),
+  ).toHaveCount(0);
+
+  for (const name of ["Pulse", "Projects", "Workflows", "Forum", "Reminders"]) {
+    await expect(page.getByRole("link", { name })).toBeVisible();
+  }
+});

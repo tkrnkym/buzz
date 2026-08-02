@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { useMyPubkey } from "@/features/chat/use-chat";
 import { EmojiSettings } from "@/features/emoji/ui/EmojiSettings";
+import { MembersSettings } from "@/features/members/ui/MembersSettings";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import { useAvatarUpload } from "@/features/profile/use-avatar-upload";
@@ -246,6 +247,13 @@ export function SettingsPage() {
                 </p>
               </div>
             </form>
+          </Section>
+
+          <Section
+            description="このコミュニティに参加している人と、招待リンク。"
+            title="メンバー"
+          >
+            <MembersSettings />
           </Section>
 
           <Section

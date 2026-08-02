@@ -15,6 +15,7 @@ import { Route as remindersRouteImport } from "./routes/reminders";
 import { Route as pulseRouteImport } from "./routes/pulse";
 import { Route as projectsRouteImport } from "./routes/projects";
 import { Route as homeRouteImport } from "./routes/home";
+import { Route as forumRouteImport } from "./routes/forum";
 import { Route as cRouteImport } from "./routes/c";
 import { Route as browseRouteImport } from "./routes/browse";
 import { Route as agentsRouteImport } from "./routes/agents";
@@ -73,6 +74,11 @@ const homeRoute = homeRouteImport.update({
   path: "/home",
   getParentRoute: () => shellRoute,
 } as any);
+const forumRoute = forumRouteImport.update({
+  id: "/forum",
+  path: "/forum",
+  getParentRoute: () => shellRoute,
+} as any);
 const cRoute = cRouteImport.update({
   id: "/c",
   path: "/c",
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
+  "/forum": typeof forumRoute;
   "/home": typeof homeRoute;
   "/projects": typeof projectsRoute;
   "/pulse": typeof pulseRoute;
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
+  "/forum": typeof forumRoute;
   "/home": typeof homeRoute;
   "/projects": typeof projectsRoute;
   "/pulse": typeof pulseRoute;
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   "/_shell/agents": typeof agentsRoute;
   "/_shell/browse": typeof browseRoute;
   "/_shell/c": typeof cRoute;
+  "/_shell/forum": typeof forumRoute;
   "/_shell/home": typeof homeRoute;
   "/_shell/projects": typeof projectsRoute;
   "/_shell/pulse": typeof pulseRoute;
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | "/agents"
     | "/browse"
     | "/c"
+    | "/forum"
     | "/home"
     | "/projects"
     | "/pulse"
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | "/agents"
     | "/browse"
     | "/c"
+    | "/forum"
     | "/home"
     | "/projects"
     | "/pulse"
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | "/_shell/agents"
     | "/_shell/browse"
     | "/_shell/c"
+    | "/_shell/forum"
     | "/_shell/home"
     | "/_shell/projects"
     | "/_shell/pulse"
@@ -315,6 +327,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof homeRouteImport;
       parentRoute: typeof shellRoute;
     };
+    "/_shell/forum": {
+      id: "/_shell/forum";
+      path: "/forum";
+      fullPath: "/forum";
+      preLoaderRoute: typeof forumRouteImport;
+      parentRoute: typeof shellRoute;
+    };
     "/_shell/c": {
       id: "/_shell/c";
       path: "/c";
@@ -379,6 +398,7 @@ interface shellRouteChildren {
   agentsRoute: typeof agentsRoute;
   browseRoute: typeof browseRoute;
   cRoute: typeof cRoute;
+  forumRoute: typeof forumRoute;
   homeRoute: typeof homeRoute;
   projectsRoute: typeof projectsRoute;
   pulseRoute: typeof pulseRoute;
@@ -395,6 +415,7 @@ const shellRouteChildren: shellRouteChildren = {
   agentsRoute: agentsRoute,
   browseRoute: browseRoute,
   cRoute: cRoute,
+  forumRoute: forumRoute,
   homeRoute: homeRoute,
   projectsRoute: projectsRoute,
   pulseRoute: pulseRoute,
