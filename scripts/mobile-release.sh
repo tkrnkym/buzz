@@ -17,6 +17,15 @@ fail() {
   exit 1
 }
 
+# The repository this script publishes for, named once.
+#
+# It used to be spelled out at each use, and the buzz -> nuxx rename updated
+# three of them and missed the run-URL pattern below, which kept saying
+# `block/nuxx`. No legitimate URL could match it, so every candidate dispatch
+# failed with "returned no workflow run URL" — and because the contract test
+# gates the whole CI matrix, that took every other job down with it.
+readonly REPO="tkrnkym/nuxx"
+
 # shellcheck source=scripts/release-rulesets.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/release-rulesets.sh"
 
@@ -131,7 +140,7 @@ case "$command" in
     tag="mobile-v${version}-rc.${next}"
     workflow="mobile-release-candidate.yml"
     if dispatch_output="$(gh workflow run "$workflow" \
-      --repo tkrnkym/nuxx \
+      --repo "$REPO" \
       --ref main \
       -f "version=$version" \
       -f "candidate_number=$next" \
@@ -143,12 +152,20 @@ case "$command" in
       fi
       fail "could not dispatch App-backed publication for $tag: $dispatch_output"
     fi
-    run_url="$(printf '%s\n' "$dispatch_output" | awk '/^https:\/\/github\.com\/block\/nuxx\/actions\/runs\/[0-9]+$/ { if (found) exit 2; found = $0 } END { if (found) print found }')" || \
+    # Anchored to this repository on purpose: `gh` echoes whatever GitHub
+    # returns, and accepting any owner would let a redirected dispatch point
+    # `gh run watch` at somebody else's run.
+    run_url="$(printf '%s\n' "$dispatch_output" | awk -v repo="$REPO" '
+      $0 ~ "^https://github\\.com/" repo "/actions/runs/[0-9]+$" {
+        if (found) exit 2
+        found = $0
+      }
+      END { if (found) print found }')" || \
       fail "GitHub returned multiple workflow run URLs for one candidate dispatch"
     [[ -n "$run_url" ]] || \
       fail "GitHub accepted the candidate dispatch but returned no workflow run URL"
     run_id="${run_url##*/}"
-    gh run watch "$run_id" --repo tkrnkym/nuxx --exit-status --compact || \
+    gh run watch "$run_id" --repo "$REPO" --exit-status --compact || \
       fail "App-backed publication failed: $run_url"
 
     current_main_sha="$(remote_main_commit_sha)" || fail "origin/main does not exist after publication"
