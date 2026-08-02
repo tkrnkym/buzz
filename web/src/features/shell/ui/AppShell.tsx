@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ProfileStoreProvider } from "@/features/profile/profile-store";
 import { ShellProvider, useShell } from "@/features/shell/shell-context";
 import { AppSidebar } from "@/features/shell/ui/AppSidebar";
+import { resolveShellView } from "@/features/shell/lib/shell-view";
 import { CommunityRail } from "@/features/shell/ui/CommunityRail";
 import { relayWsUrl } from "@/shared/lib/relay-url";
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar";
@@ -44,14 +45,7 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   // `channelId` or a `q`. Asking strictly would have to know which.
   const { channelId } = useParams({ strict: false }) as { channelId?: string };
   const { q } = useSearch({ strict: false }) as { q?: string };
-  // Derived rather than passed down: the shell is a layout route, so it renders
-  // before the child route's component and cannot be told which one won.
-  const pathname = useLocation().pathname;
-  const view = pathname.startsWith("/home")
-    ? "inbox"
-    : pathname.startsWith("/settings")
-      ? "settings"
-      : "chat";
+  const view = resolveShellView(useLocation().pathname);
   const communityName = communityNameFromRelay();
   const hasUnread = channels.some((channel) => unread.isUnread(channel.id));
 

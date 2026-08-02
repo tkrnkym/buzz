@@ -1,5 +1,16 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Compass, FolderGit2, Inbox, MessageSquare, Plus } from "lucide-react";
+import {
+  Activity,
+  Bell,
+  Bot,
+  Compass,
+  FolderGit2,
+  FolderKanban,
+  Inbox,
+  MessageSquare,
+  Plus,
+  Zap,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +31,7 @@ import {
   groupChannels,
   type ChannelGroup,
 } from "@/features/shell/lib/channel-groups";
+import type { ShellView } from "@/features/shell/lib/shell-view";
 import { useShell } from "@/features/shell/shell-context";
 import {
   SidebarChannelSection,
@@ -57,7 +69,7 @@ export function AppSidebar({
   communityName: string;
   /** The committed search, from the URL. */
   query: string;
-  view: "chat" | "inbox" | "settings";
+  view: ShellView;
 }) {
   const {
     channels,
@@ -253,7 +265,71 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Browse channels">
+            <SidebarMenuButton
+              asChild
+              isActive={view === "pulse"}
+              tooltip="Pulse"
+            >
+              <Link to="/pulse">
+                <Activity className="size-4" />
+                <span>Pulse</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={view === "projects"}
+              tooltip="Projects"
+            >
+              <Link to="/projects">
+                <FolderKanban className="size-4" />
+                <span>Projects</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={view === "agents"}
+              tooltip="Agents"
+            >
+              <Link to="/agents">
+                <Bot className="size-4" />
+                <span>Agents</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={view === "workflows"}
+              tooltip="Workflows"
+            >
+              <Link to="/workflows">
+                <Zap className="size-4" />
+                <span>Workflows</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={view === "reminders"}
+              tooltip="Reminders"
+            >
+              <Link to="/reminders">
+                <Bell className="size-4" />
+                <span>Reminders</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={view === "browse"}
+              tooltip="Browse channels"
+            >
               <Link to="/browse">
                 <Compass className="size-4" />
                 <span>Browse</span>

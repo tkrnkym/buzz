@@ -9,11 +9,18 @@ import { Route as reposRouteImport } from "./routes/repos";
 import { Route as shellRouteImport } from "./routes/shell";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
 import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
+import { Route as workflowsRouteImport } from "./routes/workflows";
 import { Route as settingsRouteImport } from "./routes/settings";
+import { Route as remindersRouteImport } from "./routes/reminders";
+import { Route as pulseRouteImport } from "./routes/pulse";
+import { Route as projectsRouteImport } from "./routes/projects";
 import { Route as homeRouteImport } from "./routes/home";
 import { Route as cRouteImport } from "./routes/c";
 import { Route as browseRouteImport } from "./routes/browse";
+import { Route as agentsRouteImport } from "./routes/agents";
 import { Route as indexRouteImport } from "./routes/index";
+import { Route as workflowsDotworkflowIdRouteImport } from "./routes/workflows.$workflowId";
+import { Route as projectsDotprojectIdRouteImport } from "./routes/projects.$projectId";
 import { Route as chatDotchannelIdRouteImport } from "./routes/chat.$channelId";
 import { Route as reposDotrepoIdDotblobDotsplatRouteImport } from "./routes/repos.$repoId.blob.$";
 
@@ -36,9 +43,29 @@ const inviteDotcodeRoute = inviteDotcodeRouteImport.update({
   path: "/invite/$code",
   getParentRoute: () => rootRouteImport,
 } as any);
+const workflowsRoute = workflowsRouteImport.update({
+  id: "/workflows",
+  path: "/workflows",
+  getParentRoute: () => shellRoute,
+} as any);
 const settingsRoute = settingsRouteImport.update({
   id: "/settings",
   path: "/settings",
+  getParentRoute: () => shellRoute,
+} as any);
+const remindersRoute = remindersRouteImport.update({
+  id: "/reminders",
+  path: "/reminders",
+  getParentRoute: () => shellRoute,
+} as any);
+const pulseRoute = pulseRouteImport.update({
+  id: "/pulse",
+  path: "/pulse",
+  getParentRoute: () => shellRoute,
+} as any);
+const projectsRoute = projectsRouteImport.update({
+  id: "/projects",
+  path: "/projects",
   getParentRoute: () => shellRoute,
 } as any);
 const homeRoute = homeRouteImport.update({
@@ -56,9 +83,24 @@ const browseRoute = browseRouteImport.update({
   path: "/browse",
   getParentRoute: () => shellRoute,
 } as any);
+const agentsRoute = agentsRouteImport.update({
+  id: "/agents",
+  path: "/agents",
+  getParentRoute: () => shellRoute,
+} as any);
 const indexRoute = indexRouteImport.update({
   id: "/",
   path: "/",
+  getParentRoute: () => shellRoute,
+} as any);
+const workflowsDotworkflowIdRoute = workflowsDotworkflowIdRouteImport.update({
+  id: "/workflows/$workflowId",
+  path: "/workflows/$workflowId",
+  getParentRoute: () => shellRoute,
+} as any);
+const projectsDotprojectIdRoute = projectsDotprojectIdRouteImport.update({
+  id: "/projects/$projectId",
+  path: "/projects/$projectId",
   getParentRoute: () => shellRoute,
 } as any);
 const chatDotchannelIdRoute = chatDotchannelIdRouteImport.update({
@@ -76,25 +118,39 @@ const reposDotrepoIdDotblobDotsplatRoute =
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
   "/repos": typeof reposRoute;
+  "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
   "/home": typeof homeRoute;
+  "/projects": typeof projectsRoute;
+  "/pulse": typeof pulseRoute;
+  "/reminders": typeof remindersRoute;
   "/settings": typeof settingsRoute;
+  "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/c/$channelId": typeof chatDotchannelIdRoute;
+  "/projects/$projectId": typeof projectsDotprojectIdRoute;
+  "/workflows/$workflowId": typeof workflowsDotworkflowIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesByTo {
   "/repos": typeof reposRoute;
   "/": typeof indexRoute;
+  "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
   "/home": typeof homeRoute;
+  "/projects": typeof projectsRoute;
+  "/pulse": typeof pulseRoute;
+  "/reminders": typeof remindersRoute;
   "/settings": typeof settingsRoute;
+  "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/c/$channelId": typeof chatDotchannelIdRoute;
+  "/projects/$projectId": typeof projectsDotprojectIdRoute;
+  "/workflows/$workflowId": typeof workflowsDotworkflowIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesById {
@@ -102,13 +158,20 @@ export interface FileRoutesById {
   "/_shell": typeof shellRouteWithChildren;
   "/repos": typeof reposRoute;
   "/_shell/": typeof indexRoute;
+  "/_shell/agents": typeof agentsRoute;
   "/_shell/browse": typeof browseRoute;
   "/_shell/c": typeof cRoute;
   "/_shell/home": typeof homeRoute;
+  "/_shell/projects": typeof projectsRoute;
+  "/_shell/pulse": typeof pulseRoute;
+  "/_shell/reminders": typeof remindersRoute;
   "/_shell/settings": typeof settingsRoute;
+  "/_shell/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/_shell/c/$channelId": typeof chatDotchannelIdRoute;
+  "/_shell/projects/$projectId": typeof projectsDotprojectIdRoute;
+  "/_shell/workflows/$workflowId": typeof workflowsDotworkflowIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRouteTypes {
@@ -116,38 +179,59 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/repos"
+    | "/agents"
     | "/browse"
     | "/c"
     | "/home"
+    | "/projects"
+    | "/pulse"
+    | "/reminders"
     | "/settings"
+    | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/c/$channelId"
+    | "/projects/$projectId"
+    | "/workflows/$workflowId"
     | "/repos/$repoId/blob/$";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/repos"
     | "/"
+    | "/agents"
     | "/browse"
     | "/c"
     | "/home"
+    | "/projects"
+    | "/pulse"
+    | "/reminders"
     | "/settings"
+    | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/c/$channelId"
+    | "/projects/$projectId"
+    | "/workflows/$workflowId"
     | "/repos/$repoId/blob/$";
   id:
     | "__root__"
     | "/_shell"
     | "/repos"
     | "/_shell/"
+    | "/_shell/agents"
     | "/_shell/browse"
     | "/_shell/c"
     | "/_shell/home"
+    | "/_shell/projects"
+    | "/_shell/pulse"
+    | "/_shell/reminders"
     | "/_shell/settings"
+    | "/_shell/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/_shell/c/$channelId"
+    | "/_shell/projects/$projectId"
+    | "/_shell/workflows/$workflowId"
     | "/repos/$repoId/blob/$";
   fileRoutesById: FileRoutesById;
 }
@@ -189,11 +273,39 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof inviteDotcodeRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/_shell/workflows": {
+      id: "/_shell/workflows";
+      path: "/workflows";
+      fullPath: "/workflows";
+      preLoaderRoute: typeof workflowsRouteImport;
+      parentRoute: typeof shellRoute;
+    };
     "/_shell/settings": {
       id: "/_shell/settings";
       path: "/settings";
       fullPath: "/settings";
       preLoaderRoute: typeof settingsRouteImport;
+      parentRoute: typeof shellRoute;
+    };
+    "/_shell/reminders": {
+      id: "/_shell/reminders";
+      path: "/reminders";
+      fullPath: "/reminders";
+      preLoaderRoute: typeof remindersRouteImport;
+      parentRoute: typeof shellRoute;
+    };
+    "/_shell/pulse": {
+      id: "/_shell/pulse";
+      path: "/pulse";
+      fullPath: "/pulse";
+      preLoaderRoute: typeof pulseRouteImport;
+      parentRoute: typeof shellRoute;
+    };
+    "/_shell/projects": {
+      id: "/_shell/projects";
+      path: "/projects";
+      fullPath: "/projects";
+      preLoaderRoute: typeof projectsRouteImport;
       parentRoute: typeof shellRoute;
     };
     "/_shell/home": {
@@ -217,11 +329,32 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof browseRouteImport;
       parentRoute: typeof shellRoute;
     };
+    "/_shell/agents": {
+      id: "/_shell/agents";
+      path: "/agents";
+      fullPath: "/agents";
+      preLoaderRoute: typeof agentsRouteImport;
+      parentRoute: typeof shellRoute;
+    };
     "/_shell/": {
       id: "/_shell/";
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof indexRouteImport;
+      parentRoute: typeof shellRoute;
+    };
+    "/_shell/workflows/$workflowId": {
+      id: "/_shell/workflows/$workflowId";
+      path: "/workflows/$workflowId";
+      fullPath: "/workflows/$workflowId";
+      preLoaderRoute: typeof workflowsDotworkflowIdRouteImport;
+      parentRoute: typeof shellRoute;
+    };
+    "/_shell/projects/$projectId": {
+      id: "/_shell/projects/$projectId";
+      path: "/projects/$projectId";
+      fullPath: "/projects/$projectId";
+      preLoaderRoute: typeof projectsDotprojectIdRouteImport;
       parentRoute: typeof shellRoute;
     };
     "/_shell/c/$channelId": {
@@ -243,20 +376,34 @@ declare module "@tanstack/react-router" {
 
 interface shellRouteChildren {
   indexRoute: typeof indexRoute;
+  agentsRoute: typeof agentsRoute;
   browseRoute: typeof browseRoute;
   cRoute: typeof cRoute;
   homeRoute: typeof homeRoute;
+  projectsRoute: typeof projectsRoute;
+  pulseRoute: typeof pulseRoute;
+  remindersRoute: typeof remindersRoute;
   settingsRoute: typeof settingsRoute;
+  workflowsRoute: typeof workflowsRoute;
   chatDotchannelIdRoute: typeof chatDotchannelIdRoute;
+  projectsDotprojectIdRoute: typeof projectsDotprojectIdRoute;
+  workflowsDotworkflowIdRoute: typeof workflowsDotworkflowIdRoute;
 }
 
 const shellRouteChildren: shellRouteChildren = {
   indexRoute: indexRoute,
+  agentsRoute: agentsRoute,
   browseRoute: browseRoute,
   cRoute: cRoute,
   homeRoute: homeRoute,
+  projectsRoute: projectsRoute,
+  pulseRoute: pulseRoute,
+  remindersRoute: remindersRoute,
   settingsRoute: settingsRoute,
+  workflowsRoute: workflowsRoute,
   chatDotchannelIdRoute: chatDotchannelIdRoute,
+  projectsDotprojectIdRoute: projectsDotprojectIdRoute,
+  workflowsDotworkflowIdRoute: workflowsDotworkflowIdRoute,
 };
 
 const shellRouteWithChildren = shellRoute._addFileChildren(shellRouteChildren);

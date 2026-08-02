@@ -42,6 +42,18 @@ export const KEN = "b0b".padEnd(64, "b");
 export const AYA = "ca401".padEnd(64, "c");
 export const RELAY = "fe1a".padEnd(64, "f");
 
+/**
+ * Agent identities.
+ *
+ * Declared here with the people because they are people as far as the protocol
+ * is concerned: an agent signs its own events with its own key and publishes a
+ * kind:0 like anyone else. Keeping them in one list is what makes a name
+ * resolve the same way wherever it appears.
+ */
+export const AGENT_REVIEWER = "d00d".padEnd(64, "d");
+export const AGENT_RELEASE = "e11e".padEnd(64, "e");
+export const AGENT_TRIAGE = "0a11".padEnd(64, "0");
+
 export const CH_GENERAL = "11111111-1111-4111-8111-111111111111";
 export const CH_DEV = "22222222-2222-4222-8222-222222222222";
 export const CH_DESIGN = "33333333-3333-4333-8333-333333333333";
@@ -601,6 +613,21 @@ export const PROFILES: NostrEvent[] = [
     about: "デザインシステム",
   }),
   profile(RELAY, { display_name: "channels.nuxx.ai", name: "relay" }),
+  profile(AGENT_REVIEWER, {
+    display_name: "レビュー係",
+    name: "reviewer",
+    about: "PR を読んで、危ないところだけ指摘します",
+  }),
+  profile(AGENT_RELEASE, {
+    display_name: "リリース番",
+    name: "releaser",
+    about: "タグを切って、リリースノートの下書きを置きます",
+  }),
+  profile(AGENT_TRIAGE, {
+    display_name: "トリアージ",
+    name: "triage",
+    about: "新しい Issue にラベルを付けます",
+  }),
 ];
 
 export const PRESENCE: NostrEvent[] = [MISAKI, KEN].map((pubkey, index) =>
