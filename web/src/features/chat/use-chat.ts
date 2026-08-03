@@ -17,6 +17,8 @@ import {
   type Channel,
   buildChannelHistoryFilter,
   buildChannelListFilter,
+  buildDeleteMessageTemplate,
+  buildEditTemplate,
   buildChannelTimelineFilter,
   buildMessageTemplate,
   buildReactionFilter,
@@ -26,6 +28,7 @@ import {
   buildReplyTemplate,
   chunkIds,
   toChannelList,
+  toDmList,
 } from "@/features/chat/chat-model";
 import {
   type TimelineRow,
@@ -56,6 +59,23 @@ export function useChannels() {
       toChannelList(
         await session.query(buildChannelListFilter(CHANNEL_LIST_LIMIT)),
       ),
+  });
+}
+
+/**
+ * Direct messages.
+ *
+ * A separate query from `useChannels` rather than one list split two ways: the
+ * two are ordered differently (rooms by name, conversations by recency) and read
+ * in different places, so keeping them apart means neither has to re-sort the
+ * other's data.
+ */
+export function useDms() {
+  const session = useRelaySession();
+  return useQuery<Channel[]>({
+    queryKey: ["chat", "dms"],
+    queryFn: async () =>
+      toDmList(await session.query(buildChannelListFilter(CHANNEL_LIST_LIMIT))),
   });
 }
 
@@ -260,6 +280,50 @@ export function useSendMessage(channelId: string | null) {
 }
 
 /**
+ * Edit a message.
+ *
+ * Publishes a kind:40003 pointing at the original rather than replacing it — a
+ * signed event is immutable, so "editing" is an overlay the timeline applies
+ * (see `deriveTimeline`, which only honours an edit from the original author).
+ */
+export function useEditMessage(channelId: string | null) {
+  const session = useRelaySession();
+
+  return useMutation({
+    mutationFn: async (input: { messageId: string; content: string }) => {
+      if (!channelId) throw new Error("No channel selected");
+      const trimmed = input.content.trim();
+      // An empty edit is a delete in disguise. Refusing it keeps the two
+      // intentions separate: a blank row is not something a reader can act on,
+      // and a tombstone is.
+      if (!trimmed) throw new Error("An edited message cannot be empty");
+      return session.publish(
+        buildEditTemplate(channelId, input.messageId, trimmed),
+      );
+    },
+  });
+}
+
+/**
+ * Delete a message.
+ *
+ * Kind 9005, which carries the channel tag, so everyone with the timeline open
+ * sees the tombstone. See `buildDeleteMessageTemplate` for why not kind:5.
+ */
+export function useDeleteMessage(channelId: string | null) {
+  const session = useRelaySession();
+
+  return useMutation({
+    mutationFn: async (input: { messageId: string }) => {
+      if (!channelId) throw new Error("No channel selected");
+      return session.publish(
+        buildDeleteMessageTemplate(channelId, input.messageId),
+      );
+    },
+  });
+}
+
+/**
  * Add or withdraw a reaction.
  *
  * Withdrawal needs the reader's own kind:7 event id, which the derived row
@@ -274,11 +338,17 @@ export function useToggleReaction() {
       messageId: string;
       emoji: string;
       myReactionId?: string;
+      /** A NIP-30 custom emoji's URL, carried on the kind:7 so others render it. */
+      customEmojiUrl?: string;
     }) =>
       session.publish(
         input.myReactionId
           ? buildReactionWithdrawalTemplate(input.myReactionId)
-          : buildReactionTemplate(input.messageId, input.emoji),
+          : buildReactionTemplate(
+              input.messageId,
+              input.emoji,
+              input.customEmojiUrl,
+            ),
       ),
   });
 }

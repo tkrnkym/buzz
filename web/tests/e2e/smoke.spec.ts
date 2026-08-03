@@ -1,16 +1,17 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
-test("home page loads with Nuxx branding", async ({ page }) => {
-  await page.goto("/");
+test("the repo browser loads with Nuxx branding", async ({ page }) => {
+  // Was the top page until chat took `/`; it lives at `/repos` now.
+  await page.goto("/repos");
   await expect(
     page.getByRole("main").getByRole("img", { name: "Nuxx" }),
   ).toBeVisible();
 });
 
-test("home page shows repositories section", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByText("Repositories")).toBeVisible();
+test("the repo browser shows its repositories section", async ({ page }) => {
+  await page.goto("/repos");
+  await expect(page.getByRole("main").getByText("Repositories")).toBeVisible();
 });
 
 test("invite requires age and legal consent before opening Nuxx", async ({
@@ -198,6 +199,12 @@ function mockRelay(
      * cursor while the first publish is still in flight.
      */
     delayReadStateOkMs?: number;
+    /** kind:0 metadata served for a profile lookup. */
+    profileEvents?: unknown[];
+    /** kind:39002 member lists, from which the directory is built. */
+    memberEvents?: unknown[];
+    /** kind:30030 emoji sets, from which the palette is built. */
+    emojiEvents?: unknown[];
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -209,6 +216,17 @@ function mockRelay(
   const historyRequests: { until: number; beforeId: string }[] = [];
   /** Search filters the client sent, in order. */
   const searchRequests: QueryFilter[] = [];
+  /** How many WebSockets the page opened, so a spec can assert reuse. */
+  let socketsOpened = 0;
+  /**
+   * Open message subscriptions, by id and channel.
+   *
+   * A publish is echoed to whichever subscription actually asked for that
+   * channel's messages, the way a relay fans out. This used to be a hardcoded
+   * `s1`, which quietly depended on the timeline being the first subscription
+   * the client opened — so it broke the moment the app shell opened one first.
+   */
+  const messageSubs: { subId: string; channelId: string }[] = [];
 
   const channelMetadata = {
     id: "a".repeat(64),
@@ -273,6 +291,7 @@ function mockRelay(
     queries,
     historyRequests,
     searchRequests,
+    socketCount: () => socketsOpened,
     install: async () => {
       await page.route("**/query", async (route) => {
         const body = JSON.parse(route.request().postData() ?? "{}") as {
@@ -283,7 +302,35 @@ function mockRelay(
 
         const events: unknown[] = [];
         for (const filter of filters) {
-          if (filter.kinds?.includes(20001)) {
+          if (filter.kinds?.includes(30315)) {
+            // Parameterized-replaceable: the newest published event on the
+            // coordinate is the whole answer, which is also how a clear works.
+            const statuses = published.filter(
+              (event) => (event as { kind: number }).kind === 30315,
+            );
+            const newest = statuses.at(-1);
+            if (newest) events.push(newest);
+          } else if (filter.kinds?.includes(0)) {
+            // Plus anything published this session, so a profile the spec saves
+            // is the one the timeline then names the author by.
+            events.push(
+              ...(options.profileEvents ?? []),
+              ...published.filter(
+                (event) => (event as { kind: number }).kind === 0,
+              ),
+            );
+          } else if (filter.kinds?.includes(30030)) {
+            // Plus anything published this session, so a set the spec saves is
+            // the one the picker then offers.
+            events.push(
+              ...(options.emojiEvents ?? []),
+              ...published.filter(
+                (event) => (event as { kind: number }).kind === 30030,
+              ),
+            );
+          } else if (filter.kinds?.includes(39002)) {
+            events.push(...(options.memberEvents ?? []));
+          } else if (filter.kinds?.includes(20001)) {
             events.push(...(options.presenceEvents ?? []));
           } else if (filter.kinds?.includes(39007)) {
             events.push(...activitySnapshots());
@@ -329,6 +376,7 @@ function mockRelay(
       await page.routeWebSocket(
         (url) => url.protocol === "ws:" || url.protocol === "wss:",
         (ws) => {
+          socketsOpened += 1;
           // Nuxx relays always challenge before serving anything.
           ws.send(JSON.stringify(["AUTH", "challenge-from-mock"]));
 
@@ -353,8 +401,17 @@ function mockRelay(
                 return;
               }
               ws.send(JSON.stringify(["OK", frame[1].id, true, ""]));
-              // Echo it back on the live subscription, as a relay would.
-              ws.send(JSON.stringify(["EVENT", "s1", frame[1]]));
+              // Echo it back to every subscription that covers it, as a relay
+              // would. Reactions and deletions carry an `e` tag rather than an
+              // `h` tag, so they go to all open message subscriptions.
+              const hTag = (frame[1].tags as string[][]).find(
+                (tag) => tag[0] === "h",
+              )?.[1];
+              for (const sub of messageSubs) {
+                if (hTag === undefined || sub.channelId === hTag) {
+                  ws.send(JSON.stringify(["EVENT", sub.subId, frame[1]]));
+                }
+              }
               return;
             }
 
@@ -371,6 +428,17 @@ function mockRelay(
                   ws.send(JSON.stringify(["EVENT", subId, readState]));
                 }
               } else if (filter.kinds.includes(9) && filter["#h"]) {
+                messageSubs.push({ subId, channelId: filter["#h"][0] });
+                /**
+                 * Serve a fixture only if the filter actually named its kind.
+                 *
+                 * A relay would. The mock did not, which meant a client that
+                 * forgot to subscribe to edits or tombstones still saw them here
+                 * and failed only in production — which is exactly what happened
+                 * with kinds 40003 and 9005.
+                 */
+                const wanted = (event: unknown) =>
+                  filter.kinds.includes((event as { kind: number }).kind);
                 // Echo the requested channel back on the `h` tag so a spec that
                 // opens two rooms sees each one's own timeline.
                 ws.send(
@@ -392,7 +460,9 @@ function mockRelay(
                   ]),
                 );
                 for (const extra of options.extraMessages ?? []) {
-                  ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  if (wanted(extra)) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
                 }
               } else if (filter.kinds.includes(39007)) {
                 // Live badge updates. The relay never stores these, so a real
@@ -409,6 +479,9 @@ function mockRelay(
                   ws.send(JSON.stringify(["EVENT", subId, typing]));
                 }
               } else if (filter.kinds.includes(7)) {
+                // The reaction subscription is keyed on `e`, not `h`, so it has
+                // no channel of its own — it takes every echo.
+                messageSubs.push({ subId, channelId: "" });
                 // The #e-keyed auxiliary read: reactions and NIP-09 deletes,
                 // neither of which carries an `h` tag.
                 for (const aux of options.auxEvents ?? []) {
@@ -423,6 +496,118 @@ function mockRelay(
     },
   };
 }
+
+test("the top page is chat, with the app shell around it", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+
+  // The shell: community rail, channel list, and the identity card at its foot.
+  await expect(
+    page.getByRole("navigation", { name: "Communities" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Channels" }).getByText("general"),
+  ).toBeVisible();
+  await expect(page.getByTestId("sidebar-profile-card")).toBeVisible();
+  // No channel chosen yet, so the content pane offers the rooms instead of
+  // pointing at a sidebar that may be collapsed.
+  await expect(
+    page.getByRole("heading", { name: "Welcome to nuxx" }),
+  ).toBeVisible();
+});
+
+test("the legacy /c link still lands on chat", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  // Shared links and bookmarks from before chat moved to `/` must not 404.
+  await page.goto("/c?q=ship");
+  await expect(page).toHaveURL(/\/\?q=ship$/);
+});
+
+test("the sidebar survives channel navigation without reconnecting", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await expect(page.getByText("Connected")).toBeVisible();
+  const socketsAfterLoad = relay.socketCount();
+
+  await page
+    .getByRole("navigation", { name: "Channels" })
+    .getByText("general")
+    .click();
+  await expect(page.getByRole("heading", { name: "#general" })).toBeVisible();
+
+  // The shell is a layout route, so the authenticated socket is reused. A
+  // per-page provider would have opened a second one here.
+  expect(relay.socketCount()).toBe(socketsAfterLoad);
+});
+
+test("starring a channel moves it under Starred", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  // The heading does not exist until something is starred, so an empty Starred
+  // section never takes up room.
+  await expect(page.getByTestId("sidebar-group-starred")).toBeHidden();
+
+  // Starring lives in the row's action menu, alongside mute and leave.
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-star").click();
+  const starred = page.getByTestId("sidebar-group-starred");
+  await expect(starred.getByText("general")).toBeVisible();
+  // Only under Starred: listing it twice would double the unread badge and make
+  // the room count look wrong.
+  await expect(
+    page.getByTestId("sidebar-group-channels").getByText("general"),
+  ).toHaveCount(0);
+});
+
+test("a star survives a reload for a durable identity", async ({ page }) => {
+  // Stars are stored locally, keyed by pubkey — a private view preference should
+  // not be published to the community. That key is what makes this test need a
+  // NIP-07 identity: without an extension the signer mints a fresh key per page
+  // load, so there is no identity for a preference to belong to.
+  await page.addInitScript(() => {
+    (
+      window as Window & {
+        nostr?: {
+          getPublicKey(): Promise<string>;
+          signEvent(
+            event: Record<string, unknown>,
+          ): Promise<Record<string, unknown>>;
+        };
+      }
+    ).nostr = {
+      async getPublicKey() {
+        return "ab".repeat(32);
+      },
+      async signEvent(event) {
+        return { ...event, id: "cd".repeat(32), sig: "ef".repeat(64) };
+      },
+    };
+  });
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-star").click();
+  await expect(
+    page.getByTestId("sidebar-group-starred").getByText("general"),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page.getByTestId("sidebar-group-starred").getByText("general"),
+  ).toBeVisible();
+});
 
 test("chat lists channels from kind:39000 metadata", async ({ page }) => {
   const relay = mockRelay(page);
@@ -467,7 +652,7 @@ test("sending a message publishes kind:9 with the channel h tag", async ({
   await page.getByRole("button", { name: "Send" }).click();
 
   // The composer clears only after the relay OKs the event.
-  await expect(composer).toHaveValue("");
+  await expect(composer).toHaveText("");
   await expect(page.getByText("sent from the browser")).toBeVisible();
 
   // Read state publishes on the same stream, so scope to the message kind.
@@ -490,6 +675,30 @@ test("sending a message publishes kind:9 with the channel h tag", async ({
 
 const CHANNEL_UUID = "11111111-1111-1111-1111-111111111111";
 
+/**
+ * A DM's group metadata, as the relay emits it: hidden, `t:dm`, and carrying the
+ * participants as `p` tags so a client can label it without a second fetch.
+ */
+function dmChannel(channelId: string) {
+  return {
+    id: channelId.replace(/-/g, "").padEnd(64, "0").slice(0, 64),
+    pubkey: "b".repeat(64),
+    kind: 39000,
+    created_at: 1_700_000_500,
+    tags: [
+      ["d", channelId],
+      ["name", "dm"],
+      ["hidden"],
+      ["closed"],
+      ["t", "dm"],
+      ["p", MY_PUBKEY],
+      ["p", "e".repeat(64)],
+    ],
+    content: "",
+    sig: "c".repeat(128),
+  };
+}
+
 function markdownMessage(id: string, content: string, tags: string[][] = []) {
   return {
     id: id.repeat(64).slice(0, 64),
@@ -501,6 +710,63 @@ function markdownMessage(id: string, content: string, tags: string[][] = []) {
     sig: "f".repeat(128),
   };
 }
+
+test("Enter sends and Shift+Enter is a line break", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.click();
+  await composer.pressSequentially("first");
+  await page.keyboard.press("Shift+Enter");
+  await composer.pressSequentially("second");
+  // Still unsent: Shift+Enter is a line break, not a send.
+  expect(
+    relay.published.filter((event) => (event as { kind: number }).kind === 9),
+  ).toEqual([]);
+
+  await page.keyboard.press("Enter");
+
+  await expect
+    .poll(() =>
+      relay.published.some((event) => (event as { kind: number }).kind === 9),
+    )
+    .toBe(true);
+  const sent = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9,
+  ) as { content: string };
+  // One newline, which the renderer turns into a line break — not a paragraph
+  // split, and not two separate messages.
+  expect(sent.content).toBe("first\nsecond");
+});
+
+test("markdown shorthand becomes markup and serializes back", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.click();
+  // Typed as shorthand, applied as marks by the editor's input rules.
+  await composer.pressSequentially("**bold** and `code`");
+  await expect(composer.locator("strong")).toHaveText("bold");
+  await expect(composer.locator("code")).toHaveText("code");
+
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      relay.published.some((event) => (event as { kind: number }).kind === 9),
+    )
+    .toBe(true);
+  const sent = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9,
+  ) as { content: string };
+  // The event carries markdown, because that is what every other client reads.
+  expect(sent.content).toBe("**bold** and `code`");
+});
 
 test("message content renders markdown", async ({ page }) => {
   const relay = mockRelay(page, {
@@ -667,7 +933,7 @@ test("replying publishes thread tags and shows the reply count", async ({
   const rootRow = page
     .getByRole("listitem")
     .filter({ hasText: "the original" });
-  await rootRow.getByRole("button", { name: "Reply" }).click();
+  await rootRow.getByRole("button", { name: "Reply in thread" }).click();
   await expect(page.getByText(/Replying to/)).toBeVisible();
 
   const composer = page.getByRole("textbox", { name: /^Reply to/ });
@@ -687,6 +953,1054 @@ test("replying publishes thread tags and shows the reply count", async ({
   // Root === parent for a direct reply, which nuxx-sdk collapses to one tag.
   expect(reply.tags).toContainEqual(["e", root.id, "", "reply"]);
   expect(reply.tags).toContainEqual(["h", CHANNEL_UUID]);
+});
+
+test("creating a channel publishes kind:9007 and opens the room", async ({
+  page,
+}) => {
+  // A NIP-29 command: the relay validates it and publishes the group metadata,
+  // which is why nothing is inserted optimistically.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("open-create-channel").click();
+  await page.getByTestId("create-channel-name").fill("#Design Review");
+
+  // The preview shows what the relay's own canonicalization will produce —
+  // leading `#` stripped, nothing else touched.
+  await expect(page.getByTestId("create-channel-name-preview")).toContainText(
+    "Design Review",
+  );
+
+  await page.getByTestId("create-channel-visibility-private").click();
+  await page.getByTestId("create-channel-type-forum").click();
+  await page.getByTestId("create-channel-about").fill("weekly");
+  await page.getByTestId("create-channel-submit").click();
+
+  const created = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9007,
+  ) as { tags: string[][] };
+  expect(created.tags).toContainEqual(["name", "Design Review"]);
+  expect(created.tags).toContainEqual(["visibility", "private"]);
+  expect(created.tags).toContainEqual(["channel_type", "forum"]);
+  expect(created.tags).toContainEqual(["about", "weekly"]);
+  // The client picks the id, because the `h` tag has to exist before the relay
+  // can scope anything to it.
+  const hTag = created.tags.find((tag) => tag[0] === "h");
+  expect(hTag?.[1]).toMatch(/^[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(new RegExp(`/c/${hTag?.[1]}$`));
+});
+
+test("muting a channel dims it but keeps an unread room legible", async ({
+  page,
+}) => {
+  // The one time a reader who muted a room still asked to be told.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-mute").click();
+
+  // A standalone `opacity-50`, not the base variant's `disabled:opacity-50` —
+  // a loose match here would pass whether or not the row was ever dimmed.
+  const dimmed = /(^|\s)opacity-50(\s|$)/;
+  const row = page.getByTestId("channel-general");
+  await expect(row).toHaveClass(dimmed);
+  await expect(page.getByLabel("Muted")).toBeVisible();
+
+  // Unmuting is the same menu item, now inverted.
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-toggle-mute").click();
+  await expect(row).not.toHaveClass(dimmed);
+  await expect(page.getByLabel("Muted")).toHaveCount(0);
+});
+
+test("leaving a channel publishes kind:9022 and leaves the room", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId("channel-menu-general").click();
+  await page.getByTestId("menu-leave-channel").click();
+
+  const left = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9022,
+  ) as { tags: string[][] };
+  expect(left.tags).toEqual([["h", CHANNEL_UUID]]);
+  // Staying would leave the reader looking at a timeline they can no longer load.
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test("a DM is listed and titled by who is in it", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraChannels: [dmChannel("22222222-2222-2222-2222-222222222222")],
+    profileEvents: [
+      {
+        id: "0b".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 0,
+        created_at: 1_700_000_000,
+        tags: [],
+        content: JSON.stringify({ display_name: "Erin Example" }),
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto("/");
+  // Not under Channels: the relay marks a DM hidden, and it is read as a
+  // conversation rather than as a room.
+  const dms = page.getByTestId("sidebar-group-dms");
+  await expect(dms.getByText("Erin Example")).toBeVisible();
+  await expect(
+    page.getByTestId("sidebar-group-channels").getByText("Erin Example"),
+  ).toHaveCount(0);
+
+  await dms.getByText("Erin Example").click();
+  // No hash: it is a person, and "#Erin Example" reads as a channel that does
+  // not exist.
+  await expect(
+    page.getByRole("heading", { name: "Erin Example", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Message Erin Example" }),
+  ).toBeVisible();
+});
+
+test("opening a DM publishes kind:41010 with only p tags", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("open-new-dm").click();
+  // The pasted-key path stays first-class: someone who shares no channel with
+  // the reader is not in the directory and cannot be searched for.
+  for (const key of ["a".repeat(64), "b".repeat(64)]) {
+    await page.getByTestId("new-dm-search").fill(key);
+    await page.getByTestId("new-dm-add-pubkey").click();
+  }
+  await page.getByTestId("new-dm-submit").click();
+
+  const opened = relay.published.find(
+    (event) => (event as { kind: number }).kind === 41010,
+  ) as { tags: string[][] };
+  expect(opened.tags).toEqual([
+    ["p", "a".repeat(64)],
+    ["p", "b".repeat(64)],
+  ]);
+  // No `h` tag: the relay allocates the channel, so this client never derives an
+  // id for a set of people.
+  expect(opened.tags.every((tag) => tag[0] !== "h")).toBe(true);
+});
+
+test("a DM cannot be opened without a whole public key", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("open-new-dm").click();
+  await page.getByTestId("new-dm-search").fill("alice");
+  // Not a whole key and not anyone in the directory: nothing to add, so there is
+  // nobody to open a conversation with.
+  await expect(page.getByTestId("new-dm-add-pubkey")).toHaveCount(0);
+  await expect(page.getByTestId("new-dm-submit")).toBeDisabled();
+  expect(
+    relay.published.filter(
+      (event) => (event as { kind: number }).kind === 41010,
+    ),
+  ).toEqual([]);
+});
+
+/** A kind:39002 member list, which is where the directory comes from. */
+function memberList(channelId: string, members: [string, string][]) {
+  return {
+    id: `39002${channelId.replace(/-/g, "")}`.padEnd(64, "0").slice(0, 64),
+    pubkey: "b".repeat(64),
+    kind: 39002,
+    created_at: 1_700_000_000,
+    tags: [
+      ["d", channelId],
+      ...members.map(([pubkey, role]) => ["p", pubkey, "", role]),
+    ],
+    content: "",
+    sig: "f".repeat(128),
+  };
+}
+
+const MENTIONABLE = "e".repeat(64);
+
+/** Directory fixtures: one member with a profile, in the default channel. */
+function directoryOptions() {
+  return {
+    memberEvents: [
+      memberList(CHANNEL_UUID, [
+        [MENTIONABLE, "admin"],
+        [MY_PUBKEY, "member"],
+      ]),
+    ],
+    profileEvents: [
+      {
+        id: "0c".repeat(32),
+        pubkey: MENTIONABLE,
+        kind: 0,
+        created_at: 1_700_000_000,
+        tags: [],
+        content: JSON.stringify({ display_name: "Erin Example", name: "erin" }),
+        sig: "f".repeat(128),
+      },
+    ],
+  };
+}
+
+test("a mention completes from the directory and publishes a p tag", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, directoryOptions());
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  // The handle finds the display name: an author types what they remember.
+  await composer.fill("@eri");
+  await page.getByTestId("user-picker-Erin Example").click();
+  await expect(composer).toHaveText("@Erin Example");
+
+  await composer.fill("@Erin Example please look");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content.includes("please look"),
+  ) as { tags: string[][] };
+  // The `p` tag is what notifies, and it carries the pubkey the author chose
+  // rather than a name parsed back out of the text.
+  expect(sent.tags).toContainEqual(["p", MENTIONABLE]);
+});
+
+test("a mention deleted before sending notifies nobody", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, directoryOptions());
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("@eri");
+  await page.getByTestId("user-picker-Erin Example").click();
+  // The author thinks better of it and removes the name.
+  await composer.fill("never mind");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content === "never mind",
+  ) as { tags: string[][] };
+  expect(sent.tags.every((tag) => tag[0] !== "p")).toBe(true);
+});
+
+test("a known name renders as a mention chip, an unknown one does not", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    extraMessages: [
+      markdownMessage("b", "@Erin Example and @Nobody Here", [
+        ["p", MENTIONABLE],
+      ]),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.locator("[data-mention]")).toHaveCount(1);
+  await expect(page.locator("[data-mention]")).toHaveText("@Erin Example");
+  // A chip asserts this client resolved a person; an unknown handle stays text.
+  await expect(page.getByText("@Nobody Here")).toBeVisible();
+});
+
+/** A kind:30030 emoji set, which is where the palette comes from. */
+function emojiSet(pubkey: string, entries: [string, string][]) {
+  return {
+    id: `30030${pubkey}`.padEnd(64, "0").slice(0, 64),
+    pubkey,
+    kind: 30030,
+    created_at: 1_700_000_000,
+    tags: [
+      ["d", "nuxx"],
+      ...entries.map(([code, url]) => ["emoji", code, url]),
+    ],
+    content: "",
+    sig: "f".repeat(128),
+  };
+}
+
+const SHIPIT_URL = "https://example.com/shipit.png";
+
+test("a custom emoji completes in the composer and travels with the message", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    emojiEvents: [emojiSet(MENTIONABLE, [["shipit", SHIPIT_URL]])],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("ready :shi");
+  await page.getByTestId("emoji-shipit").click();
+  await expect(composer).toHaveText("ready :shipit:");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content.includes(":shipit:"),
+  ) as { tags: string[][] };
+  // NIP-30: the definition travels with the event, or a client that has never
+  // seen the author's set renders the literal text.
+  expect(sent.tags).toContainEqual(["emoji", "shipit", SHIPIT_URL]);
+});
+
+test("a defined shortcode renders as an image, an undefined one as text", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [
+      markdownMessage("c", "shipping :shipit: not :nope:", [
+        ["emoji", "shipit", SHIPIT_URL],
+      ]),
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const emoji = page.locator("img[data-emoji]");
+  await expect(emoji).toHaveCount(1);
+  await expect(emoji).toHaveAttribute("src", SHIPIT_URL);
+  // An undefined shortcode is left exactly as the author typed it.
+  await expect(page.getByText(":nope:")).toBeVisible();
+});
+
+test("a custom reaction carries its definition", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    emojiEvents: [emojiSet(MENTIONABLE, [["shipit", SHIPIT_URL]])],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByText("hello from the mocked relay").hover();
+  await page.getByTestId("open-reaction-picker").click();
+  await page.getByTestId("emoji-shipit").click();
+
+  const reaction = relay.published.find(
+    (event) => (event as { kind: number }).kind === 7,
+  ) as { content: string; tags: string[][] };
+  expect(reaction.content).toBe(":shipit:");
+  // A kind:7 whose content is a shortcode and which carries no `emoji` tag is a
+  // pill every other client draws as literal text.
+  expect(reaction.tags).toContainEqual(["emoji", "shipit", SHIPIT_URL]);
+});
+
+test("adding a custom emoji publishes the whole kind:30030 set", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    emojiEvents: [emojiSet(MY_PUBKEY, [["wave", "https://example.com/w.png"]])],
+  });
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("emoji-shortcode").fill("shipit");
+  await page.getByTestId("emoji-url").fill(SHIPIT_URL);
+  await page.getByTestId("add-emoji").click();
+
+  const set = relay.published.find(
+    (event) => (event as { kind: number }).kind === 30030,
+  ) as { tags: string[][] };
+  // The set is addressable, so the published event is the whole new state —
+  // the existing emoji has to be republished alongside the new one.
+  expect(set.tags).toEqual([
+    ["d", "nuxx"],
+    ["emoji", "wave", "https://example.com/w.png"],
+    ["emoji", "shipit", SHIPIT_URL],
+  ]);
+});
+
+test("a DM addresses its participants even when the text names nobody", async ({
+  page,
+}) => {
+  const DM_UUID = "22222222-2222-2222-2222-222222222222";
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraChannels: [dmChannel(DM_UUID)] });
+  await relay.install();
+
+  await page.goto(`/c/${DM_UUID}`);
+  await page
+    .getByRole("textbox", { name: /^Message / })
+    .fill("just between us");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number }).kind === 9 &&
+      (event as { content: string }).content === "just between us",
+  ) as { tags: string[][] };
+  // The other participant, and not the sender: a client that tagged its own
+  // author would badge every conversation the moment it spoke in one.
+  expect(sent.tags).toContainEqual(["p", MENTIONABLE]);
+  expect(sent.tags).not.toContainEqual(["p", MY_PUBKEY]);
+});
+
+test("the channel browser lists open rooms this reader is not in", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const openId = "33333333-3333-3333-3333-333333333333";
+  const secretId = "44444444-4444-4444-4444-444444444444";
+  const browsable = (id: string, name: string, extra: string[][] = []) => ({
+    id: id.replace(/-/g, "").padEnd(64, "0").slice(0, 64),
+    pubkey: "b".repeat(64),
+    kind: 39000,
+    created_at: 1_700_000_600,
+    tags: [
+      ["d", id],
+      ["name", name],
+      ["about", `${name} room`],
+      ["closed"],
+      ["t", "stream"],
+      ...extra,
+    ],
+    content: "",
+    sig: "c".repeat(128),
+  });
+  const relay = mockRelay(page, {
+    extraChannels: [
+      browsable(openId, "release", [["public"]]),
+      browsable(secretId, "secret", [["private"]]),
+    ],
+    // The reader is in #general only.
+    memberEvents: [memberList(CHANNEL_UUID, [[MY_PUBKEY, "member"]])],
+  });
+  await relay.install();
+
+  await page.goto("/browse");
+  await expect(page.getByTestId("browse-channel-release")).toBeVisible();
+  // Already joined, so it is not on offer.
+  await expect(
+    page.getByTestId("browse-available").getByText("general"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByTestId("browse-joined").getByText("general"),
+  ).toBeVisible();
+  // Private: its metadata is visible but the relay would refuse the join, and a
+  // button that fails is worse than no button.
+  await expect(page.getByTestId("browse-channel-secret")).toHaveCount(0);
+
+  await page.getByTestId("browse-search").fill("release");
+  await expect(page.getByTestId("browse-channel-release")).toBeVisible();
+  await page.getByTestId("browse-search").fill("nothing matches this");
+  await expect(page.getByTestId("browse-available-empty")).toBeVisible();
+});
+
+test("joining from the browser publishes kind:9021", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const openId = "33333333-3333-3333-3333-333333333333";
+  const relay = mockRelay(page, {
+    extraChannels: [
+      {
+        id: openId.replace(/-/g, "").padEnd(64, "0").slice(0, 64),
+        pubkey: "b".repeat(64),
+        kind: 39000,
+        created_at: 1_700_000_600,
+        tags: [
+          ["d", openId],
+          ["name", "release"],
+          ["public"],
+          ["closed"],
+          ["t", "stream"],
+        ],
+        content: "",
+        sig: "c".repeat(128),
+      },
+    ],
+    memberEvents: [memberList(CHANNEL_UUID, [[MY_PUBKEY, "member"]])],
+  });
+  await relay.install();
+
+  await page.goto("/browse");
+  await page.getByTestId("browse-join-release").click();
+
+  const join = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9021,
+  ) as { tags: string[][] };
+  expect(join.tags).toEqual([["h", openId]]);
+});
+
+test("an unsent draft survives a channel switch and a reload", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const other = "22222222-2222-2222-2222-222222222222";
+  const relay = mockRelay(page, {
+    extraChannels: [
+      {
+        ...dmChannel(other),
+        tags: [
+          ["d", other],
+          ["name", "random"],
+          ["public"],
+          ["closed"],
+          ["t", "stream"],
+        ],
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page
+    .getByRole("textbox", { name: "Message #general" })
+    .fill("half a thought");
+  // The sidebar says where unsent text is — a reader who wandered off needs to
+  // find it again without opening every room.
+  await expect(page.getByTestId("channel-draft-general")).toBeHidden();
+
+  await page.getByTestId("channel-random").click();
+  const otherComposer = page.getByRole("textbox", { name: "Message #random" });
+  // Each room's draft is its own: the text does not follow the reader.
+  await expect(otherComposer).toHaveText("");
+  await expect(page.getByTestId("channel-draft-general")).toBeVisible();
+
+  await page.reload();
+  await page.getByTestId("channel-general").click();
+  await expect(
+    page.getByRole("textbox", { name: "Message #general" }),
+  ).toHaveText("half a thought");
+
+  // Nothing was published: a draft is not a message, and half-written text is
+  // the last thing that should reach an event store other clients read.
+  expect(
+    relay.published.filter((event) => (event as { kind: number }).kind === 9),
+  ).toEqual([]);
+});
+
+test("sending clears the draft, and a failed send keeps it", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("this one goes out");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(composer).toHaveText("");
+
+  await page.reload();
+  await expect(
+    page.getByRole("textbox", { name: "Message #general" }),
+  ).toHaveText("");
+});
+
+test("an edit and a tombstone from the relay both reach the timeline", async ({
+  page,
+}) => {
+  // Both carry an `h` tag, so both belong on the channel subscription. Naming
+  // only the content kinds renders a timeline that looks complete and silently
+  // ignores every edit and every removal — which is what this client did.
+  const target = markdownMessage("1", "before the edit");
+  const doomed = markdownMessage("2", "about to go");
+  const relay = mockRelay(page, {
+    extraMessages: [
+      target,
+      doomed,
+      {
+        id: "ed".repeat(32),
+        pubkey: target.pubkey,
+        kind: 40003,
+        created_at: 1_700_000_400,
+        tags: [
+          ["h", CHANNEL_UUID],
+          ["e", target.id],
+        ],
+        content: "after the edit",
+        sig: "f".repeat(128),
+      },
+      {
+        id: "de".repeat(32),
+        pubkey: doomed.pubkey,
+        kind: 9005,
+        created_at: 1_700_000_500,
+        tags: [
+          ["h", CHANNEL_UUID],
+          ["e", doomed.id],
+        ],
+        content: "",
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+
+  await expect(page.getByText("after the edit")).toBeVisible();
+  await expect(page.getByText("before the edit")).toHaveCount(0);
+  await expect(page.getByText("(edited)").first()).toBeVisible();
+
+  await expect(page.getByText("Message deleted")).toBeVisible();
+  await expect(page.getByText("about to go")).toHaveCount(0);
+
+  // And the subscription that carried them named its kinds, as the relay's
+  // p-gate requires.
+  const channelSubs = relay.subscriptions.filter(
+    (filter) => filter.kinds?.includes(9) && filter["#h"],
+  );
+  expect(channelSubs.length).toBeGreaterThan(0);
+  for (const filter of channelSubs) {
+    expect(filter.kinds).toContain(40003);
+    expect(filter.kinds).toContain(9005);
+  }
+});
+
+test("each day heading is scoped to its own day", async ({ page }) => {
+  // Flat sticky siblings all pin at the same offset, so a second day's heading
+  // covers the first instead of pushing it away.
+  const yesterday = Math.floor(Date.now() / 1000) - 26 * 60 * 60;
+  const relay = mockRelay(page, {
+    extraMessages: [
+      { ...markdownMessage("1", "older day"), created_at: yesterday },
+      {
+        ...markdownMessage("2", "newer day"),
+        created_at: Math.floor(Date.now() / 1000) - 60,
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("newer day")).toBeVisible();
+
+  const headings = page.getByTestId("message-timeline-day-divider");
+  const labels = await headings.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("data-day-label")),
+  );
+  // Distinct days, each with its own heading — not one heading repeated.
+  expect(new Set(labels).size).toBe(labels.length);
+  expect(labels).toContain("Today");
+});
+
+test("a message is attributed to its author's display name", async ({
+  page,
+}) => {
+  // Everything that names a person goes through one resolver, so a kind:0
+  // display name has to replace the truncated pubkey everywhere at once.
+  const relay = mockRelay(page, {
+    profileEvents: [
+      {
+        id: "0a".repeat(32),
+        pubkey: "e".repeat(64),
+        kind: 0,
+        created_at: 1_700_000_000,
+        tags: [],
+        content: JSON.stringify({
+          display_name: "Erin Example",
+          name: "erin",
+        }),
+        sig: "f".repeat(128),
+      },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("Erin Example").first()).toBeVisible();
+  await expect(page.getByText("eeeeeeee…eeee")).toHaveCount(0);
+});
+
+test("an author with no profile still has a name to show", async ({ page }) => {
+  // The truncated pubkey is the last resort, not an error state: a community
+  // where nobody has published kind:0 must still be readable.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("eeeeeeee…eeee").first()).toBeVisible();
+});
+
+test("profiles are fetched once per identity, not once per row", async ({
+  page,
+}) => {
+  // The store exists to stop a per-viewport refetch. Four messages from one
+  // author must produce one lookup for that author, coalesced into one request.
+  const relay = mockRelay(page, {
+    extraMessages: [
+      { ...markdownMessage("1", "first"), created_at: 1_700_000_300 },
+      { ...markdownMessage("2", "second"), created_at: 1_700_000_330 },
+      { ...markdownMessage("3", "third"), created_at: 1_700_000_360 },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("third")).toBeVisible();
+
+  const profileRequests = relay.queries.filter((filters) =>
+    filters.some((filter) => filter.kinds?.includes(0)),
+  );
+  expect(profileRequests.length).toBeLessThanOrEqual(2);
+  // And each one names its kind, which the relay's p-gate requires.
+  for (const filters of profileRequests) {
+    for (const filter of filters) {
+      expect(filter.kinds).toEqual([0]);
+    }
+  }
+});
+
+test("saving a profile publishes kind:0 and renames the reader", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraMessages: [myMessage("1", "mine")] });
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("settings-display-name").fill("Dana Dev");
+  await page.getByTestId("settings-name").fill("dana");
+  await page.getByTestId("save-profile").click();
+
+  const saved = relay.published.find(
+    (event) => (event as { kind: number }).kind === 0,
+  ) as { content: string; tags: string[][] };
+  expect(JSON.parse(saved.content)).toEqual({
+    display_name: "Dana Dev",
+    name: "dana",
+  });
+  // kind:0 carries no tags — it is replaceable by author, not addressable.
+  expect(saved.tags).toEqual([]);
+
+  // The reader's own edit shows without waiting for the relay to echo it back.
+  await expect(page.getByTestId("sidebar-profile-name")).toHaveText("Dana Dev");
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("Dana Dev").first()).toBeVisible();
+});
+
+test("the theme choice survives a reload", async ({ page }) => {
+  // A setting that resets on reload is worse than not offering it.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("theme-dark").click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.getByTestId("theme-dark")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("settings names the key custody honestly", async ({ page }) => {
+  // Everything else on the page is worthless if it is signed by a key that
+  // disappears, so the page has to say which case the reader is in.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await expect(page.getByTestId("settings-custody")).toContainText(
+    /minted for this page load only/,
+  );
+});
+
+test("presence and a status are published from the profile menu", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("sidebar-profile-card").click();
+  await expect(page.getByTestId("profile-popover")).toBeVisible();
+
+  await page.getByTestId("set-presence-away").click();
+  // The newest, not the first: the shell heartbeats the current status on mount,
+  // so an "online" beat precedes the choice.
+  await expect
+    .poll(() =>
+      relay.published
+        .filter((event) => (event as { kind: number }).kind === 20001)
+        .at(-1),
+    )
+    .toMatchObject({ content: "away", tags: [["status", "away"]] });
+
+  await page.getByTestId("sidebar-profile-card").click();
+  await page.getByTestId("status-preset-In a meeting").click();
+  const status = relay.published.find(
+    (event) => (event as { kind: number }).kind === 30315,
+  ) as { content: string; tags: string[][] };
+  expect(status.content).toBe("In a meeting");
+  expect(status.tags).toContainEqual(["d", "general"]);
+  expect(status.tags).toContainEqual(["emoji", "📅"]);
+
+  await expect(page.getByTestId("sidebar-profile-secondary")).toContainText(
+    "In a meeting",
+  );
+});
+
+test("clearing a status publishes an empty replaceable event", async ({
+  page,
+}) => {
+  // kind 30315 is parameterized-replaceable, so publishing nothing on the
+  // coordinate *is* the removal. There is no delete to issue.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("sidebar-profile-card").click();
+  await page.getByTestId("status-preset-Focusing").click();
+  await expect(page.getByTestId("sidebar-profile-secondary")).toContainText(
+    "Focusing",
+  );
+
+  await page.getByTestId("sidebar-profile-card").click();
+  await page.getByTestId("clear-user-status").click();
+
+  const cleared = relay.published
+    .filter((event) => (event as { kind: number }).kind === 30315)
+    .at(-1) as { content: string; tags: string[][] };
+  expect(cleared.content).toBe("");
+  expect(cleared.tags).toEqual([["d", "general"]]);
+});
+
+test("a burst from one author renders as one block", async ({ page }) => {
+  // Grouping is what makes the timeline read as conversation rather than as a
+  // log. The structural decision is unit-tested in `timeline-items`; this checks
+  // it actually reaches the DOM.
+  const relay = mockRelay(page, {
+    extraMessages: [
+      { ...markdownMessage("1", "first"), created_at: 1_700_000_300 },
+      { ...markdownMessage("2", "second"), created_at: 1_700_000_330 },
+      { ...markdownMessage("3", "third"), created_at: 1_700_000_360 },
+    ],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("third")).toBeVisible();
+
+  // Four messages from one author (the mock's baseline plus these three), and
+  // the author line appears once — the continuations show only a time.
+  const authorLines = page.getByText("eeeeeeee…eeee", { exact: true });
+  await expect(authorLines).toHaveCount(1);
+});
+
+test("the timeline is dated", async ({ page }) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(
+    page.getByTestId("message-timeline-day-divider").first(),
+  ).toBeVisible();
+});
+
+test("a reply lands in the thread panel, not in the channel", async ({
+  page,
+}) => {
+  // The trade that keeps a channel readable when one thread gets busy: replies
+  // are reached through the panel, and the channel keeps a summary row.
+  const root = markdownMessage("9", "the original");
+  const relay = mockRelay(page, { extraMessages: [root] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const rootRow = page
+    .getByRole("listitem")
+    .filter({ hasText: "the original" });
+  await rootRow.getByRole("button", { name: "Reply in thread" }).click();
+
+  // Replying opens the thread, because the reply would otherwise be sent
+  // somewhere the reader cannot see.
+  const panel = page.getByTestId("thread-panel");
+  await expect(panel).toBeVisible();
+
+  const composer = page.getByRole("textbox", { name: /^Reply to/ });
+  await composer.fill("a threaded answer");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(panel.getByText("a threaded answer")).toBeVisible();
+  await expect(rootRow.getByText("1 reply")).toBeVisible();
+  // Still in the thread after sending: a reader mid-conversation should not have
+  // to re-open it, and their next message must not land in the channel.
+  await expect(page.getByRole("textbox", { name: /^Reply to/ })).toBeVisible();
+
+  await panel.getByTestId("close-thread").click();
+  await expect(panel).toBeHidden();
+  // Closing returns the composer to the channel: leaving it aimed at a thread
+  // the reader can no longer see is how a reply goes missing.
+  await expect(
+    page.getByRole("textbox", { name: "Message #general" }),
+  ).toBeVisible();
+  // Closed, the reply is nowhere in the channel — only its summary row is.
+  await expect(page.getByText("a threaded answer")).toHaveCount(0);
+  await expect(rootRow.getByText("1 reply")).toBeVisible();
+});
+
+/**
+ * Author pubkey for the manage-my-own-messages specs.
+ *
+ * Edit and delete are offered only on the reader's own messages, so these need a
+ * stable identity: without a NIP-07 extension the signer mints a fresh key per
+ * page load and nothing in a fixture can belong to it.
+ */
+const MY_PUBKEY = "1a".repeat(32);
+
+/** A fixture message authored by the reader rather than the mock's stranger. */
+function myMessage(id: string, content: string) {
+  return { ...markdownMessage(id, content), pubkey: MY_PUBKEY };
+}
+
+test("opening a thread aims the composer at it", async ({ page }) => {
+  // A panel open with the composer still aimed at the channel is the trap: the
+  // reader is looking at a thread, types, and the message lands in the room.
+  const root = markdownMessage("9", "the subject");
+  const reply = {
+    ...markdownMessage("a", "an existing answer"),
+    created_at: 1_700_000_300,
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["e", markdownMessage("9", "the subject").id, "", "reply"],
+    ],
+  };
+  const relay = mockRelay(page, { extraMessages: [root, reply] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const rootRow = page.getByRole("listitem").filter({ hasText: "the subject" });
+  await rootRow.getByText("1 reply").click();
+
+  await expect(page.getByTestId("thread-panel")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /^Reply to/ })).toBeVisible();
+
+  await page.getByRole("textbox", { name: /^Reply to/ }).fill("me too");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const sent = relay.published.find(
+    (event) =>
+      (event as { kind: number; content: string }).kind === 9 &&
+      (event as { content: string }).content === "me too",
+  ) as { tags: string[][] };
+  expect(sent.tags).toContainEqual(["e", root.id, "", "reply"]);
+});
+
+test("editing a message publishes kind:40003 against the original", async ({
+  page,
+}) => {
+  // A signed event cannot be rewritten, so an edit is a separate event the
+  // timeline overlays. The `h` tag is what makes it visible to everyone already
+  // subscribed.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const target = myMessage("1", "typo here");
+  const relay = mockRelay(page, { extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "typo here" });
+  await row.getByTestId("edit-message").click();
+
+  await page.getByTestId("message-editor").fill("fixed now");
+  await page.getByTestId("save-edit").click();
+
+  await expect(page.getByText("fixed now")).toBeVisible();
+  await expect(page.getByText("(edited)").first()).toBeVisible();
+
+  const edit = relay.published.find(
+    (event) => (event as { kind: number }).kind === 40003,
+  ) as { tags: string[][]; content: string };
+  expect(edit.content).toBe("fixed now");
+  expect(edit.tags).toContainEqual(["h", CHANNEL_UUID]);
+  expect(edit.tags).toContainEqual(["e", target.id]);
+});
+
+test("an unchanged edit publishes nothing", async ({ page }) => {
+  // Publishing it would stamp the message "(edited)" for everyone over a change
+  // that was never made.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [myMessage("1", "leave me alone")],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "leave me alone" });
+  await row.getByTestId("edit-message").click();
+  await page.getByTestId("save-edit").click();
+
+  await expect(page.getByTestId("message-editor")).toBeHidden();
+  expect(
+    relay.published.filter(
+      (event) => (event as { kind: number }).kind === 40003,
+    ),
+  ).toEqual([]);
+});
+
+test("deleting a message publishes the channel-scoped tombstone", async ({
+  page,
+}) => {
+  // Kind 9005, not NIP-09's kind:5 — the Nuxx tombstone carries the `h` tag, so
+  // readers with the timeline open see the removal.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const target = myMessage("1", "delete me");
+  const relay = mockRelay(page, { extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "delete me" });
+  await row.getByTestId("delete-message").click();
+
+  await expect(page.getByText("Message deleted")).toBeVisible();
+  await expect(page.getByText("delete me")).toHaveCount(0);
+
+  const tombstone = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9005,
+  ) as { tags: string[][] };
+  expect(tombstone.tags).toContainEqual(["h", CHANNEL_UUID]);
+  expect(tombstone.tags).toContainEqual(["e", target.id]);
+});
+
+test("someone else's message offers no edit or delete", async ({ page }) => {
+  // The relay refuses it too, but offering a button that is going to be refused
+  // is worse than not offering it. Same identity as the specs above, so the
+  // contrast is authorship and nothing else.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [markdownMessage("1", "not yours")],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const row = page.getByRole("listitem").filter({ hasText: "not yours" });
+  await expect(row.getByTestId("reply-in-thread")).toHaveCount(1);
+  await expect(row.getByTestId("edit-message")).toHaveCount(0);
+  await expect(row.getByTestId("delete-message")).toHaveCount(0);
 });
 
 test("a deleted message renders as a tombstone", async ({ page }) => {
@@ -867,7 +2181,7 @@ test("a channel with activity past its cursor shows as unread", async ({
 
   // The badge is on the other room; the open one is being read right now.
   const nav = page.getByRole("navigation", { name: "Channels" });
-  await expect(nav.getByText("Unread messages")).toHaveCount(1);
+  await expect(nav.getByText("unread", { exact: true })).toHaveCount(1);
 
   // No subscription may carry message bodies for a channel the reader is not
   // looking at. A channel-less content filter is exactly that firehose, so its
@@ -960,7 +2274,7 @@ test("a channel read past its newest message shows no badge", async ({
     .toBe(true);
 
   const nav = page.getByRole("navigation", { name: "Channels" });
-  await expect(nav.getByText("Unread messages")).toHaveCount(0);
+  await expect(nav.getByText("unread", { exact: true })).toHaveCount(0);
 });
 
 test("searching puts the query in the URL and lists ranked hits", async ({
@@ -1177,29 +2491,118 @@ test("paging in history keeps the reader where they were", async ({ page }) => {
   await page.goto(`/c/${CHANNEL_UUID}`);
   await expect(page.getByText("recent message 39")).toBeVisible();
 
-  const scroller = page.locator("div.overflow-y-auto").first();
-  await scroller.evaluate((el) => {
-    el.scrollTop = 0;
+  const scroller = page.getByTestId("message-timeline");
+  const loadOlder = page.getByRole("button", {
+    name: "Load older messages",
+  });
+  // The row the reader is on. Asserting on `scrollHeight - scrollTop` would be
+  // asserting on an estimate: with a virtualized list the scroll height is
+  // derived from the sizes measured so far and moves as more are measured.
+  const anchor = page.getByText("recent message 0");
+
+  // Scroll up and click in one retried step. Separating them is racy: the
+  // timeline lands on the newest message by measuring as it goes, so a scroll
+  // issued mid-settle is corrected back and the button leaves the viewport
+  // between the check and the click.
+  await expect
+    .poll(
+      async () => {
+        await scroller.evaluate((el) => {
+          el.scrollTop = 0;
+        });
+        if (!(await loadOlder.isVisible())) return false;
+        await loadOlder.click({ timeout: 1_000 }).catch(() => {});
+        return page.getByText("older message 39").isVisible();
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+
+  // Still on screen: forty rows were pushed in above it without moving it.
+  await expect(anchor).toBeInViewport();
+  // And demonstrably not at the bottom, which is the failure this guards
+  // against — following the tail on row count would land there.
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+
+test("an uploaded picture fills the profile field and is saved with it", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.route("**/upload", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        url: "https://relay.test/media/face.png",
+        sha256: "a".repeat(64),
+        size: 5,
+        type: "image/png",
+        uploaded: 1_700_000_000,
+      }),
+    });
   });
 
-  const before = await scroller.evaluate((el) => ({
-    fromBottom: el.scrollHeight - el.scrollTop,
-  }));
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Upload a picture" }).setInputFiles({
+    name: "face.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("hello"),
+  });
 
-  await page.getByRole("button", { name: "Load older messages" }).click();
-  await expect(page.getByText("older message 39")).toBeVisible();
+  // The upload only fills the field. kind:0 carries every field in one event,
+  // so publishing here would save a half-finished profile.
+  await expect(page.getByTestId("settings-avatar-url")).toHaveValue(
+    "https://relay.test/media/face.png",
+  );
+  expect(
+    relay.published.filter((event) => (event as { kind: number }).kind === 0),
+  ).toEqual([]);
 
-  const after = await scroller.evaluate((el) => ({
-    fromBottom: el.scrollHeight - el.scrollTop,
-    scrollTop: el.scrollTop,
-  }));
+  await page.getByTestId("settings-display-name").fill("Picture Person");
+  await page.getByTestId("save-profile").click();
 
-  // Distance from the bottom is what a prepend leaves unchanged, so restoring it
-  // puts the reader back on the same row.
-  expect(Math.abs(after.fromBottom - before.fromBottom)).toBeLessThan(4);
-  // And they are demonstrably not at the bottom, which is the failure this
-  // guards against.
-  expect(after.scrollTop).toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      relay.published.some((event) => (event as { kind: number }).kind === 0),
+    )
+    .toBe(true);
+  const profile = relay.published.find(
+    (event) => (event as { kind: number }).kind === 0,
+  ) as { content: string };
+  expect(JSON.parse(profile.content).picture).toBe(
+    "https://relay.test/media/face.png",
+  );
+});
+
+test("a picture the relay will not store is refused before the upload", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  let uploaded = false;
+  await page.route("**/upload", async (route) => {
+    uploaded = true;
+    await route.fulfill({ status: 500, body: "should not be reached" });
+  });
+
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Upload a picture" }).setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("not an image"),
+  });
+
+  await expect(
+    page.getByText("That is not an image the relay will store."),
+  ).toBeVisible();
+  // Rejected locally: sending it only to be refused would cost the transfer.
+  expect(uploaded).toBe(false);
 });
 
 test("attaching a file uploads it and publishes its imeta", async ({
@@ -1306,7 +2709,7 @@ test("a refused upload keeps the message and says why", async ({ page }) => {
   await expect(page.getByText(/too large/i)).toBeVisible();
   // The typed text survives, and nothing half-attached is left behind to be
   // published as a broken link.
-  await expect(composer).toHaveValue("look at this");
+  await expect(composer).toHaveText("look at this");
   await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0);
 });
 
@@ -1389,7 +2792,11 @@ test("presence comes from the HTTP snapshot, which is the only path that has it"
   await page.goto(`/c/${CHANNEL_UUID}`);
   await expect(page.getByText("hello from the mocked relay")).toBeVisible();
 
-  await expect(page.getByText("Status: online")).toBeAttached();
+  // The dot's accessible name, not sr-only text: it is a `role="img"` badge on
+  // the author avatar, so its name is what a screen reader announces.
+  await expect(
+    page.getByRole("img", { name: "Status: online" }),
+  ).toBeAttached();
 
   const presence = relay.queries
     .flat()
@@ -1503,4 +2910,60 @@ test("a signer without NIP-44 is told unread sync is unavailable", async ({
         ).length,
     )
     .toBe(0);
+});
+
+/**
+ * The mock-up screens.
+ *
+ * These have no relay data path yet, so the real build shows an honest "not
+ * connected" panel. That is the behaviour worth guarding: the failure mode is
+ * shipping invented projects and agents to someone pointed at a real relay.
+ */
+const SHOWCASE_ROUTES = [
+  ["/agents", "エージェント"],
+  ["/projects", "プロジェクト"],
+  ["/workflows", "ワークフロー"],
+  ["/pulse", "Pulse"],
+  ["/reminders", "リマインダー"],
+  ["/forum", "フォーラム"],
+] as const;
+
+for (const [path, what] of SHOWCASE_ROUTES) {
+  test(`${path} says it is not connected rather than showing invented data`, async ({
+    page,
+  }) => {
+    const relay = mockRelay(page);
+    await relay.install();
+
+    await page.goto(path);
+    await expect(page.getByTestId("showcase-not-wired")).toBeVisible();
+    await expect(
+      page.getByText(`${what}はまだ接続されていません`),
+    ).toBeVisible();
+  });
+}
+
+test("the sidebar reaches every section, and lights only the current one", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/agents");
+  // The old `startsWith` chain defaulted to "chat", so every new section lit
+  // the Channels item up as if the reader were in a room.
+  await expect(
+    page
+      .getByRole("link", { name: "Agents" })
+      .and(page.locator("[data-active=true]")),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("link", { name: "Channels" })
+      .and(page.locator("[data-active=true]")),
+  ).toHaveCount(0);
+
+  for (const name of ["Pulse", "Projects", "Workflows", "Forum", "Reminders"]) {
+    await expect(page.getByRole("link", { name })).toBeVisible();
+  }
 });

@@ -19,7 +19,9 @@
 
 import {
   KIND_CHANNEL_ACTIVITY_SNAPSHOT,
+  KIND_NIP29_GROUP_MEMBERS,
   KIND_PRESENCE_UPDATE,
+  KIND_PROFILE,
   KIND_STREAM_MESSAGE,
 } from "@/shared/constants/kinds";
 import type {
@@ -28,7 +30,14 @@ import type {
 } from "@/shared/api/relay-session";
 import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
 
-import { ACTIVITY, OLDER_MESSAGES, PRESENCE, SEEDED } from "./demo-data";
+import {
+  ACTIVITY,
+  CH_ANNOUNCE,
+  CH_DESIGN,
+  OLDER_MESSAGES,
+  PRESENCE,
+  SEEDED,
+} from "./demo-data";
 
 /** Events the mock knows about, newest first. Publishes append here. */
 const store: NostrEvent[] = [...SEEDED].sort(
@@ -88,6 +97,33 @@ function activitySnapshots(): NostrEvent[] {
   }));
 }
 
+/**
+ * Add a pubkey to the seeded member lists, once.
+ *
+ * Rewrites the stored kind:39002 events in place rather than appending new
+ * ones: they are addressable on `(pubkey, d)`, so a second event for the same
+ * channel would simply replace the first and drop the personas.
+ */
+let enrolled: string | null = null;
+
+function enrolVisitor(pubkey: string): void {
+  if (!pubkey || enrolled === pubkey) return;
+  enrolled = pubkey;
+  for (let index = 0; index < store.length; index++) {
+    const event = store[index];
+    if (event.kind !== KIND_NIP29_GROUP_MEMBERS) continue;
+    // Not every room: a visitor who is already in all of them would have an
+    // empty browser, which is the one state that shows nothing about it.
+    const channelId = event.tags.find((tag) => tag[0] === "d")?.[1];
+    if (channelId === CH_ANNOUNCE || channelId === CH_DESIGN) continue;
+    if (event.tags.some((tag) => tag[0] === "p" && tag[1] === pubkey)) continue;
+    store[index] = {
+      ...event,
+      tags: [...event.tags, ["p", pubkey, "", "member"]],
+    };
+  }
+}
+
 interface LiveSub {
   subId: string;
   filter: NostrFilter;
@@ -129,6 +165,11 @@ class MockSocket implements RelaySocket {
 
     if (verb === "AUTH") {
       const signed = frame[1] as NostrEvent;
+      // The demo visitor's key is ephemeral, so it cannot be in the seeded
+      // member lists — but a real relay would have added them on join. Without
+      // this the channel browser would say they belong to nothing while the
+      // sidebar lists the very rooms they are reading.
+      enrolVisitor(signed.pubkey);
       this.emit(["OK", signed.id, true, ""]);
       return;
     }
@@ -175,6 +216,10 @@ function answerQuery(filters: CursorFilter[]): NostrEvent[] {
   for (const filter of filters) {
     if (filter.kinds?.includes(KIND_CHANNEL_ACTIVITY_SNAPSHOT)) {
       events.push(...activitySnapshots());
+    } else if (filter.kinds?.includes(KIND_PROFILE)) {
+      // Profiles come from the same store as everything else, so a profile the
+      // demo visitor publishes is the one the timeline then shows them by.
+      events.push(...store.filter((event) => matches(filter, event)));
     } else if (filter.kinds?.includes(KIND_PRESENCE_UPDATE)) {
       events.push(...PRESENCE.filter((event) => matches(filter, event)));
     } else if (filter.search !== undefined) {

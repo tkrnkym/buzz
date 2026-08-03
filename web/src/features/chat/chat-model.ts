@@ -8,11 +8,15 @@
 import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
 
 import {
+  CHANNEL_E_SCOPED_KINDS,
+  CHANNEL_H_SCOPED_KINDS,
   CHANNEL_TIMELINE_CONTENT_KINDS,
   KIND_DELETION,
+  KIND_NIP29_DELETE_EVENT,
   KIND_NIP29_GROUP_METADATA,
   KIND_REACTION,
   KIND_STREAM_MESSAGE,
+  KIND_STREAM_MESSAGE_EDIT,
   KIND_SYSTEM_MESSAGE,
 } from "@/shared/constants/kinds";
 import {
@@ -33,6 +37,13 @@ export interface Channel {
   /** NIP-29 `hidden`: DMs, which should stay out of the channel list. */
   hidden: boolean;
   archived: boolean;
+  /**
+   * Participants, from the `p` tags the relay puts on a DM's metadata.
+   *
+   * Only DMs carry these. It is what lets a DM be labelled by who is in it
+   * without a second fetch — a DM's own `name` is a generic placeholder.
+   */
+  participantPubkeys: string[];
   updatedAt: number;
 }
 
@@ -52,6 +63,31 @@ export interface Message {
    * `imeta` tag, so the common case allocates nothing.
    */
   imeta?: Map<string, ImetaEntry>;
+  /**
+   * NIP-30 custom emoji defined by this event, keyed by bare shortcode.
+   *
+   * Read from the event rather than from the reader's palette: the definition
+   * travels with the message, which is what lets a client that has never seen
+   * the author's set render `:shortcode:` at all.
+   */
+  emoji?: Map<string, string>;
+}
+
+/**
+ * NIP-30 `["emoji", shortcode, url]` tags, keyed by shortcode.
+ *
+ * An entry missing either half is dropped: a shortcode with no URL has nothing
+ * to render, and a URL with no shortcode has nothing to match in the text.
+ */
+function parseEmojiTags(tags: string[][]): Map<string, string> {
+  const urls = new Map<string, string>();
+  for (const tag of tags) {
+    if (tag[0] !== "emoji" || !tag[1] || !tag[2]) continue;
+    // First definition wins, so a duplicate tag cannot change what the text
+    // already meant further up the message.
+    if (!urls.has(tag[1])) urls.set(tag[1], tag[2]);
+  }
+  return urls;
 }
 
 function firstTag(event: NostrEvent, name: string): string | undefined {
@@ -104,6 +140,9 @@ export function eventToChannel(event: NostrEvent): Channel | null {
     isPrivate: hasTag(event, "private"),
     hidden: hasTag(event, "hidden"),
     archived: firstTag(event, "archived") === "true",
+    participantPubkeys: event.tags
+      .filter((tag) => tag[0] === "p" && typeof tag[1] === "string")
+      .map((tag) => (tag[1] as string).toLowerCase()),
     updatedAt: event.created_at,
   };
 }
@@ -118,6 +157,22 @@ export function toChannelList(events: NostrEvent[]): Channel[] {
     .filter((channel): channel is Channel => channel !== null)
     .filter((channel) => !channel.hidden && !channel.archived)
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * Direct messages: the rooms `toChannelList` deliberately leaves out.
+ *
+ * Selected on the channel type rather than on `hidden`, which is a display hint
+ * the relay may set on other kinds of room later. Newest first, because a DM list
+ * is read as a conversation list — the room that just moved belongs at the top,
+ * not under whichever name sorts first.
+ */
+export function toDmList(events: NostrEvent[]): Channel[] {
+  return dedupeAddressable(events)
+    .map(eventToChannel)
+    .filter((channel): channel is Channel => channel !== null)
+    .filter((channel) => channel.type === "dm" && !channel.archived)
+    .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 /**
@@ -163,6 +218,7 @@ export function eventToMessage(event: NostrEvent): Message | null {
   if (!CHANNEL_TIMELINE_CONTENT_KINDS.includes(event.kind)) return null;
   const { rootId, parentId } = parseThreadRefs(event);
   const imeta = parseImetaTags(event.tags);
+  const emoji = parseEmojiTags(event.tags);
   return {
     id: event.id,
     pubkey: event.pubkey,
@@ -172,16 +228,24 @@ export function eventToMessage(event: NostrEvent): Message | null {
     rootId,
     parentId,
     ...(imeta.size > 0 ? { imeta } : {}),
+    ...(emoji.size > 0 ? { emoji } : {}),
   };
 }
 
-/** Historical + live filter for one channel's timeline. */
+/**
+ * Historical + live filter for one channel's timeline.
+ *
+ * Asks for the modifiers that carry an `h` tag as well as the content kinds —
+ * see `CHANNEL_H_SCOPED_KINDS`. A filter naming only the content kinds renders a
+ * timeline that looks complete and silently ignores every edit and every
+ * tombstone.
+ */
 export function buildChannelTimelineFilter(
   channelId: string,
   limit: number,
 ): NostrFilter {
   return {
-    kinds: CHANNEL_TIMELINE_CONTENT_KINDS,
+    kinds: CHANNEL_H_SCOPED_KINDS,
     "#h": [channelId],
     limit,
   };
@@ -219,7 +283,7 @@ export function buildChannelHistoryFilter(
   cursor: HistoryCursor,
 ): NostrFilter {
   return {
-    kinds: CHANNEL_TIMELINE_CONTENT_KINDS,
+    kinds: CHANNEL_H_SCOPED_KINDS,
     "#h": [channelId],
     limit,
     until: cursor.createdAt,
@@ -265,7 +329,7 @@ export function chunkIds(
  */
 export function buildReactionFilter(messageIds: string[]): NostrFilter {
   return {
-    kinds: [KIND_REACTION, KIND_DELETION],
+    kinds: CHANNEL_E_SCOPED_KINDS,
     "#e": messageIds,
     limit: MAX_AUX_LIMIT,
   };
@@ -332,15 +396,29 @@ export const MAX_REACTION_EMOJI_LENGTH = 64;
 export function buildReactionTemplate(
   targetEventId: string,
   emoji: string,
+  /**
+   * A NIP-30 custom emoji's URL, when `emoji` is `:shortcode:`.
+   *
+   * Required for a custom reaction to render anywhere else: a kind:7 whose
+   * content is `:shipit:` and which carries no `emoji` tag is a pill every other
+   * client draws as the literal text.
+   */
+  customEmojiUrl?: string,
 ): { kind: number; tags: string[][]; content: string } {
   if ([...emoji].length > MAX_REACTION_EMOJI_LENGTH) {
     throw new Error(
       `Reaction emoji must be at most ${MAX_REACTION_EMOJI_LENGTH} characters`,
     );
   }
+  const shortcode = /^:([a-z0-9_]+):$/.exec(emoji)?.[1];
   return {
     kind: KIND_REACTION,
-    tags: [["e", targetEventId]],
+    tags: [
+      ["e", targetEventId],
+      ...(shortcode && customEmojiUrl
+        ? [["emoji", shortcode, customEmojiUrl]]
+        : []),
+    ],
     content: emoji,
   };
 }
@@ -359,6 +437,60 @@ export function buildReactionWithdrawalTemplate(reactionEventId: string): {
   return {
     kind: KIND_DELETION,
     tags: [["e", reactionEventId]],
+    content: "",
+  };
+}
+
+/** Longest message body the relay accepts, per `nuxx-sdk::check_content`. */
+export const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
+
+/**
+ * Event template for an edit, matching `nuxx-sdk::build_edit`.
+ *
+ * An edit is a separate kind:40003 event pointing at the original, not a
+ * rewrite of it — a signed event cannot be changed after the fact. The `h` tag
+ * is what makes the edit visible to a channel-scoped subscription; without it
+ * the timeline would keep showing the original text to everyone already
+ * connected.
+ */
+export function buildEditTemplate(
+  channelId: string,
+  targetEventId: string,
+  content: string,
+): { kind: number; tags: string[][]; content: string } {
+  return {
+    kind: KIND_STREAM_MESSAGE_EDIT,
+    tags: [
+      ["h", channelId],
+      ["e", targetEventId],
+    ],
+    content,
+  };
+}
+
+/**
+ * Event template for a delete, matching `nuxx-sdk::build_delete_message`.
+ *
+ * Kind 9005 rather than NIP-09's kind:5: the Nuxx-native tombstone carries the
+ * `h` tag, so channel subscribers see the removal. A bare kind:5 carries no
+ * channel, and every reader with the timeline already open would go on showing
+ * the message.
+ *
+ * The moderation fields (`action_id`, `reason_code`, `public_reason`) are
+ * deliberately not settable here: this is the author deleting their own message,
+ * and a client-supplied reason on a self-delete would read as a moderator
+ * action.
+ */
+export function buildDeleteMessageTemplate(
+  channelId: string,
+  targetEventId: string,
+): { kind: number; tags: string[][]; content: string } {
+  return {
+    kind: KIND_NIP29_DELETE_EVENT,
+    tags: [
+      ["h", channelId],
+      ["e", targetEventId],
+    ],
     content: "",
   };
 }

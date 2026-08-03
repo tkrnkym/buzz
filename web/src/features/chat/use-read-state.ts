@@ -44,6 +44,16 @@ export interface ReadStateApi {
    * UI says so rather than letting mark-as-read silently do nothing.
    */
   canSync: boolean;
+  /**
+   * Whether the relay read has settled.
+   *
+   * Anything that has to distinguish "never read" from "not loaded yet" must
+   * wait on this — the unread divider in particular, which would otherwise
+   * flash above a whole channel on every open. True once the load resolves, and
+   * also when there is nothing to load (no signer, or no NIP-44), because in
+   * that case the empty cursor set is the final answer rather than a stale one.
+   */
+  loaded: boolean;
   /** Populated when a publish or decrypt failed, for display. */
   error: string | null;
   markRead: (channelId: string, readAt: number) => void;
@@ -63,6 +73,7 @@ export function useReadState(): ReadStateApi {
   const canSync = signer.canEncrypt;
 
   const [snapshot, setSnapshot] = useState<ReadStateSnapshot>(EMPTY_READ_STATE);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Refs, not state, are what the publisher reads. `setState` is asynchronous,
@@ -77,7 +88,12 @@ export function useReadState(): ReadStateApi {
   const pendingRef = useRef(false);
 
   useEffect(() => {
-    if (!myPubkey || !canSync) return;
+    if (!myPubkey || !canSync) {
+      // Nothing to fetch. The empty cursor set is the answer, not a placeholder,
+      // so consumers must not keep waiting on it.
+      setLoaded(true);
+      return;
+    }
     let active = true;
 
     const load = async () => {
@@ -117,6 +133,10 @@ export function useReadState(): ReadStateApi {
               : "Could not load read state",
           );
         }
+      } finally {
+        // Loaded either way: a failed read is a settled one, and a divider that
+        // never appears is worse than one computed from no cursors.
+        if (active) setLoaded(true);
       }
     };
 
@@ -216,10 +236,11 @@ export function useReadState(): ReadStateApi {
     () => ({
       contexts: snapshot.contexts,
       canSync,
+      loaded,
       error,
       markRead,
       isChannelUnread,
     }),
-    [snapshot.contexts, canSync, error, markRead, isChannelUnread],
+    [snapshot.contexts, canSync, loaded, error, markRead, isChannelUnread],
   );
 }

@@ -9,6 +9,14 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/shared/lib/cn";
 import { isClickableHref } from "@/shared/ui/markdown/link-safety";
 import {
+  EMOJI_ATTRIBUTE,
+  rehypeEmoji,
+} from "@/shared/ui/markdown/rehype-emoji";
+import {
+  MENTION_ATTRIBUTE,
+  rehypeMentions,
+} from "@/shared/ui/markdown/rehype-mentions";
+import {
   type ImetaEntry,
   dimensionsFromDim,
 } from "@/shared/ui/markdown/parse-imeta";
@@ -52,6 +60,24 @@ export interface MarkdownProps {
   renderLink?: LinkRenderer;
   /** NIP-92 metadata for the event's attachments, keyed by URL. */
   imeta?: Map<string, ImetaEntry>;
+  /**
+   * Display names that render as a mention chip when written as `@Name`.
+   *
+   * Supplied by the caller rather than parsed, because only the app knows who
+   * exists: an unknown `@handle` must stay plain text, since a chip asserts this
+   * client resolved a person.
+   */
+  mentionLabels?: string[];
+  /** Which of those names are the reader's, so their own mentions stand out. */
+  isSelfMention?: (label: string) => boolean;
+  /**
+   * NIP-30 custom emoji defined by this event, keyed by bare shortcode.
+   *
+   * From the event's own `emoji` tags rather than the reader's palette: the
+   * definition travels with the message, so an undefined `:shortcode:` stays
+   * literal instead of picking up somebody else's picture.
+   */
+  emojiUrls?: Map<string, string>;
   className?: string;
 }
 
@@ -81,11 +107,35 @@ export function Markdown({
   preserveUrl,
   renderLink,
   imeta,
+  mentionLabels,
+  isSelfMention,
+  emojiUrls,
   className,
 }: MarkdownProps) {
   const components = useMemo<Components>(
     () => ({
       p: ({ children }) => <p className="text-base">{children}</p>,
+
+      span: ({ node, children }) => {
+        // `rehypeMentions` wrote this property, so it is read back by the exact
+        // key it was written with rather than through a JSX prop name whose
+        // casing depends on react-markdown's attribute mapping.
+        const label = node?.properties?.[MENTION_ATTRIBUTE];
+        if (typeof label !== "string") return <span>{children}</span>;
+        return (
+          <span
+            className={cn(
+              "rounded px-1 text-base font-medium",
+              isSelfMention?.(label)
+                ? "bg-primary text-primary-foreground"
+                : "bg-primary/10 text-primary",
+            )}
+            data-mention={label}
+          >
+            {children}
+          </span>
+        );
+      },
 
       a: ({ href, children }) => {
         const target = href ?? "";
@@ -175,8 +225,24 @@ export function Markdown({
         <td className="border border-border px-2 py-1">{children}</td>
       ),
 
-      img: ({ src, alt }) => {
+      img: ({ node, src, alt }) => {
         const url = typeof src === "string" ? src : undefined;
+        const shortcode = node?.properties?.[EMOJI_ATTRIBUTE];
+        if (typeof shortcode === "string") {
+          // Inline with the text it sits in, sized in em so it tracks the
+          // surrounding type rather than a fixed pixel box.
+          return (
+            <img
+              alt={alt ?? `:${shortcode}:`}
+              className="inline-block h-[1.25em] w-auto align-text-bottom"
+              data-emoji={shortcode}
+              decoding="async"
+              draggable={false}
+              loading="lazy"
+              src={url}
+            />
+          );
+        }
         const entry = url ? imeta?.get(url) : undefined;
         const dimensions = dimensionsFromDim(entry?.dim);
         return (
@@ -195,7 +261,36 @@ export function Markdown({
         );
       },
     }),
-    [renderLink, imeta],
+    [renderLink, imeta, isSelfMention],
+  );
+
+  // Joined so the plugin is rebuilt when the *names* change, not each time the
+  // caller derives a fresh array from the profile cache. Newline is the
+  // separator because a display name can contain a space but not a line break.
+  const mentionKey = (mentionLabels ?? []).join("\n");
+  // Same for the emoji definitions: keyed on the pairs, so a re-render with an
+  // equal map does not rebuild the plugin.
+  const emojiKey = emojiUrls
+    ? [...emojiUrls].map(([code, url]) => `${code} ${url}`).join("\n")
+    : "";
+  const rehypePlugins = useMemo(
+    () => [
+      rehypeMentions(mentionKey ? mentionKey.split("\n") : []),
+      rehypeEmoji(
+        new Map(
+          emojiKey
+            ? emojiKey.split("\n").map((pair) => {
+                const space = pair.indexOf(" ");
+                return [pair.slice(0, space), pair.slice(space + 1)] as [
+                  string,
+                  string,
+                ];
+              })
+            : [],
+        ),
+      ),
+    ],
+    [mentionKey, emojiKey],
   );
 
   const urlTransform = useMemo(
@@ -214,6 +309,7 @@ export function Markdown({
         // `remarkBreaks` maps a single newline to a line break: in chat a user
         // pressing Enter means a new line, not paragraph continuation.
         remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={rehypePlugins}
         urlTransform={urlTransform}
         components={components}
       >

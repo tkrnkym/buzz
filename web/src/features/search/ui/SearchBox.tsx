@@ -34,7 +34,7 @@ export function SearchBox({
         search: next ? { q: next } : {},
       });
     } else {
-      void navigate({ to: "/c", search: next ? { q: next } : {} });
+      void navigate({ to: "/", search: next ? { q: next } : {} });
     }
   };
 

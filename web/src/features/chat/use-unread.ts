@@ -16,6 +16,13 @@ import {
 
 export interface UnreadApi {
   isUnread: (channelId: string) => boolean;
+  /**
+   * Last observed activity for a channel, in seconds, or `null` when no
+   * snapshot has mentioned it. Feeds activity-ordered lists (sidebar "recent"
+   * sort, the inbox) from the same data the badges use, so a room can never be
+   * bold in one place and stale in another.
+   */
+  lastActivityAt: (channelId: string) => number | null;
   /** True until the first snapshot arrives, so the sidebar can stay quiet. */
   isLoading: boolean;
 }
@@ -71,6 +78,7 @@ export function useUnreadChannels(contexts: Record<string, number>): UnreadApi {
     return {
       isUnread: (channelId: string) =>
         isChannelUnread(channelId, activity, contexts, nowSeconds),
+      lastActivityAt: (channelId: string) => activity[channelId] ?? null,
       isLoading: !loaded,
     };
   }, [activity, contexts, loaded]);

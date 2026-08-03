@@ -54,8 +54,31 @@ test("eventToChannel reads the NIP-29 metadata tags", () => {
     isPrivate: false,
     hidden: false,
     archived: false,
+    participantPubkeys: [],
     updatedAt: 1_700_000_000,
   });
+});
+
+test("a DM's metadata carries its participants", () => {
+  // The relay puts `p` tags on a DM's kind:39000 so a client can label the room
+  // by who is in it without a second fetch — a DM's own name is a placeholder.
+  const channel = eventToChannel(
+    event({
+      tags: [
+        ["d", "dm-1"],
+        ["name", "dm"],
+        ["hidden"],
+        ["t", "dm"],
+        ["p", "AA".repeat(32)],
+        ["p", "bb".repeat(32)],
+      ],
+    }),
+  );
+  assert.equal(channel.hidden, true);
+  assert.deepEqual(channel.participantPubkeys, [
+    "aa".repeat(32),
+    "bb".repeat(32),
+  ]);
 });
 
 test("eventToChannel treats a bare private tag as restricted", () => {

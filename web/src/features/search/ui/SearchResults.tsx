@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import type { Channel } from "@/features/chat/chat-model";
 import { excerpt } from "@/features/search/search-model";
 import { useSearch } from "@/features/search/use-search";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { useUserLabels } from "@/features/profile/use-user-label";
 import { relativeTime } from "@/shared/lib/relative-time";
 
 /**
@@ -25,8 +26,13 @@ export function SearchResults({
   scopeChannelId: string | null;
 }) {
   const search = useSearch(query, scopeChannelId);
-  const nameOf = (channelId: string | null) =>
+  const channelNameOf = (channelId: string | null) =>
     channels.find((channel) => channel.id === channelId)?.name ?? null;
+  const authorPubkeys = useMemo(
+    () => search.hits.map((hit) => hit.pubkey),
+    [search.hits],
+  );
+  const { nameOf } = useUserLabels(authorPubkeys);
 
   if (search.error) {
     return (
@@ -52,7 +58,7 @@ export function SearchResults({
     <div className="flex-1 overflow-y-auto">
       <ul className="flex flex-col">
         {search.hits.map((hit) => {
-          const channelName = nameOf(hit.channelId);
+          const channelName = channelNameOf(hit.channelId);
           return (
             <li key={hit.id} className="border-b border-border last:border-0">
               {hit.channelId ? (
@@ -65,16 +71,22 @@ export function SearchResults({
                   className="block px-4 py-2 hover:bg-secondary"
                 >
                   <HitBody
+                    authorLabel={nameOf(hit.pubkey)}
+                    channelName={channelName ?? hit.channelId}
                     hit={hit}
                     query={query}
-                    channelName={channelName ?? hit.channelId}
                   />
                 </Link>
               ) : (
                 // A hit with no `h` tag has no channel to open — forum posts
                 // reachable elsewhere. Shown, but not as a dead link.
                 <div className="px-4 py-2">
-                  <HitBody hit={hit} query={query} channelName={null} />
+                  <HitBody
+                    authorLabel={nameOf(hit.pubkey)}
+                    channelName={null}
+                    hit={hit}
+                    query={query}
+                  />
                 </div>
               )}
             </li>
@@ -99,10 +111,12 @@ export function SearchResults({
 }
 
 function HitBody({
+  authorLabel,
   hit,
   query,
   channelName,
 }: {
+  authorLabel: string;
   hit: { pubkey: string; createdAt: number; content: string };
   query: string;
   channelName: string | null;
@@ -115,7 +129,7 @@ function HitBody({
             #{channelName}
           </span>
         )}
-        <span className="text-2xs">{truncatePubkey(hit.pubkey)}</span>
+        <span className="text-2xs font-medium">{authorLabel}</span>
         <time
           className="text-2xs text-muted-foreground"
           dateTime={new Date(hit.createdAt * 1000).toISOString()}

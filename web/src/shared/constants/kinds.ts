@@ -9,17 +9,37 @@
  * array. An open-ended filter trips the relay's p-gate and comes back 403.
  */
 
+/** NIP-01 profile metadata. Self-asserted: signed by its own subject. */
+export const KIND_PROFILE = 0;
 export const KIND_DELETION = 5;
 export const KIND_REACTION = 7;
 /** Chat message in a stream channel (NIP-29 group chat). What clients write. */
 export const KIND_STREAM_MESSAGE = 9;
 export const KIND_NIP29_DELETE_EVENT = 9005;
 /**
+ * NIP-29 group commands.
+ *
+ * Commands, not content: the relay validates each one, executes it, and
+ * publishes the outcome as new metadata (39000) or a system message (40099).
+ * Nothing here is stored as written, so there is no optimistic state to
+ * reconcile.
+ */
+export const KIND_NIP29_CREATE_GROUP = 9007;
+export const KIND_NIP29_JOIN_REQUEST = 9021;
+export const KIND_NIP29_LEAVE_REQUEST = 9022;
+/**
  * Presence heartbeat. Ephemeral, so never stored: current status lives in the
  * relay's Redis and is synthesized for an authored `POST /query`.
  */
 export const KIND_PRESENCE_UPDATE = 20001;
 export const KIND_TYPING_INDICATOR = 20002;
+/**
+ * Open a direct message.
+ *
+ * Carries only `p` tags: the relay allocates the channel and answers with its
+ * metadata, so a client never has to derive an id for a set of people.
+ */
+export const KIND_DM_OPEN = 41010;
 /** NIP-29 group metadata — the relay-signed channel descriptor. */
 export const KIND_NIP29_GROUP_METADATA = 39000;
 export const KIND_NIP29_GROUP_ADMINS = 39001;
@@ -35,6 +55,24 @@ export const KIND_SYSTEM_MESSAGE = 40099;
  * marker — so a filter for read state must scope on both.
  */
 export const KIND_READ_STATE = 30078;
+
+/**
+ * NIP-38 user status — the free-text "in a meeting" line beside a name.
+ *
+ * Parameterized-replaceable on `d:general`, so an event carrying neither text
+ * nor emoji is how a status is cleared.
+ */
+export const KIND_USER_STATUS = 30315;
+
+/**
+ * NIP-30 custom emoji: a member's preferred list, and their named sets.
+ *
+ * There is no server-side registry. Each member signs their own set, and the
+ * workspace palette is the union of everyone's — a view computed on read rather
+ * than stored state.
+ */
+export const KIND_EMOJI_LIST = 10030;
+export const KIND_EMOJI_SET = 30030;
 
 /**
  * Forum post and comment.
@@ -70,21 +108,24 @@ export const CHANNEL_TIMELINE_CONTENT_KINDS = [
 ];
 
 /**
- * Auxiliary kinds that modify an existing timeline row rather than adding one.
+ * Everything an `#h`-scoped channel subscription must ask for.
  *
- * These carry only an `e` tag — no `h` — so they are unreachable from an
- * `#h`-scoped channel filter and must be fetched by `#e` reference against the
- * message ids already on screen.
+ * The content kinds plus the two modifiers that *do* carry an `h` tag: an edit
+ * (40003) and the Nuxx tombstone (9005). Leaving them out is invisible — the
+ * timeline renders, it just never applies anyone's edit or removal — which is
+ * exactly what this client did until it was noticed.
  */
-export const CHANNEL_AUX_EVENT_KINDS = [
-  KIND_REACTION,
-  KIND_DELETION,
-  KIND_NIP29_DELETE_EVENT,
+export const CHANNEL_H_SCOPED_KINDS = [
+  ...CHANNEL_TIMELINE_CONTENT_KINDS,
   KIND_STREAM_MESSAGE_EDIT,
+  KIND_NIP29_DELETE_EVENT,
 ];
 
-/** Everything a live channel subscription needs: content plus aux. */
-export const CHANNEL_EVENT_KINDS = [
-  ...CHANNEL_TIMELINE_CONTENT_KINDS,
-  ...CHANNEL_AUX_EVENT_KINDS,
-];
+/**
+ * Modifiers that carry only an `e` tag, never an `h`.
+ *
+ * A reaction (`nuxx-sdk::build_reaction`) and a NIP-09 deletion both omit the
+ * channel, so no `#h` subscription can reach them: they have to be fetched by
+ * `#e` against the message ids already on screen.
+ */
+export const CHANNEL_E_SCOPED_KINDS = [KIND_REACTION, KIND_DELETION];

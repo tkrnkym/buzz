@@ -1,12 +1,34 @@
-import { type FormEvent, useRef, useState } from "react";
-import { Paperclip, X } from "lucide-react";
+import { type FormEvent, useCallback, useRef, useState } from "react";
+import { Paperclip, Smile, X } from "lucide-react";
 
-import { useSendMessage } from "@/features/chat/use-chat";
+import { useMyPubkey, useSendMessage } from "@/features/chat/use-chat";
 import { formatBytes } from "@/features/chat/upload";
 import { useUpload } from "@/features/chat/use-upload";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { useDirectory } from "@/features/directory/use-directory";
+import { UserPicker } from "@/features/directory/ui/UserPicker";
+import {
+  activeEmojiQuery,
+  emojiInsertText,
+  emojiTagsForContent,
+} from "@/features/emoji/emoji-model";
+import { EmojiPicker } from "@/features/emoji/ui/EmojiPicker";
+import { useEmojiCatalog } from "@/features/emoji/use-emoji";
+import { serializeToMarkdown } from "@/features/messages/lib/markdown-serializer";
+import {
+  RichComposerEditor,
+  type RichEditorHandle,
+} from "@/features/messages/ui/RichComposerEditor";
+import { useDraft } from "@/features/messages/use-draft";
+import {
+  activeMentionQuery,
+  mentionInsertText,
+  mentionRecipients,
+  mentionTags,
+  survivingMentions,
+} from "@/features/messages/lib/mentions";
+import { useProfiles } from "@/features/profile/profile-store";
+import { useUserLabels } from "@/features/profile/use-user-label";
 import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
 
 export interface ReplyTarget {
   rootId: string;
@@ -15,9 +37,14 @@ export interface ReplyTarget {
   preview: string;
 }
 
+/** Stable empty list, so the label hook is not re-run on every render. */
+const EMPTY_PUBKEYS: string[] = [];
+
 export function MessageComposer({
   channelId,
   channelName,
+  channelParticipants,
+  isDm = false,
   replyTo,
   onCancelReply,
   onComposing,
@@ -25,6 +52,10 @@ export function MessageComposer({
 }: {
   channelId: string;
   channelName: string;
+  /** A DM's participants, who are addressed whether or not the text names them. */
+  channelParticipants?: string[];
+  /** A DM is addressed by a person's name, not by a hashed channel name. */
+  isDm?: boolean;
   replyTo: ReplyTarget | null;
   onCancelReply: () => void;
   /** Called as the user types; throttling is the caller's business. */
@@ -32,23 +63,117 @@ export function MessageComposer({
   /** Called once a message lands, so this author stops showing as typing. */
   onSent: (input: { pubkey: string; threadHeadId: string | null }) => void;
 }) {
-  const [draft, setDraft] = useState("");
+  // The composer's text lives in `useDraft`: it survives a channel switch and a
+  // reload, and stays in this browser rather than becoming an event — see
+  // `lib/drafts.ts` for why.
+  const {
+    text: draft,
+    setText: updateDraft,
+    clear: clearDraft,
+  } = useDraft({
+    channelId,
+    threadRootId: replyTo?.rootId ?? null,
+  });
   const sendMessage = useSendMessage(channelId);
   const upload = useUpload();
   const fileInput = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<RichEditorHandle | null>(null);
+  const myPubkey = useMyPubkey();
+  const directory = useDirectory();
+  const directoryProfiles = useProfiles([]);
+  const emojiCatalog = useEmojiCatalog();
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  /** The `:name` token being typed, which completes without opening the grid. */
+  const [emojiQuery, setEmojiQuery] = useState<{
+    query: string;
+    from: number;
+  } | null>(null);
+  /**
+   * Mentions inserted through the picker, with the label each one wrote.
+   *
+   * Kept here rather than derived from the text on send: two people can share a
+   * display name, so parsing `@Name` back to a pubkey is ambiguous. What the
+   * author *chose* is unambiguous, and `survivingMentions` drops any whose text
+   * they then deleted.
+   */
+  const insertedMentions = useRef<{ pubkey: string; label: string }[]>([]);
+  const [mention, setMention] = useState<{
+    query: string;
+    from: number;
+  } | null>(null);
+  const pickerKeyHandler = useRef<((event: KeyboardEvent) => boolean) | null>(
+    null,
+  );
+
+  /**
+   * Re-read the token under the caret from the editor.
+   *
+   * Both autocompletes work on the plain text of the block the caret is in.
+   * That is the honest unit: a mention cannot span a paragraph, and reading the
+   * whole document would make an `@` two blocks up look like the one being
+   * typed.
+   */
+  const syncQueries = useCallback(() => {
+    const context = editorRef.current?.caretContext();
+    if (!context) return;
+    const mentionAt = activeMentionQuery(context.text, context.caret);
+    setMention(mentionAt);
+    // A mention wins: `@` and `:` cannot both be the token under the caret, and
+    // showing two floating lists at once would be a guess about which.
+    setEmojiQuery(
+      mentionAt ? null : activeEmojiQuery(context.text, context.caret),
+    );
+  }, []);
+
+  /** Insert at the caret, replacing the `:name` token if one is open. */
+  const insertEmoji = useCallback(
+    (text: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      if (emojiQuery) {
+        const caret = editor.caretContext().caret;
+        editor.replaceRange(emojiQuery.from, caret, text);
+      } else {
+        editor.insert(text);
+      }
+      setEmojiQuery(null);
+      setEmojiOpen(false);
+    },
+    [emojiQuery],
+  );
+
+  const pickMention = useCallback(
+    (entry: { pubkey: string; label: string }) => {
+      const editor = editorRef.current;
+      if (!mention || !editor) return;
+      const caret = editor.caretContext().caret;
+      editor.replaceRange(mention.from, caret, mentionInsertText(entry.label));
+      insertedMentions.current = [
+        ...insertedMentions.current,
+        { pubkey: entry.pubkey, label: entry.label },
+      ];
+      setMention(null);
+      setEmojiQuery(null);
+    },
+    [mention],
+  );
+  // The person being replied to. `labelOf`, so replying to yourself reads
+  // "Reply to You" rather than repeating your own name back at you.
+  const { labelOf } = useUserLabels(
+    replyTo ? [replyTo.authorPubkey] : EMPTY_PUBKEYS,
+  );
+  const replyToLabel = replyTo ? labelOf(replyTo.authorPubkey) : "";
 
   const onPickFile = async (file: File | undefined) => {
     if (!file) return;
     const markdown = await upload.attach(file);
     // The renderer keys `imeta` off the URL in the body, so an attachment that
     // never reaches the text is invisible however complete its tag is.
-    if (markdown) {
-      setDraft((current) => (current ? `${current}\n${markdown}` : markdown));
-    }
+    if (markdown) editorRef.current?.insert(markdown);
   };
 
-  const submit = (submitEvent: FormEvent) => {
-    submitEvent.preventDefault();
+  const submit = (submitEvent?: FormEvent) => {
+    submitEvent?.preventDefault();
     const content = draft.trim();
     // An attachment is a message on its own; requiring a caption would mean a
     // picture could not be posted without one.
@@ -58,33 +183,58 @@ export function MessageComposer({
     ) {
       return;
     }
+    const recipients = mentionRecipients({
+      channelParticipants,
+      explicitMentions: survivingMentions(content, insertedMentions.current),
+      isDm,
+      senderPubkey: myPubkey,
+    });
+
     // Clear only after the relay accepts: a rejected send must not lose the
     // author's text or make them upload again.
     sendMessage.mutate(
       {
         content,
-        attachments: upload.attachments.map((attachment) => attachment.imeta),
+        attachments: [
+          ...upload.attachments.map((attachment) => attachment.imeta),
+          ...mentionTags(recipients),
+          // NIP-30 requires the definition to travel with the event: a reader
+          // whose client has never seen the author's set still has to render it.
+          ...emojiTagsForContent(content, emojiCatalog),
+        ],
         ...(replyTo
           ? { thread: { rootId: replyTo.rootId, parentId: replyTo.parentId } }
           : {}),
       },
       {
         onSuccess: (event) => {
-          setDraft("");
+          // Only on success: a rejected send has to leave the text where the
+          // author can still see it.
+          clearDraft();
+          editorRef.current?.clear();
           upload.clear();
+          insertedMentions.current = [];
+          setMention(null);
+          setEmojiQuery(null);
           onSent({
             pubkey: event.pubkey,
             threadHeadId: replyTo?.parentId ?? null,
           });
-          onCancelReply();
+          // The reply target deliberately survives the send. It is bound to the
+          // open thread panel now, so clearing it here would drop the reader out
+          // of the thread they are in the middle of — and their next message
+          // would land in the channel instead. Closing the panel is what ends
+          // the reply.
         },
       },
     );
   };
 
   const label = replyTo
-    ? `Reply to ${truncatePubkey(replyTo.authorPubkey)}`
-    : `Message #${channelName}`;
+    ? `Reply to ${replyToLabel}`
+    : // No hash for a DM: the label is a person's name, and "Message #Alice" reads
+      // as a channel that does not exist.
+      `Message ${isDm ? "" : "#"}${channelName}`;
 
   return (
     <form
@@ -94,8 +244,7 @@ export function MessageComposer({
       {replyTo && (
         <div className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1">
           <span className="min-w-0 flex-1 truncate text-2xs text-secondary-foreground">
-            Replying to {truncatePubkey(replyTo.authorPubkey)}:{" "}
-            {replyTo.preview}
+            Replying to {replyToLabel}: {replyTo.preview}
           </span>
           <button
             type="button"
@@ -134,6 +283,38 @@ export function MessageComposer({
         </ul>
       )}
 
+      {mention && (
+        <div className="relative">
+          <UserPicker
+            className="absolute bottom-1 left-0 w-72"
+            emptyLabel="Nobody here matches that."
+            entries={directory}
+            onPick={pickMention}
+            profiles={directoryProfiles}
+            query={mention.query}
+            registerKeyHandler={(handler) => {
+              pickerKeyHandler.current = handler;
+            }}
+          />
+        </div>
+      )}
+
+      {(emojiOpen || emojiQuery) && (
+        <div className="relative">
+          <EmojiPicker
+            catalog={emojiCatalog}
+            className="absolute bottom-1 left-0"
+            onPick={(choice) =>
+              insertEmoji(
+                choice.emoji
+                  ? emojiInsertText(choice.emoji.shortcode)
+                  : choice.text,
+              )
+            }
+          />
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <input
           ref={fileInput}
@@ -156,11 +337,33 @@ export function MessageComposer({
         >
           <Paperclip aria-hidden className="size-4" />
         </Button>
-        <Input
-          value={draft}
-          onChange={(changeEvent) => {
-            setDraft(changeEvent.target.value);
-            if (changeEvent.target.value.trim()) {
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Add an emoji"
+          data-testid="open-emoji-picker"
+          disabled={sendMessage.isPending}
+          onClick={() => {
+            setEmojiQuery(null);
+            setEmojiOpen((open) => !open);
+          }}
+        >
+          <Smile aria-hidden className="size-4" />
+        </Button>
+        <RichComposerEditor
+          ariaLabel={label}
+          // Remounted when the composer is re-pointed, so the editor is seeded
+          // with the draft belonging to the room it now writes into.
+          key={`${channelId}:${replyTo?.rootId ?? ""}`}
+          disabled={sendMessage.isPending}
+          handleRef={editorRef}
+          initialMarkdown={draft}
+          onChange={({ editor }) => {
+            const markdown = serializeToMarkdown(editor.getJSON());
+            updateDraft(markdown);
+            syncQueries();
+            if (markdown.trim()) {
               onComposing(
                 replyTo
                   ? { rootId: replyTo.rootId, parentId: replyTo.parentId }
@@ -168,10 +371,20 @@ export function MessageComposer({
               );
             }
           }}
+          onKeyDown={(keyEvent) => {
+            // The picker moves its own highlight but never takes focus: pulling
+            // focus off the field to arrow through a list would interrupt
+            // typing, and in a rich editor it would also drop the selection.
+            if (mention && pickerKeyHandler.current?.(keyEvent)) return true;
+            if (keyEvent.key === "Escape" && (mention || emojiQuery)) {
+              setMention(null);
+              setEmojiQuery(null);
+              return true;
+            }
+            return false;
+          }}
+          onSubmit={() => submit()}
           placeholder={label}
-          aria-label={label}
-          autoComplete="off"
-          disabled={sendMessage.isPending}
         />
         <Button
           type="submit"
