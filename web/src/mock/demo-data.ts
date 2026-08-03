@@ -773,3 +773,15 @@ export const MODERATION_AUDIT = [
     createdAt: new Date(ago(1500) * 1000).toISOString(),
   },
 ];
+
+/**
+ * Messages the mock addresses to the demo visitor, by event id.
+ *
+ * Two, both plain channel messages rather than thread replies, so following a
+ * notification lands on something the timeline actually shows. The `p` tag is
+ * added at AUTH time — the visitor's key is ephemeral and unknown here.
+ */
+export const ADDRESSED_TO_VISITOR_IDS: string[] = [
+  id("msg:gen-9"),
+  id("msg:dev-3"),
+];

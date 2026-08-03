@@ -6,6 +6,7 @@ import { useMyPubkey } from "@/features/chat/use-chat";
 import { EmojiSettings } from "@/features/emoji/ui/EmojiSettings";
 import { MembersSettings } from "@/features/members/ui/MembersSettings";
 import { ModerationQueue } from "@/features/moderation/ui/ModerationQueue";
+import { NotificationSettings } from "@/features/notifications/ui/NotificationSettings";
 import { MuteListSettings } from "@/features/moderation/ui/MuteListSettings";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
@@ -249,6 +250,13 @@ export function SettingsPage() {
                 </p>
               </div>
             </form>
+          </Section>
+
+          <Section
+            description="このブラウザだけの設定です。リレーには送りません — 机の上のPCと電車の中のスマホで答えが違うので。"
+            title="通知"
+          >
+            <NotificationSettings />
           </Section>
 
           <Section

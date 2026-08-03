@@ -471,6 +471,42 @@ function mockRelay(
                 for (const readState of options.readStateEvents ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, readState]));
                 }
+              } else if (filter.kinds.includes(9) && filter["#p"]) {
+                // The notification subscriptions. Scoped by tag rather than by
+                // channel, so they need their own branches — the `#h` one below
+                // would inject its synthetic channel message under a filter that
+                // never asked for a room.
+                for (const extra of options.extraMessages ?? []) {
+                  const tags = (extra as { tags: string[][] }).tags;
+                  if (
+                    tags.some(
+                      (tag) => tag[0] === "p" && filter["#p"].includes(tag[1]),
+                    )
+                  ) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
+                }
+              } else if (filter.kinds.includes(9) && filter["#e"]) {
+                for (const extra of options.extraMessages ?? []) {
+                  const tags = (extra as { tags: string[][] }).tags;
+                  if (
+                    tags.some(
+                      (tag) => tag[0] === "e" && filter["#e"].includes(tag[1]),
+                    )
+                  ) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
+                }
+              } else if (filter.kinds.includes(9) && filter.authors) {
+                for (const extra of options.extraMessages ?? []) {
+                  if (
+                    filter.authors.includes(
+                      (extra as { pubkey: string }).pubkey,
+                    )
+                  ) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
+                }
               } else if (filter.kinds.includes(9) && filter["#h"]) {
                 messageSubs.push({ subId, channelId: filter["#h"][0] });
                 /**
@@ -3216,4 +3252,135 @@ test("a timeout refusal becomes a banner rather than the relay's raw message", a
   // The text survives, because a refused send must not cost the author their
   // message.
   await expect(composer).toHaveText("送れるはずの一言");
+});
+
+// --- Notifications ---------------------------------------------------------
+//
+// The Inbox's upper half. Built from real filters rather than the activity
+// snapshots the room list below it uses — see `notifications-model` for the four
+// and why a reply needs two of them.
+
+test("the inbox lists mentions and DMs addressed to the reader", async ({
+  page,
+}) => {
+  const mention = {
+    ...markdownMessage("1", "レビューお願いします"),
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["p", MY_PUBKEY],
+    ],
+  };
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraMessages: [mention] });
+  await relay.install();
+
+  await page.goto("/home");
+  const rows = page.getByTestId("notification-rows");
+  await expect(rows.getByText("レビューお願いします")).toBeVisible();
+  // Labelled as a mention, and the room is named — that pair is what decides
+  // whether the reader opens it.
+  await expect(rows.getByText("メンション")).toBeVisible();
+  await expect(rows.getByText("#general")).toBeVisible();
+
+  // A `#p` filter, not a scan of the community.
+  const filter = relay.subscriptions.find(
+    (candidate) => candidate["#p"] !== undefined,
+  );
+  expect(filter?.["#p"]).toEqual([MY_PUBKEY]);
+  expect(filter?.kinds).toEqual([9, 40002]);
+});
+
+test("an ordinary channel message is not a notification", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [markdownMessage("1", "誰にも宛てていない発言")],
+  });
+  await relay.install();
+
+  await page.goto("/home");
+  // The room list may well show the channel moved; this half is only for what
+  // was addressed to the reader.
+  await expect(page.getByTestId("notifications-empty")).toBeVisible();
+});
+
+test("a notification links to the message, not just the room", async ({
+  page,
+}) => {
+  const mention = {
+    ...markdownMessage("1", "ここを見てください"),
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["p", MY_PUBKEY],
+    ],
+  };
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraMessages: [mention] });
+  await relay.install();
+
+  await page.goto("/home");
+  await page.getByTestId(`notification-${mention.id}`).click();
+  // `m` anchors the view on the message, so following one lands on what was said
+  // rather than at the bottom of a busy channel. The router JSON-encodes search
+  // values, so the id arrives quoted — asserted on the parsed value rather than
+  // the raw string, which is what the route actually reads.
+  await expect(page).toHaveURL(new RegExp(`/c/${CHANNEL_UUID}\\?m=`));
+  const anchored = await page.evaluate(() => {
+    const raw = new URL(window.location.href).searchParams.get("m");
+    try {
+      return JSON.parse(raw ?? "");
+    } catch {
+      return raw;
+    }
+  });
+  expect(anchored).toBe(mention.id);
+});
+
+test("muting an author also silences their notifications", async ({ page }) => {
+  const mention = {
+    ...markdownMessage("1", "ミュート後は出ないはず"),
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["p", MY_PUBKEY],
+    ],
+  };
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [mention] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${mention.id}`).click();
+  await page.getByTestId(`mute-author-${mention.id}`).click();
+
+  await page.getByRole("link", { name: "Inbox" }).click();
+  // A mute that left the notification standing would be worse than useless.
+  await expect(page.getByTestId("notifications-empty")).toBeVisible();
+});
+
+test("notification settings are per-browser and survive navigation", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  const settings = page.getByTestId("notification-settings");
+  // Quiet by default: a client that announced without being asked would start
+  // making noise on a machine nobody chose.
+  await expect(page.getByTestId("notify-sound")).not.toBeChecked();
+  await expect(settings.getByTestId("notify-only-hidden")).toBeChecked();
+  // Desktop notifications need a permission the headless browser has not given,
+  // so the request button stands in for the toggle.
+  await expect(page.getByTestId("notify-request-permission")).toBeVisible();
+
+  await page.getByTestId("notify-sound").check();
+  await expect(page.getByTestId("notify-test-sound")).toBeVisible();
+
+  await page.goto("/home");
+  await page.goto("/settings");
+  await expect(page.getByTestId("notify-sound")).toBeChecked();
+  // Nothing about this was published — it describes the machine, not the account.
+  expect(
+    relay.published.some((event) => (event as { kind: number }).kind === 30078),
+  ).toBe(false);
 });

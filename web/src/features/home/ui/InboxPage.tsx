@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import type { Channel } from "@/features/chat/chat-model";
 import { buildInbox } from "@/features/home/inbox";
+import { NotificationList } from "@/features/notifications/ui/NotificationList";
 import { useShell } from "@/features/shell/shell-context";
 import { relativeTime } from "@/shared/lib/relative-time";
 import { SidebarTrigger } from "@/shared/ui/sidebar";
@@ -17,13 +18,16 @@ function RowIcon({ channel }: { channel: Channel }) {
 }
 
 /**
- * The Inbox: rooms that moved since the reader last read them.
+ * The Inbox: what was addressed to this reader, and which rooms moved.
  *
- * Room-level rather than message-level, because room-level is what this client
- * can state truthfully today — the relay publishes per-channel activity
- * snapshots, and the reader's cursors say where they stopped. A mention list
- * needs the messages module, and inventing one from partial data would be worse
- * than not having it.
+ * Two halves, because they answer different questions and are built from
+ * different things. The notification list is message-level — mentions, DMs, and
+ * replies, read from three real filters (see `notifications-model`). The room
+ * list below it is built from the relay's per-channel activity snapshots and the
+ * reader's own cursors, which say a room moved and nothing about who said what.
+ *
+ * Notifications go first: a message with your name on it is the more urgent of
+ * the two, and burying it under a list of busy rooms would invert that.
  */
 export function InboxPage() {
   const { channels, channelsLoading, readState, unread } = useShell();
@@ -56,6 +60,13 @@ export function InboxPage() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <section className="border-b border-border px-4 py-4">
+          <NotificationList />
+        </section>
+
+        <h2 className="px-4 pt-4 text-2xs font-semibold text-muted-foreground">
+          動きのあった部屋
+        </h2>
         {isLoading ? (
           <ul className="flex flex-col gap-1 p-4">
             {[80, 62, 71].map((width) => (
@@ -66,7 +77,7 @@ export function InboxPage() {
             ))}
           </ul>
         ) : rows.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
+          <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
             <CheckCheck aria-hidden className="size-8 text-muted-foreground" />
             <p className="text-sm font-medium">You are all caught up</p>
             <p className="max-w-sm text-2xs text-muted-foreground">
