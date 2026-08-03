@@ -19,6 +19,12 @@ import {
   type RichEditorHandle,
 } from "@/features/messages/ui/RichComposerEditor";
 import { useDraft } from "@/features/messages/use-draft";
+import { ComposerTimeoutBanner } from "@/features/moderation/ui/ComposerTimeoutBanner";
+import {
+  clearTimeoutState,
+  recordTimeoutFromRejection,
+  useTimeoutState,
+} from "@/features/moderation/timeout-store";
 import {
   activeMentionQuery,
   mentionInsertText,
@@ -75,6 +81,10 @@ export function MessageComposer({
     threadRootId: replyTo?.rootId ?? null,
   });
   const sendMessage = useSendMessage(channelId);
+  // A community timeout is learned from a refused send, not read ahead of time —
+  // see `moderation-model`. So the composer stays enabled until the relay says
+  // otherwise, and the banner appears on the first refusal.
+  const timeoutState = useTimeoutState();
   const upload = useUpload();
   const fileInput = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichEditorHandle | null>(null);
@@ -207,7 +217,19 @@ export function MessageComposer({
           : {}),
       },
       {
+        onError: (error) => {
+          // A timeout refusal becomes the banner instead of a toast: the reason
+          // the send failed is a state the author is in, not a one-off event, and
+          // a toast that vanishes leaves them retyping into a composer that is
+          // still blocked.
+          recordTimeoutFromRejection(
+            error instanceof Error ? error.message : null,
+          );
+        },
         onSuccess: (event) => {
+          // An accepted send is proof the block is gone, which is the only signal
+          // there is — the relay never announces the end of a timeout.
+          clearTimeoutState();
           // Only on success: a rejected send has to leave the text where the
           // author can still see it.
           clearDraft();
@@ -241,6 +263,10 @@ export function MessageComposer({
       onSubmit={submit}
       className="flex flex-col gap-1 border-t border-border px-4 py-3"
     >
+      {timeoutState.active && (
+        <ComposerTimeoutBanner expiresAtMs={timeoutState.expiresAtMs} />
+      )}
+
       {replyTo && (
         <div className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1">
           <span className="min-w-0 flex-1 truncate text-2xs text-secondary-foreground">
@@ -414,7 +440,10 @@ export function MessageComposer({
         </p>
       )}
 
-      {sendMessage.error && (
+      {/* Suppressed while timed out: the banner above already says why, and the
+          relay's raw refusal ("restricted: you are timed out until 1750…") is not
+          a sentence to show anyone. */}
+      {sendMessage.error && !timeoutState.active && (
         <p className="text-2xs text-destructive">
           {sendMessage.error instanceof Error
             ? sendMessage.error.message

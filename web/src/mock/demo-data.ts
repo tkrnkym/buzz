@@ -692,3 +692,84 @@ export const SEEDED: NostrEvent[] = [
   ...REACTIONS,
   ...OVERLAYS,
 ];
+
+/**
+ * Moderation rows for the demo's `/moderation/*` endpoints.
+ *
+ * Fixtures for three reads the relay derives from its own state rather than from
+ * events, so there is nothing in the event store that could stand in for them —
+ * see `moderation-api.ts` for why they are HTTP.
+ *
+ * Deliberately unglamorous: one open spam report, one member serving a timeout,
+ * and an audit trail short enough to read. A queue seeded with a dozen lurid
+ * reports would demo the list widget and misrepresent the product.
+ */
+export const MODERATION_REPORTS = [
+  {
+    id: "rep-1",
+    reportEventId: "1".repeat(64),
+    reporterPubkey: AYA,
+    targetKind: "pubkey" as const,
+    target: KEN,
+    channelId: CH_RANDOM,
+    reportType: "spam",
+    note: "同じリンクを短時間に何度も貼っています。",
+    status: "open",
+    resolvedBy: null,
+    resolvedAt: null,
+    createdAt: new Date(ago(95) * 1000).toISOString(),
+  },
+  {
+    id: "rep-2",
+    reportEventId: "2".repeat(64),
+    reporterPubkey: KEN,
+    targetKind: "event" as const,
+    target: "3".repeat(64),
+    channelId: CH_GENERAL,
+    reportType: "other",
+    note: null,
+    status: "open",
+    resolvedBy: null,
+    resolvedAt: null,
+    createdAt: new Date(ago(400) * 1000).toISOString(),
+  },
+];
+
+export const MODERATION_RESTRICTED = [
+  {
+    pubkey: AYA,
+    banned: false,
+    banExpiresAt: null,
+    banReason: null,
+    // Still running, so the demo shows the lift control rather than an empty list.
+    mutedUntil: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+    muteReason: "議論が白熱したため",
+    actorPubkey: MISAKI,
+    updatedAt: new Date(ago(180) * 1000).toISOString(),
+  },
+];
+
+export const MODERATION_AUDIT = [
+  {
+    id: "act-1",
+    actorPubkey: MISAKI,
+    action: "timeout",
+    targetPubkey: AYA,
+    targetEventId: null,
+    channelId: CH_GENERAL,
+    reasonCode: null,
+    publicReason: "議論が白熱したため",
+    createdAt: new Date(ago(180) * 1000).toISOString(),
+  },
+  {
+    id: "act-2",
+    actorPubkey: MISAKI,
+    action: "resolve_report",
+    targetPubkey: null,
+    targetEventId: "4".repeat(64),
+    channelId: CH_DEV,
+    reasonCode: "duplicate",
+    publicReason: null,
+    createdAt: new Date(ago(1500) * 1000).toISOString(),
+  },
+];

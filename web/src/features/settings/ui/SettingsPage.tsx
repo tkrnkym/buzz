@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useMyPubkey } from "@/features/chat/use-chat";
 import { EmojiSettings } from "@/features/emoji/ui/EmojiSettings";
 import { MembersSettings } from "@/features/members/ui/MembersSettings";
+import { ModerationQueue } from "@/features/moderation/ui/ModerationQueue";
+import { MuteListSettings } from "@/features/moderation/ui/MuteListSettings";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import { useAvatarUpload } from "@/features/profile/use-avatar-upload";
@@ -254,6 +256,20 @@ export function SettingsPage() {
             title="メンバー"
           >
             <MembersSettings />
+          </Section>
+
+          <Section
+            description="自分にだけ効く一覧です。リレーにもモデレーターにも何も要求しません。"
+            title="ミュート"
+          >
+            <MuteListSettings />
+          </Section>
+
+          <Section
+            description="通報の受付と、モデレーターが何をしたかの記録。オーナーと管理者だけが読めます。"
+            title="モデレーション"
+          >
+            <ModerationQueue />
           </Section>
 
           <Section

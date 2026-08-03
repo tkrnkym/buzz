@@ -74,6 +74,7 @@ export function MessageActionBar({
   canManage,
   disabled,
   emojiCatalog,
+  moderationMenu,
   onCopyLink,
   onDelete,
   onEdit,
@@ -85,6 +86,14 @@ export function MessageActionBar({
   disabled?: boolean;
   /** The workspace palette, offered alongside the Unicode grid. */
   emojiCatalog: EmojiCatalog;
+  /**
+   * The report/mute/moderate menu, passed in rather than rendered here.
+   *
+   * A slot because that menu reads relay state — the reader's role, the
+   * restricted list — and this bar is otherwise given everything it draws. Kept
+   * that way so a row's toolbar stays cheap to render.
+   */
+  moderationMenu?: React.ReactNode;
   onCopyLink: () => void;
   onDelete: () => void;
   onEdit: () => void;
@@ -109,7 +118,11 @@ export function MessageActionBar({
       className={cn(
         "absolute -top-3 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm",
         "opacity-0 transition-opacity group-focus-within/message:opacity-100 group-hover/message:opacity-100",
-        pickerOpen && "opacity-100",
+        // Lifted while the picker is open: it renders as a child of this bar,
+        // and this bar is a stacking context — at z-10 the next row's bar paints
+        // over the open grid and swallows clicks aimed at it. The moderation menu
+        // needs no equivalent because it portals out (see `shared/ui/menu.tsx`).
+        pickerOpen && "z-30 opacity-100",
       )}
       data-testid="message-action-bar"
     >
@@ -188,6 +201,8 @@ export function MessageActionBar({
           </Action>
         </>
       )}
+
+      {moderationMenu}
     </div>
   );
 }

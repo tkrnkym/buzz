@@ -21,6 +21,7 @@ import { useEmojiCatalog } from "@/features/emoji/use-emoji";
 import { HuddleBar } from "@/features/huddle/ui/HuddleBar";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
+import { useMuteList } from "@/features/moderation/use-moderation";
 import { useProfiles } from "@/features/profile/profile-store";
 import type { MessageRowActions } from "@/features/messages/ui/MessageRow";
 import { MessageTimeline } from "@/features/messages/ui/MessageTimeline";
@@ -49,6 +50,23 @@ export function ChatPage({
   // and this pane cannot disagree — see `shell-context.tsx`.
   const { channels, dms, readState } = useShell();
   const timeline = useChannelMessages(channelId);
+  // A mute hides the person, which is the whole of what a mute means — there is
+  // no "message hidden" placeholder, because a row announcing that someone spoke
+  // is the thing the reader asked not to see.
+  //
+  // Applied to what is rendered, not to the read cursor below. A channel whose
+  // newest message is from a muted author still has to become read, or its badge
+  // would never clear and the mute would look like a bug.
+  const muted = useMuteList();
+  const rows = useMemo(
+    () =>
+      muted.size === 0
+        ? timeline.rows
+        : timeline.rows.filter(
+            (row) => !muted.has(row.message.pubkey.toLowerCase()),
+          ),
+    [muted, timeline.rows],
+  );
   const toggleReaction = useToggleReaction();
   const editMessage = useEditMessage(channelId);
   const deleteMessage = useDeleteMessage(channelId);
@@ -58,8 +76,8 @@ export function ChatPage({
   // Only the authors on screen: presence is read per-author, so asking about
   // everyone would grow the query with the community rather than the viewport.
   const visibleAuthors = useMemo(
-    () => timeline.rows.map((row) => row.message.pubkey),
-    [timeline.rows],
+    () => rows.map((row) => row.message.pubkey),
+    [rows],
   );
   const presence = usePresence(visibleAuthors);
   // Same author set as presence: names and avatars are needed for exactly the
@@ -75,8 +93,8 @@ export function ChatPage({
   // Read the rows from a ref inside callbacks: depending on the array directly
   // would give every action a new identity on each delivered event, which is
   // exactly what defeats `React.memo` further down the tree.
-  const timelineRowsRef = useRef(timeline.rows);
-  timelineRowsRef.current = timeline.rows;
+  const timelineRowsRef = useRef(rows);
+  timelineRowsRef.current = rows;
   // The reply target is stored with the channel it belongs to and read back only
   // for a match, so switching channels cannot post a reply into a thread that
   // does not exist in the new room — and no render sees a stale target.
@@ -118,8 +136,8 @@ export function ChatPage({
     () =>
       frontier === undefined
         ? { firstUnreadMessageId: null, unreadCount: 0 }
-        : computeChannelUnreadMarker(timeline.rows, frontier, myPubkey),
-    [frontier, timeline.rows, myPubkey],
+        : computeChannelUnreadMarker(rows, frontier, myPubkey),
+    [frontier, rows, myPubkey],
   );
 
   // Reading the room marks it read up to its newest message. Driven by the
@@ -323,7 +341,7 @@ export function ChatPage({
               isLoadingMore={timeline.isLoadingMore}
               loaded={timeline.loaded}
               onLoadOlder={timeline.loadOlder}
-              rows={timeline.rows}
+              rows={rows}
               unreadCount={unreadMarker.unreadCount}
             />
             <HuddleBar />
@@ -349,7 +367,7 @@ export function ChatPage({
           actions={rowActions}
           onClose={onCloseThread}
           rootId={openThreadRootId}
-          rows={timeline.rows}
+          rows={rows}
         />
       )}
     </div>

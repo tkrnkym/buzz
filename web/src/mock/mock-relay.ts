@@ -34,6 +34,9 @@ import {
   ACTIVITY,
   CH_ANNOUNCE,
   CH_DESIGN,
+  MODERATION_AUDIT,
+  MODERATION_REPORTS,
+  MODERATION_RESTRICTED,
   OLDER_MESSAGES,
   PRESENCE,
   SEEDED,
@@ -119,7 +122,12 @@ function enrolVisitor(pubkey: string): void {
     if (event.tags.some((tag) => tag[0] === "p" && tag[1] === pubkey)) continue;
     store[index] = {
       ...event,
-      tags: [...event.tags, ["p", pubkey, "", "member"]],
+      // Admin, so the demo can show the moderator surfaces at all. A real
+      // visitor to a real community would be a member and would correctly find
+      // the report queue closed to them — this is the one place the demo grants
+      // itself something, and it grants it in the seeded membership rather than
+      // by weakening the client's gate.
+      tags: [...event.tags, ["p", pubkey, "", "admin"]],
     };
   }
 }
@@ -255,6 +263,21 @@ function answerQuery(filters: CursorFilter[]): NostrEvent[] {
 }
 
 /**
+ * Fixture rows for a `/moderation/*` read, or `null` when the URL is not one.
+ *
+ * These are not events, so they cannot come from the store — the relay derives
+ * them from its own tables. The demo serves them unauthenticated, which the real
+ * endpoints never do: there is nobody here to authorize against.
+ */
+function moderationFixture(url: string): unknown[] | null {
+  const path = new URL(url, window.location.origin).pathname;
+  if (path.endsWith("/moderation/reports")) return MODERATION_REPORTS;
+  if (path.endsWith("/moderation/restricted")) return MODERATION_RESTRICTED;
+  if (path.endsWith("/moderation/audit")) return MODERATION_AUDIT;
+  return null;
+}
+
+/**
  * Route `POST …/query` to the in-memory store; leave every other request to
  * the real `fetch`. Installed once, before the app mounts.
  */
@@ -279,6 +302,15 @@ function installMockQuery(): void {
     if (url.includes("/media/upload")) {
       return new Response("uploads are disabled in the static demo", {
         status: 403,
+      });
+    }
+    // The moderator reads. Matched on the path rather than the whole URL because
+    // two of them carry a query string.
+    const moderation = moderationFixture(url);
+    if (moderation) {
+      return new Response(JSON.stringify(moderation), {
+        status: 200,
+        headers: { "content-type": "application/json" },
       });
     }
     return realFetch(input, init);

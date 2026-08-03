@@ -205,6 +205,15 @@ function mockRelay(
     memberEvents?: unknown[];
     /** kind:30030 emoji sets, from which the palette is built. */
     emojiEvents?: unknown[];
+    /** Rows served for `GET /moderation/restricted`. */
+    restrictedRows?: unknown[];
+    /**
+     * Refuse every kind:9 with this message, verbatim.
+     *
+     * The only way to exercise a community timeout: the relay tells a member
+     * they are blocked by rejecting a write, and nothing else announces it.
+     */
+    rejectSendWith?: string;
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -293,6 +302,22 @@ function mockRelay(
     searchRequests,
     socketCount: () => socketsOpened,
     install: async () => {
+      // The moderator reads are HTTP because the relay derives them from its own
+      // state — there is no kind to subscribe to. Answered here so a spec can
+      // assert the moderator surface without the client falling back to the
+      // preview server and getting a 404.
+      await page.route("**/moderation/**", async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        const rows = path.endsWith("/restricted")
+          ? (options.restrictedRows ?? [])
+          : [];
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(rows),
+        });
+      });
+
       await page.route("**/query", async (route) => {
         const body = JSON.parse(route.request().postData() ?? "{}") as {
           filters?: QueryFilter[];
@@ -326,6 +351,14 @@ function mockRelay(
               ...(options.emojiEvents ?? []),
               ...published.filter(
                 (event) => (event as { kind: number }).kind === 30030,
+              ),
+            );
+          } else if (filter.kinds?.includes(10000)) {
+            // Replaceable, and the only source is the reader themselves — so a
+            // mute published this session is what the timeline then filters on.
+            events.push(
+              ...published.filter(
+                (event) => (event as { kind: number }).kind === 10000,
               ),
             );
           } else if (filter.kinds?.includes(39002)) {
@@ -391,6 +424,17 @@ function mockRelay(
 
             if (verb === "EVENT") {
               published.push(frame[1]);
+              if (options.rejectSendWith && frame[1].kind === 9) {
+                ws.send(
+                  JSON.stringify([
+                    "OK",
+                    frame[1].id,
+                    false,
+                    options.rejectSendWith,
+                  ]),
+                );
+                return;
+              }
               const delay =
                 frame[1].kind === 30078 ? (options.delayReadStateOkMs ?? 0) : 0;
               if (delay > 0) {
@@ -2966,4 +3010,210 @@ test("the sidebar reaches every section, and lights only the current one", async
   for (const name of ["Pulse", "Projects", "Workflows", "Forum", "Reminders"]) {
     await expect(page.getByRole("link", { name })).toBeVisible();
   }
+});
+
+// --- Moderation ------------------------------------------------------------
+//
+// The identity is `MY_PUBKEY` throughout, and the message under test is always
+// someone else's — there is nothing on this menu that applies to your own
+// message, and the component returns null for it.
+
+/** Membership where the reader is an ordinary member. */
+function asMember() {
+  return {
+    memberEvents: [
+      memberList(CHANNEL_UUID, [
+        [MY_PUBKEY, "member"],
+        ["e".repeat(64), "member"],
+      ]),
+    ],
+  };
+}
+
+/** Membership where the reader may issue moderation commands. */
+function asAdmin(restrictedRows: unknown[] = []) {
+  return {
+    memberEvents: [
+      memberList(CHANNEL_UUID, [
+        [MY_PUBKEY, "admin"],
+        ["e".repeat(64), "member"],
+      ]),
+    ],
+    restrictedRows,
+  };
+}
+
+test("reporting a message publishes kind:1984 with the category on the e tag", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "報告される投稿");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await page.getByTestId(`report-message-${target.id}`).click();
+  await page.getByTestId("report-category-spam").click();
+  await page.getByTestId("report-note").fill("同じリンクの連投です");
+  await page.getByTestId("submit-report").click();
+
+  const report = relay.published.find(
+    (event) => (event as { kind: number }).kind === 1984,
+  ) as { tags: string[][]; content: string };
+  expect(report.tags).toContainEqual(["p", target.pubkey]);
+  // The category rides the e tag's third element, which is where the relay's
+  // triage reads it — not the content, which is prose for a human.
+  expect(report.tags).toContainEqual(["e", target.id, "spam"]);
+  expect(report.content).toBe("同じリンクの連投です");
+  // The dialog closes only once the relay has accepted it.
+  await expect(page.getByTestId("report-message-dialog")).toHaveCount(0);
+});
+
+test("a report cannot be submitted without a category", async ({ page }) => {
+  const target = markdownMessage("1", "理由なしの通報");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await page.getByTestId(`report-message-${target.id}`).click();
+  // A category is what makes a report sortable, so it is the one required field.
+  await expect(page.getByTestId("submit-report")).toBeDisabled();
+  await page.getByTestId("report-category-other").click();
+  await expect(page.getByTestId("submit-report")).toBeEnabled();
+});
+
+test("muting an author publishes the whole list and hides their messages", async ({
+  page,
+}) => {
+  const theirs = markdownMessage("1", "消えるべき発言");
+  const mine = myMessage("2", "残るべき発言");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...asMember(),
+    extraMessages: [theirs, mine],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("消えるべき発言")).toBeVisible();
+
+  await page.getByTestId(`message-moderation-${theirs.id}`).click();
+  await page.getByTestId(`mute-author-${theirs.id}`).click();
+
+  const list = relay.published.find(
+    (event) => (event as { kind: number }).kind === 10000,
+  ) as { tags: string[][] };
+  // kind 10000 is replaceable, so the event is the complete list — publishing a
+  // delta would unmute everyone already on it.
+  expect(list.tags).toEqual([["p", theirs.pubkey]]);
+
+  // The person is hidden, not the message annotated: a row saying someone spoke
+  // is the thing a mute is for.
+  await expect(page.getByText("消えるべき発言")).toHaveCount(0);
+  await expect(page.getByText("残るべき発言")).toBeVisible();
+});
+
+test("a member is offered reporting and muting, but not moderation", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "誰かの発言");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await expect(page.getByTestId(`report-message-${target.id}`)).toBeVisible();
+  await expect(page.getByTestId(`mute-author-${target.id}`)).toBeVisible();
+  // The relay refuses these from a member anyway; offering them would be a
+  // button that exists to fail.
+  await expect(page.getByTestId(`ban-author-${target.id}`)).toHaveCount(0);
+  await expect(
+    page.getByTestId(`timeout-author-3600-${target.id}`),
+  ).toHaveCount(0);
+});
+
+test("an admin can time out an author, and the command carries no channel", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "度を越えた発言");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asAdmin(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await page.getByTestId(`timeout-author-3600-${target.id}`).click();
+
+  const command = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9042,
+  ) as { tags: string[][] };
+  expect(command.tags).toContainEqual(["p", target.pubkey]);
+  // The community comes from the connection host. An `h` tag here does not
+  // narrow the timeout to one room — the relay rejects the command outright.
+  expect(command.tags.every((tag) => tag[0] !== "h")).toBe(true);
+  const expiration = command.tags.find((tag) => tag[0] === "expiration");
+  expect(Number(expiration?.[1])).toBeGreaterThan(Date.now() / 1000);
+});
+
+test("an author already timed out is offered the lift, not another timeout", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "すでに制限中の人");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...asAdmin([
+      {
+        pubkey: target.pubkey,
+        banned: false,
+        banExpiresAt: null,
+        banReason: null,
+        mutedUntil: new Date(Date.now() + 3_600_000).toISOString(),
+        muteReason: null,
+        actorPubkey: MY_PUBKEY,
+        updatedAt: new Date().toISOString(),
+      },
+    ]),
+    extraMessages: [target],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await expect(page.getByTestId(`untimeout-author-${target.id}`)).toBeVisible();
+  await expect(
+    page.getByTestId(`timeout-author-3600-${target.id}`),
+  ).toHaveCount(0);
+});
+
+test("a timeout refusal becomes a banner rather than the relay's raw message", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...asMember(),
+    // A member learns they are timed out by being refused a send — the relay
+    // exposes no self-restriction read.
+    rejectSendWith: `restricted: you are timed out until ${
+      Math.floor(Date.now() / 1000) + 3600
+    }`,
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("送れるはずの一言");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const banner = page.getByTestId("composer-timeout-banner");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("タイムアウト中");
+  // The relay's wire message is a parse contract, not a sentence for a reader.
+  await expect(page.getByText("restricted: you are timed out")).toHaveCount(0);
+  // The text survives, because a refused send must not cost the author their
+  // message.
+  await expect(composer).toHaveText("送れるはずの一言");
 });
