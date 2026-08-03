@@ -107,6 +107,15 @@ export const KIND_MODERATION_UNTIMEOUT = 9043;
 export const KIND_MODERATION_RESOLVE_REPORT = 9044;
 
 /**
+ * Product feedback.
+ *
+ * Accepted at ingest and sidecarred to the deployment's feedback table — never
+ * stored as an event and never fanned out. So this is the one kind a client
+ * publishes that nobody, including its author, can read back.
+ */
+export const KIND_PRODUCT_FEEDBACK = 42000;
+
+/**
  * NIP-51 mute list — people this reader does not want to see.
  *
  * A personal list, unlike everything else above: nothing is asked of the relay

@@ -5,6 +5,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/root";
+import { Route as welcomeRouteImport } from "./routes/welcome";
 import { Route as reposRouteImport } from "./routes/repos";
 import { Route as shellRouteImport } from "./routes/shell";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
@@ -25,6 +26,11 @@ import { Route as projectsDotprojectIdRouteImport } from "./routes/projects.$pro
 import { Route as chatDotchannelIdRouteImport } from "./routes/chat.$channelId";
 import { Route as reposDotrepoIdDotblobDotsplatRouteImport } from "./routes/repos.$repoId.blob.$";
 
+const welcomeRoute = welcomeRouteImport.update({
+  id: "/welcome",
+  path: "/welcome",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const reposRoute = reposRouteImport.update({
   id: "/repos",
   path: "/repos",
@@ -124,6 +130,7 @@ const reposDotrepoIdDotblobDotsplatRoute =
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
   "/repos": typeof reposRoute;
+  "/welcome": typeof welcomeRoute;
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
@@ -143,6 +150,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/repos": typeof reposRoute;
+  "/welcome": typeof welcomeRoute;
   "/": typeof indexRoute;
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/_shell": typeof shellRouteWithChildren;
   "/repos": typeof reposRoute;
+  "/welcome": typeof welcomeRoute;
   "/_shell/": typeof indexRoute;
   "/_shell/agents": typeof agentsRoute;
   "/_shell/browse": typeof browseRoute;
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/repos"
+    | "/welcome"
     | "/agents"
     | "/browse"
     | "/c"
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/repos"
+    | "/welcome"
     | "/"
     | "/agents"
     | "/browse"
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | "__root__"
     | "/_shell"
     | "/repos"
+    | "/welcome"
     | "/_shell/"
     | "/_shell/agents"
     | "/_shell/browse"
@@ -250,6 +262,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   shellRoute: typeof shellRouteWithChildren;
   reposRoute: typeof reposRoute;
+  welcomeRoute: typeof welcomeRoute;
   inviteDotcodeRoute: typeof inviteDotcodeRoute;
   reposDotrepoIdRoute: typeof reposDotrepoIdRoute;
   reposDotrepoIdDotblobDotsplatRoute: typeof reposDotrepoIdDotblobDotsplatRoute;
@@ -257,6 +270,13 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/welcome": {
+      id: "/welcome";
+      path: "/welcome";
+      fullPath: "/welcome";
+      preLoaderRoute: typeof welcomeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/repos": {
       id: "/repos";
       path: "/repos";
@@ -432,6 +452,7 @@ const shellRouteWithChildren = shellRoute._addFileChildren(shellRouteChildren);
 const rootRouteChildren: RootRouteChildren = {
   shellRoute: shellRouteWithChildren,
   reposRoute: reposRoute,
+  welcomeRoute: welcomeRoute,
   inviteDotcodeRoute: inviteDotcodeRoute,
   reposDotrepoIdRoute: reposDotrepoIdRoute,
   reposDotrepoIdDotblobDotsplatRoute: reposDotrepoIdDotblobDotsplatRoute,

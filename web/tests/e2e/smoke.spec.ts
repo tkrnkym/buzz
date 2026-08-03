@@ -1405,6 +1405,8 @@ test("adding a custom emoji publishes the whole kind:30030 set", async ({
   await relay.install();
 
   await page.goto("/settings");
+  // Custom emoji moved under the Channels panel when Settings became a left nav.
+  await page.getByTestId("settings-nav-channels").click();
   await page.getByTestId("emoji-shortcode").fill("shipit");
   await page.getByTestId("emoji-url").fill(SHIPIT_URL);
   await page.getByTestId("add-emoji").click();
@@ -3364,6 +3366,7 @@ test("notification settings are per-browser and survive navigation", async ({
   await relay.install();
 
   await page.goto("/settings");
+  await page.getByTestId("settings-nav-notifications").click();
   const settings = page.getByTestId("notification-settings");
   // Quiet by default: a client that announced without being asked would start
   // making noise on a machine nobody chose.
@@ -3378,9 +3381,208 @@ test("notification settings are per-browser and survive navigation", async ({
 
   await page.goto("/home");
   await page.goto("/settings");
+  await page.getByTestId("settings-nav-notifications").click();
   await expect(page.getByTestId("notify-sound")).toBeChecked();
   // Nothing about this was published — it describes the machine, not the account.
   expect(
     relay.published.some((event) => (event as { kind: number }).kind === 30078),
   ).toBe(false);
+});
+
+// --- Settings panels, harness, templates, feedback -------------------------
+//
+// Settings became a left nav when it grew past a dozen sections; see
+// `settings-nav.ts`. These assert the nav reaches each panel and that the two
+// surfaces with real behaviour behind them work.
+
+test("settings reaches every panel, and only one at a time", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  // Account is the landing panel: everyone touches it.
+  await expect(page.getByTestId("settings-display-name")).toBeVisible();
+
+  for (const panel of [
+    "notifications",
+    "community",
+    "agents",
+    "channels",
+    "advanced",
+  ]) {
+    await page.getByTestId(`settings-nav-${panel}`).click();
+    await expect(
+      page
+        .getByTestId(`settings-nav-${panel}`)
+        .and(page.locator('[aria-current="page"]')),
+    ).toBeVisible();
+  }
+  // Switching away really unmounts: a nav that only scrolled would leave the
+  // profile form on screen.
+  await expect(page.getByTestId("settings-display-name")).toHaveCount(0);
+});
+
+test("the mock-backed settings panels say they are not connected", async ({
+  page,
+}) => {
+  // The seam that matters more than any of their contents: `useShowcase()` hands
+  // back nothing outside the demo build, and each panel then says so. Showing a
+  // reader pointed at a real relay an invented harness list, or a template they
+  // never made, would be a lie the UI tells on every load.
+  //
+  // What those panels render *with* data is verified against the demo build in a
+  // browser, which is the only place the data exists.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+
+  await page.getByTestId("settings-nav-agents").click();
+  await expect(page.getByText("ハーネスの一覧はまだ")).toBeVisible();
+  await expect(page.getByTestId("harness-claude-code")).toHaveCount(0);
+  await expect(page.getByText("エージェントの既定値はまだ")).toBeVisible();
+
+  await page.getByTestId("settings-nav-channels").click();
+  await expect(page.getByText("テンプレートはまだリレーから")).toBeVisible();
+  await expect(page.getByTestId("add-template")).toHaveCount(0);
+
+  await page.getByTestId("settings-nav-advanced").click();
+  await expect(page.getByText("共有計算の状態はまだ")).toBeVisible();
+  await expect(page.getByText("アーカイブの状態はまだ")).toBeVisible();
+});
+
+test("feedback publishes kind:42000 with its category on a tag", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("settings-nav-advanced").click();
+  await page.getByTestId("open-feedback").click();
+
+  // An empty body is refused at ingest, so the button stays disabled rather than
+  // producing a rejection the reader has to decode.
+  await expect(page.getByTestId("submit-feedback")).toBeDisabled();
+  await page.getByTestId("feedback-category-bug").click();
+  await expect(page.getByTestId("submit-feedback")).toBeDisabled();
+  await page.getByTestId("feedback-body").fill("通知の音が大きい");
+  await page.getByTestId("submit-feedback").click();
+
+  const sent = relay.published.find(
+    (event) => (event as { kind: number }).kind === 42000,
+  ) as { tags: string[][]; content: string };
+  // At most one category tag — two is a rejection, not a last-one-wins.
+  expect(sent.tags).toEqual([["category", "bug"]]);
+  expect(sent.content).toBe("通知の音が大きい");
+});
+
+// --- Agent memory ----------------------------------------------------------
+
+test("an agent's memory section says it is not connected either", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/agents");
+  // The whole Agents screen is behind the same seam, so it never reaches the
+  // memory viewer here — asserted so a regression that started inventing agents
+  // fails on this rather than in front of a reader.
+  await expect(
+    page.getByText("エージェントはまだ接続されていません"),
+  ).toBeVisible();
+  await expect(page.getByTestId("memory-section")).toHaveCount(0);
+});
+
+// --- Communities -----------------------------------------------------------
+
+test("adding a community offers three doors and normalizes what is typed", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("add-community").click();
+  await expect(page.getByTestId("choose-join")).toBeVisible();
+
+  await page.getByTestId("choose-connect").click();
+  // A bare host becomes wss://, and the reader is shown that before connecting —
+  // guessing ws:// would silently downgrade them.
+  await page.getByTestId("relay-url-input").fill("relay.example.jp/");
+  await expect(page.getByTestId("add-community-dialog")).toContainText(
+    "wss://relay.example.jp",
+  );
+
+  await page.getByTestId("add-community-back").click();
+  await page.getByTestId("choose-create").click();
+  await page.getByTestId("hosted-name-input").fill("My-Team");
+  // Case is normalized rather than refused: the name becomes a hostname label.
+  await expect(page.getByTestId("add-community-dialog")).toContainText(
+    "wss://my-team.nuxx.host",
+  );
+});
+
+// --- Onboarding ------------------------------------------------------------
+
+test("onboarding says plainly that a browser key does not survive a reload", async ({
+  page,
+}) => {
+  // No NIP-07 extension installed, which is the case the desktop client never
+  // had to describe.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/welcome");
+  await expect(page.getByTestId("onboarding-welcome")).toBeVisible();
+  await page.getByTestId("onboarding-next").click();
+  await expect(page.getByTestId("onboarding-ephemeral-warning")).toBeVisible();
+  // Skippable: a reader with no extension to hand must not be trapped here.
+  await expect(page.getByTestId("onboarding-skip")).toBeVisible();
+});
+
+test("onboarding confirms custody when an extension holds the key", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/welcome");
+  await page.getByTestId("onboarding-next").click();
+  await expect(page.getByTestId("onboarding-pubkey")).toContainText(MY_PUBKEY);
+  await expect(page.getByTestId("onboarding-ephemeral-warning")).toHaveCount(0);
+});
+
+test("the profile typed during onboarding is published on the way out", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/welcome");
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-display-name").fill("テスト太郎");
+  await page.getByTestId("onboarding-next").click();
+
+  // Published leaving the profile step, not at the end: a reader who closes the
+  // tab on a later step should still have the name they typed.
+  const profile = relay.published.find(
+    (event) => (event as { kind: number }).kind === 0,
+  ) as { content: string };
+  expect(JSON.parse(profile.content).display_name).toBe("テスト太郎");
+
+  await expect(page.getByTestId("onboarding-done")).toBeVisible();
+  await page.getByTestId("onboarding-next").click();
+  await expect(page).toHaveURL(/\/$/);
 });
