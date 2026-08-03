@@ -205,6 +205,15 @@ function mockRelay(
     memberEvents?: unknown[];
     /** kind:30030 emoji sets, from which the palette is built. */
     emojiEvents?: unknown[];
+    /** Rows served for `GET /moderation/restricted`. */
+    restrictedRows?: unknown[];
+    /**
+     * Refuse every kind:9 with this message, verbatim.
+     *
+     * The only way to exercise a community timeout: the relay tells a member
+     * they are blocked by rejecting a write, and nothing else announces it.
+     */
+    rejectSendWith?: string;
   } = {},
 ) {
   const published: unknown[][] = [];
@@ -293,6 +302,22 @@ function mockRelay(
     searchRequests,
     socketCount: () => socketsOpened,
     install: async () => {
+      // The moderator reads are HTTP because the relay derives them from its own
+      // state — there is no kind to subscribe to. Answered here so a spec can
+      // assert the moderator surface without the client falling back to the
+      // preview server and getting a 404.
+      await page.route("**/moderation/**", async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        const rows = path.endsWith("/restricted")
+          ? (options.restrictedRows ?? [])
+          : [];
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(rows),
+        });
+      });
+
       await page.route("**/query", async (route) => {
         const body = JSON.parse(route.request().postData() ?? "{}") as {
           filters?: QueryFilter[];
@@ -326,6 +351,14 @@ function mockRelay(
               ...(options.emojiEvents ?? []),
               ...published.filter(
                 (event) => (event as { kind: number }).kind === 30030,
+              ),
+            );
+          } else if (filter.kinds?.includes(10000)) {
+            // Replaceable, and the only source is the reader themselves — so a
+            // mute published this session is what the timeline then filters on.
+            events.push(
+              ...published.filter(
+                (event) => (event as { kind: number }).kind === 10000,
               ),
             );
           } else if (filter.kinds?.includes(39002)) {
@@ -391,6 +424,17 @@ function mockRelay(
 
             if (verb === "EVENT") {
               published.push(frame[1]);
+              if (options.rejectSendWith && frame[1].kind === 9) {
+                ws.send(
+                  JSON.stringify([
+                    "OK",
+                    frame[1].id,
+                    false,
+                    options.rejectSendWith,
+                  ]),
+                );
+                return;
+              }
               const delay =
                 frame[1].kind === 30078 ? (options.delayReadStateOkMs ?? 0) : 0;
               if (delay > 0) {
@@ -426,6 +470,42 @@ function mockRelay(
               } else if (filter.kinds.includes(30078)) {
                 for (const readState of options.readStateEvents ?? []) {
                   ws.send(JSON.stringify(["EVENT", subId, readState]));
+                }
+              } else if (filter.kinds.includes(9) && filter["#p"]) {
+                // The notification subscriptions. Scoped by tag rather than by
+                // channel, so they need their own branches — the `#h` one below
+                // would inject its synthetic channel message under a filter that
+                // never asked for a room.
+                for (const extra of options.extraMessages ?? []) {
+                  const tags = (extra as { tags: string[][] }).tags;
+                  if (
+                    tags.some(
+                      (tag) => tag[0] === "p" && filter["#p"].includes(tag[1]),
+                    )
+                  ) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
+                }
+              } else if (filter.kinds.includes(9) && filter["#e"]) {
+                for (const extra of options.extraMessages ?? []) {
+                  const tags = (extra as { tags: string[][] }).tags;
+                  if (
+                    tags.some(
+                      (tag) => tag[0] === "e" && filter["#e"].includes(tag[1]),
+                    )
+                  ) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
+                }
+              } else if (filter.kinds.includes(9) && filter.authors) {
+                for (const extra of options.extraMessages ?? []) {
+                  if (
+                    filter.authors.includes(
+                      (extra as { pubkey: string }).pubkey,
+                    )
+                  ) {
+                    ws.send(JSON.stringify(["EVENT", subId, extra]));
+                  }
                 }
               } else if (filter.kinds.includes(9) && filter["#h"]) {
                 messageSubs.push({ subId, channelId: filter["#h"][0] });
@@ -1325,6 +1405,8 @@ test("adding a custom emoji publishes the whole kind:30030 set", async ({
   await relay.install();
 
   await page.goto("/settings");
+  // Custom emoji moved under the Channels panel when Settings became a left nav.
+  await page.getByTestId("settings-nav-channels").click();
   await page.getByTestId("emoji-shortcode").fill("shipit");
   await page.getByTestId("emoji-url").fill(SHIPIT_URL);
   await page.getByTestId("add-emoji").click();
@@ -2966,4 +3048,541 @@ test("the sidebar reaches every section, and lights only the current one", async
   for (const name of ["Pulse", "Projects", "Workflows", "Forum", "Reminders"]) {
     await expect(page.getByRole("link", { name })).toBeVisible();
   }
+});
+
+// --- Moderation ------------------------------------------------------------
+//
+// The identity is `MY_PUBKEY` throughout, and the message under test is always
+// someone else's — there is nothing on this menu that applies to your own
+// message, and the component returns null for it.
+
+/** Membership where the reader is an ordinary member. */
+function asMember() {
+  return {
+    memberEvents: [
+      memberList(CHANNEL_UUID, [
+        [MY_PUBKEY, "member"],
+        ["e".repeat(64), "member"],
+      ]),
+    ],
+  };
+}
+
+/** Membership where the reader may issue moderation commands. */
+function asAdmin(restrictedRows: unknown[] = []) {
+  return {
+    memberEvents: [
+      memberList(CHANNEL_UUID, [
+        [MY_PUBKEY, "admin"],
+        ["e".repeat(64), "member"],
+      ]),
+    ],
+    restrictedRows,
+  };
+}
+
+test("reporting a message publishes kind:1984 with the category on the e tag", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "報告される投稿");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await page.getByTestId(`report-message-${target.id}`).click();
+  await page.getByTestId("report-category-spam").click();
+  await page.getByTestId("report-note").fill("同じリンクの連投です");
+  await page.getByTestId("submit-report").click();
+
+  const report = relay.published.find(
+    (event) => (event as { kind: number }).kind === 1984,
+  ) as { tags: string[][]; content: string };
+  expect(report.tags).toContainEqual(["p", target.pubkey]);
+  // The category rides the e tag's third element, which is where the relay's
+  // triage reads it — not the content, which is prose for a human.
+  expect(report.tags).toContainEqual(["e", target.id, "spam"]);
+  expect(report.content).toBe("同じリンクの連投です");
+  // The dialog closes only once the relay has accepted it.
+  await expect(page.getByTestId("report-message-dialog")).toHaveCount(0);
+});
+
+test("a report cannot be submitted without a category", async ({ page }) => {
+  const target = markdownMessage("1", "理由なしの通報");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await page.getByTestId(`report-message-${target.id}`).click();
+  // A category is what makes a report sortable, so it is the one required field.
+  await expect(page.getByTestId("submit-report")).toBeDisabled();
+  await page.getByTestId("report-category-other").click();
+  await expect(page.getByTestId("submit-report")).toBeEnabled();
+});
+
+test("muting an author publishes the whole list and hides their messages", async ({
+  page,
+}) => {
+  const theirs = markdownMessage("1", "消えるべき発言");
+  const mine = myMessage("2", "残るべき発言");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...asMember(),
+    extraMessages: [theirs, mine],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await expect(page.getByText("消えるべき発言")).toBeVisible();
+
+  await page.getByTestId(`message-moderation-${theirs.id}`).click();
+  await page.getByTestId(`mute-author-${theirs.id}`).click();
+
+  const list = relay.published.find(
+    (event) => (event as { kind: number }).kind === 10000,
+  ) as { tags: string[][] };
+  // kind 10000 is replaceable, so the event is the complete list — publishing a
+  // delta would unmute everyone already on it.
+  expect(list.tags).toEqual([["p", theirs.pubkey]]);
+
+  // The person is hidden, not the message annotated: a row saying someone spoke
+  // is the thing a mute is for.
+  await expect(page.getByText("消えるべき発言")).toHaveCount(0);
+  await expect(page.getByText("残るべき発言")).toBeVisible();
+});
+
+test("a member is offered reporting and muting, but not moderation", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "誰かの発言");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await expect(page.getByTestId(`report-message-${target.id}`)).toBeVisible();
+  await expect(page.getByTestId(`mute-author-${target.id}`)).toBeVisible();
+  // The relay refuses these from a member anyway; offering them would be a
+  // button that exists to fail.
+  await expect(page.getByTestId(`ban-author-${target.id}`)).toHaveCount(0);
+  await expect(
+    page.getByTestId(`timeout-author-3600-${target.id}`),
+  ).toHaveCount(0);
+});
+
+test("an admin can time out an author, and the command carries no channel", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "度を越えた発言");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asAdmin(), extraMessages: [target] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await page.getByTestId(`timeout-author-3600-${target.id}`).click();
+
+  const command = relay.published.find(
+    (event) => (event as { kind: number }).kind === 9042,
+  ) as { tags: string[][] };
+  expect(command.tags).toContainEqual(["p", target.pubkey]);
+  // The community comes from the connection host. An `h` tag here does not
+  // narrow the timeout to one room — the relay rejects the command outright.
+  expect(command.tags.every((tag) => tag[0] !== "h")).toBe(true);
+  const expiration = command.tags.find((tag) => tag[0] === "expiration");
+  expect(Number(expiration?.[1])).toBeGreaterThan(Date.now() / 1000);
+});
+
+test("an author already timed out is offered the lift, not another timeout", async ({
+  page,
+}) => {
+  const target = markdownMessage("1", "すでに制限中の人");
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...asAdmin([
+      {
+        pubkey: target.pubkey,
+        banned: false,
+        banExpiresAt: null,
+        banReason: null,
+        mutedUntil: new Date(Date.now() + 3_600_000).toISOString(),
+        muteReason: null,
+        actorPubkey: MY_PUBKEY,
+        updatedAt: new Date().toISOString(),
+      },
+    ]),
+    extraMessages: [target],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${target.id}`).click();
+  await expect(page.getByTestId(`untimeout-author-${target.id}`)).toBeVisible();
+  await expect(
+    page.getByTestId(`timeout-author-3600-${target.id}`),
+  ).toHaveCount(0);
+});
+
+test("a timeout refusal becomes a banner rather than the relay's raw message", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...asMember(),
+    // A member learns they are timed out by being refused a send — the relay
+    // exposes no self-restriction read.
+    rejectSendWith: `restricted: you are timed out until ${
+      Math.floor(Date.now() / 1000) + 3600
+    }`,
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const composer = page.getByRole("textbox", { name: "Message #general" });
+  await composer.fill("送れるはずの一言");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const banner = page.getByTestId("composer-timeout-banner");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("タイムアウト中");
+  // The relay's wire message is a parse contract, not a sentence for a reader.
+  await expect(page.getByText("restricted: you are timed out")).toHaveCount(0);
+  // The text survives, because a refused send must not cost the author their
+  // message.
+  await expect(composer).toHaveText("送れるはずの一言");
+});
+
+// --- Notifications ---------------------------------------------------------
+//
+// The Inbox's upper half. Built from real filters rather than the activity
+// snapshots the room list below it uses — see `notifications-model` for the four
+// and why a reply needs two of them.
+
+test("the inbox lists mentions and DMs addressed to the reader", async ({
+  page,
+}) => {
+  const mention = {
+    ...markdownMessage("1", "レビューお願いします"),
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["p", MY_PUBKEY],
+    ],
+  };
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraMessages: [mention] });
+  await relay.install();
+
+  await page.goto("/home");
+  const rows = page.getByTestId("notification-rows");
+  await expect(rows.getByText("レビューお願いします")).toBeVisible();
+  // Labelled as a mention, and the room is named — that pair is what decides
+  // whether the reader opens it.
+  await expect(rows.getByText("メンション")).toBeVisible();
+  await expect(rows.getByText("#general")).toBeVisible();
+
+  // A `#p` filter, not a scan of the community.
+  const filter = relay.subscriptions.find(
+    (candidate) => candidate["#p"] !== undefined,
+  );
+  expect(filter?.["#p"]).toEqual([MY_PUBKEY]);
+  expect(filter?.kinds).toEqual([9, 40002]);
+});
+
+test("an ordinary channel message is not a notification", async ({ page }) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    extraMessages: [markdownMessage("1", "誰にも宛てていない発言")],
+  });
+  await relay.install();
+
+  await page.goto("/home");
+  // The room list may well show the channel moved; this half is only for what
+  // was addressed to the reader.
+  await expect(page.getByTestId("notifications-empty")).toBeVisible();
+});
+
+test("a notification links to the message, not just the room", async ({
+  page,
+}) => {
+  const mention = {
+    ...markdownMessage("1", "ここを見てください"),
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["p", MY_PUBKEY],
+    ],
+  };
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { extraMessages: [mention] });
+  await relay.install();
+
+  await page.goto("/home");
+  await page.getByTestId(`notification-${mention.id}`).click();
+  // `m` anchors the view on the message, so following one lands on what was said
+  // rather than at the bottom of a busy channel. The router JSON-encodes search
+  // values, so the id arrives quoted — asserted on the parsed value rather than
+  // the raw string, which is what the route actually reads.
+  await expect(page).toHaveURL(new RegExp(`/c/${CHANNEL_UUID}\\?m=`));
+  const anchored = await page.evaluate(() => {
+    const raw = new URL(window.location.href).searchParams.get("m");
+    try {
+      return JSON.parse(raw ?? "");
+    } catch {
+      return raw;
+    }
+  });
+  expect(anchored).toBe(mention.id);
+});
+
+test("muting an author also silences their notifications", async ({ page }) => {
+  const mention = {
+    ...markdownMessage("1", "ミュート後は出ないはず"),
+    tags: [
+      ["h", CHANNEL_UUID],
+      ["p", MY_PUBKEY],
+    ],
+  };
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, { ...asMember(), extraMessages: [mention] });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  await page.getByTestId(`message-moderation-${mention.id}`).click();
+  await page.getByTestId(`mute-author-${mention.id}`).click();
+
+  await page.getByRole("link", { name: "Inbox" }).click();
+  // A mute that left the notification standing would be worse than useless.
+  await expect(page.getByTestId("notifications-empty")).toBeVisible();
+});
+
+test("notification settings are per-browser and survive navigation", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("settings-nav-notifications").click();
+  const settings = page.getByTestId("notification-settings");
+  // Quiet by default: a client that announced without being asked would start
+  // making noise on a machine nobody chose.
+  await expect(page.getByTestId("notify-sound")).not.toBeChecked();
+  await expect(settings.getByTestId("notify-only-hidden")).toBeChecked();
+  // Desktop notifications need a permission the headless browser has not given,
+  // so the request button stands in for the toggle.
+  await expect(page.getByTestId("notify-request-permission")).toBeVisible();
+
+  await page.getByTestId("notify-sound").check();
+  await expect(page.getByTestId("notify-test-sound")).toBeVisible();
+
+  await page.goto("/home");
+  await page.goto("/settings");
+  await page.getByTestId("settings-nav-notifications").click();
+  await expect(page.getByTestId("notify-sound")).toBeChecked();
+  // Nothing about this was published — it describes the machine, not the account.
+  expect(
+    relay.published.some((event) => (event as { kind: number }).kind === 30078),
+  ).toBe(false);
+});
+
+// --- Settings panels, harness, templates, feedback -------------------------
+//
+// Settings became a left nav when it grew past a dozen sections; see
+// `settings-nav.ts`. These assert the nav reaches each panel and that the two
+// surfaces with real behaviour behind them work.
+
+test("settings reaches every panel, and only one at a time", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  // Account is the landing panel: everyone touches it.
+  await expect(page.getByTestId("settings-display-name")).toBeVisible();
+
+  for (const panel of [
+    "notifications",
+    "community",
+    "agents",
+    "channels",
+    "advanced",
+  ]) {
+    await page.getByTestId(`settings-nav-${panel}`).click();
+    await expect(
+      page
+        .getByTestId(`settings-nav-${panel}`)
+        .and(page.locator('[aria-current="page"]')),
+    ).toBeVisible();
+  }
+  // Switching away really unmounts: a nav that only scrolled would leave the
+  // profile form on screen.
+  await expect(page.getByTestId("settings-display-name")).toHaveCount(0);
+});
+
+test("the mock-backed settings panels say they are not connected", async ({
+  page,
+}) => {
+  // The seam that matters more than any of their contents: `useShowcase()` hands
+  // back nothing outside the demo build, and each panel then says so. Showing a
+  // reader pointed at a real relay an invented harness list, or a template they
+  // never made, would be a lie the UI tells on every load.
+  //
+  // What those panels render *with* data is verified against the demo build in a
+  // browser, which is the only place the data exists.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+
+  await page.getByTestId("settings-nav-agents").click();
+  await expect(page.getByText("ハーネスの一覧はまだ")).toBeVisible();
+  await expect(page.getByTestId("harness-claude-code")).toHaveCount(0);
+  await expect(page.getByText("エージェントの既定値はまだ")).toBeVisible();
+
+  await page.getByTestId("settings-nav-channels").click();
+  await expect(page.getByText("テンプレートはまだリレーから")).toBeVisible();
+  await expect(page.getByTestId("add-template")).toHaveCount(0);
+
+  await page.getByTestId("settings-nav-advanced").click();
+  await expect(page.getByText("共有計算の状態はまだ")).toBeVisible();
+  await expect(page.getByText("アーカイブの状態はまだ")).toBeVisible();
+});
+
+test("feedback publishes kind:42000 with its category on a tag", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings");
+  await page.getByTestId("settings-nav-advanced").click();
+  await page.getByTestId("open-feedback").click();
+
+  // An empty body is refused at ingest, so the button stays disabled rather than
+  // producing a rejection the reader has to decode.
+  await expect(page.getByTestId("submit-feedback")).toBeDisabled();
+  await page.getByTestId("feedback-category-bug").click();
+  await expect(page.getByTestId("submit-feedback")).toBeDisabled();
+  await page.getByTestId("feedback-body").fill("通知の音が大きい");
+  await page.getByTestId("submit-feedback").click();
+
+  const sent = relay.published.find(
+    (event) => (event as { kind: number }).kind === 42000,
+  ) as { tags: string[][]; content: string };
+  // At most one category tag — two is a rejection, not a last-one-wins.
+  expect(sent.tags).toEqual([["category", "bug"]]);
+  expect(sent.content).toBe("通知の音が大きい");
+});
+
+// --- Agent memory ----------------------------------------------------------
+
+test("an agent's memory section says it is not connected either", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/agents");
+  // The whole Agents screen is behind the same seam, so it never reaches the
+  // memory viewer here — asserted so a regression that started inventing agents
+  // fails on this rather than in front of a reader.
+  await expect(
+    page.getByText("エージェントはまだ接続されていません"),
+  ).toBeVisible();
+  await expect(page.getByTestId("memory-section")).toHaveCount(0);
+});
+
+// --- Communities -----------------------------------------------------------
+
+test("adding a community offers three doors and normalizes what is typed", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("add-community").click();
+  await expect(page.getByTestId("choose-join")).toBeVisible();
+
+  await page.getByTestId("choose-connect").click();
+  // A bare host becomes wss://, and the reader is shown that before connecting —
+  // guessing ws:// would silently downgrade them.
+  await page.getByTestId("relay-url-input").fill("relay.example.jp/");
+  await expect(page.getByTestId("add-community-dialog")).toContainText(
+    "wss://relay.example.jp",
+  );
+
+  await page.getByTestId("add-community-back").click();
+  await page.getByTestId("choose-create").click();
+  await page.getByTestId("hosted-name-input").fill("My-Team");
+  // Case is normalized rather than refused: the name becomes a hostname label.
+  await expect(page.getByTestId("add-community-dialog")).toContainText(
+    "wss://my-team.nuxx.host",
+  );
+});
+
+// --- Onboarding ------------------------------------------------------------
+
+test("onboarding says plainly that a browser key does not survive a reload", async ({
+  page,
+}) => {
+  // No NIP-07 extension installed, which is the case the desktop client never
+  // had to describe.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/welcome");
+  await expect(page.getByTestId("onboarding-welcome")).toBeVisible();
+  await page.getByTestId("onboarding-next").click();
+  await expect(page.getByTestId("onboarding-ephemeral-warning")).toBeVisible();
+  // Skippable: a reader with no extension to hand must not be trapped here.
+  await expect(page.getByTestId("onboarding-skip")).toBeVisible();
+});
+
+test("onboarding confirms custody when an extension holds the key", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/welcome");
+  await page.getByTestId("onboarding-next").click();
+  await expect(page.getByTestId("onboarding-pubkey")).toContainText(MY_PUBKEY);
+  await expect(page.getByTestId("onboarding-ephemeral-warning")).toHaveCount(0);
+});
+
+test("the profile typed during onboarding is published on the way out", async ({
+  page,
+}) => {
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/welcome");
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-display-name").fill("テスト太郎");
+  await page.getByTestId("onboarding-next").click();
+
+  // Published leaving the profile step, not at the end: a reader who closes the
+  // tab on a later step should still have the name they typed.
+  const profile = relay.published.find(
+    (event) => (event as { kind: number }).kind === 0,
+  ) as { content: string };
+  expect(JSON.parse(profile.content).display_name).toBe("テスト太郎");
+
+  await expect(page.getByTestId("onboarding-done")).toBeVisible();
+  await page.getByTestId("onboarding-next").click();
+  await expect(page).toHaveURL(/\/$/);
 });

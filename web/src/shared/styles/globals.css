@@ -137,4 +137,12 @@
     @apply bg-background text-foreground antialiased;
     font-family: "Inter Variable", Inter, "Avenir Next", "Segoe UI", sans-serif;
   }
+
+  /* The backdrop of a native <dialog> is a pseudo-element, so it cannot be
+     reached from a wrapper's className — see shared/ui/dialog.tsx. Styled once
+     here rather than per dialog. */
+  dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.5);
+    backdrop-filter: blur(2px);
+  }
 }

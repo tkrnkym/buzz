@@ -5,6 +5,7 @@ import {
   AGENT_STATUS_LABELS,
   formatRelativeTime,
 } from "@/features/agents/agent-model";
+import { MemorySection } from "@/features/agents/ui/MemorySection";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import type { ShowcaseAgent } from "@/mock/showcase";
@@ -89,6 +90,11 @@ export function AgentDetailPanel({
         />
         <Field label="今日のターン数" value={`${agent.turnsToday}`} />
       </dl>
+
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <h3 className="text-2xs font-medium text-muted-foreground">メモリ</h3>
+        <MemorySection agentPubkey={agent.pubkey} />
+      </div>
 
       <div className="mt-auto flex flex-col gap-2">
         <div className="flex gap-2">

@@ -22,6 +22,10 @@ export const routes = rootRoute("root.tsx", [
     route("/settings", "settings.tsx"),
   ]),
   route("/invite/$code", "invite.$code.tsx"),
+  // Onboarding sits outside the shell too: it needs no relay socket, and a
+  // sidebar full of empty channels is the wrong first thing to show someone who
+  // has not decided whether to install a signer yet.
+  route("/welcome", "welcome.tsx"),
   // The repo browser is a separate destination, deliberately outside the shell:
   // it reads git over HTTP and needs no relay socket at all.
   route("/repos", "repos.tsx"),

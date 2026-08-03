@@ -223,6 +223,96 @@ export interface CommunityMember {
   timeoutUntil: number | null;
 }
 
+/**
+ * An agent harness — the runtime that actually executes an agent's turns.
+ *
+ * `available` is the whole point of the list: a harness the machine does not have
+ * installed is still worth showing, because the reader's next question is how to
+ * get it. Hiding it would turn "not installed" into "does not exist".
+ */
+export interface Harness {
+  id: string;
+  name: string;
+  command: string;
+  version: string | null;
+  available: boolean;
+  /** Where to get it, for one that is not installed. */
+  installUrl: string;
+  /** Added by the reader rather than shipped in the catalog. */
+  custom?: boolean;
+}
+
+/** Defaults an agent inherits unless it overrides them. */
+export interface AgentDefaults {
+  provider: string;
+  model: string;
+  effort: "low" | "medium" | "high";
+  harnessId: string;
+  env: { key: string; value: string; secret: boolean }[];
+}
+
+/**
+ * A channel template: the rooms someone creates over and over.
+ *
+ * Carries the agents to invite as well as the topic, because the reason to keep
+ * a template is rarely the name — it is not having to re-add the same three
+ * agents each time.
+ */
+export interface ChannelTemplate {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "open" | "private";
+  agentIds: string[];
+  usedCount: number;
+}
+
+/** A machine sharing inference capacity with the community. */
+export interface MeshNode {
+  status: "off" | "starting" | "serving";
+  model: string;
+  maxVramGb: number;
+  servingRequests: number;
+  /** Null when nothing is downloading. */
+  download: { model: string; receivedBytes: number; totalBytes: number } | null;
+  installedModels: string[];
+}
+
+/** A standing request to keep copies of some events locally. */
+export interface ArchiveSubscription {
+  id: string;
+  scope: string;
+  kinds: number[];
+  events: number;
+  lastSyncedAt: number;
+}
+
+/** An archived identity — a member who left, whose history is kept. */
+export interface ArchivedIdentity {
+  pubkey: string;
+  archivedAt: number;
+  archivedBy: string;
+  reason: string | null;
+}
+
+/** One of an agent's memories (NIP kind 30174 engram). */
+export interface MemoryEntry {
+  slug: string;
+  body: string;
+  updatedAt: number;
+}
+
+/** A community this reader can switch to. */
+export interface ShowcaseCommunity {
+  id: string;
+  name: string;
+  relayUrl: string;
+  memberCount: number;
+  /** Hosted communities are provisioned rather than self-run. */
+  hosted: boolean;
+  joinPolicy: "open" | "invite" | "closed";
+}
+
 export interface Showcase {
   agents: ShowcaseAgent[];
   agentTeams: ShowcaseAgentTeam[];
@@ -233,6 +323,15 @@ export interface Showcase {
   forum: ForumPost[];
   huddle: HuddleState;
   members: CommunityMember[];
+  harnesses: Harness[];
+  agentDefaults: AgentDefaults;
+  channelTemplates: ChannelTemplate[];
+  mesh: MeshNode;
+  archiveSubscriptions: ArchiveSubscription[];
+  archivedIdentities: ArchivedIdentity[];
+  /** Keyed by agent pubkey. */
+  agentMemories: Record<string, MemoryEntry[]>;
+  communities: ShowcaseCommunity[];
 }
 
 export const SHOWCASE: Showcase = {
@@ -746,6 +845,179 @@ export const SHOWCASE: Showcase = {
       role: "admin",
       joinedAt: ago(60 * 24 * 210),
       timeoutUntil: null,
+    },
+  ],
+
+  // One harness missing on purpose. A catalog where everything is installed
+  // never shows the state a reader actually arrives in.
+  harnesses: [
+    {
+      id: "claude-code",
+      name: "Claude Code",
+      command: "claude",
+      version: "2.4.1",
+      available: true,
+      installUrl: "https://claude.com/claude-code",
+    },
+    {
+      id: "codex",
+      name: "Codex CLI",
+      command: "codex",
+      version: "0.48.0",
+      available: true,
+      installUrl: "https://github.com/openai/codex",
+    },
+    {
+      id: "gemini-cli",
+      name: "Gemini CLI",
+      command: "gemini",
+      version: null,
+      available: false,
+      installUrl: "https://github.com/google-gemini/gemini-cli",
+    },
+    {
+      id: "sprig",
+      name: "sprig",
+      command: "sprig",
+      version: "0.9.2",
+      available: true,
+      installUrl: "https://github.com/tkrnkym/nuxx",
+      custom: true,
+    },
+  ],
+
+  agentDefaults: {
+    provider: "anthropic",
+    model: "claude-opus-5",
+    effort: "medium",
+    harnessId: "claude-code",
+    env: [
+      { key: "NUXX_RELAY_URL", value: "wss://relay.example.jp", secret: false },
+      { key: "ANTHROPIC_API_KEY", value: "sk-ant-…", secret: true },
+    ],
+  },
+
+  channelTemplates: [
+    {
+      id: "tpl-incident",
+      name: "障害対応",
+      topic: "一次対応と時系列の記録",
+      visibility: "private",
+      agentIds: ["agent-triage", "agent-release"],
+      usedCount: 7,
+    },
+    {
+      id: "tpl-review",
+      name: "リリースレビュー",
+      topic: "リリース前の確認",
+      visibility: "open",
+      agentIds: ["agent-reviewer"],
+      usedCount: 12,
+    },
+    {
+      id: "tpl-onboarding",
+      name: "新メンバー受け入れ",
+      topic: "最初の一週間",
+      visibility: "private",
+      agentIds: [],
+      usedCount: 3,
+    },
+  ],
+
+  mesh: {
+    status: "serving",
+    model: "qwen3-coder:30b",
+    maxVramGb: 24,
+    servingRequests: 3,
+    // A download in flight, because the idle state says nothing about progress.
+    download: {
+      model: "deepseek-r1:14b",
+      receivedBytes: 6_100_000_000,
+      totalBytes: 9_000_000_000,
+    },
+    installedModels: ["qwen3-coder:30b", "llama3.3:70b"],
+  },
+
+  archiveSubscriptions: [
+    {
+      id: "arc-general",
+      scope: "#general",
+      kinds: [9, 40002, 40099],
+      events: 12_480,
+      lastSyncedAt: ago(4),
+    },
+    {
+      id: "arc-agent-frames",
+      scope: "自分のエージェントのセッション",
+      kinds: [20100],
+      events: 3_204,
+      lastSyncedAt: ago(11),
+    },
+  ],
+
+  archivedIdentities: [
+    {
+      pubkey: "9".repeat(64),
+      archivedAt: ago(60 * 24 * 45),
+      archivedBy: MISAKI,
+      reason: "退職",
+    },
+  ],
+
+  agentMemories: {
+    [AGENT_REVIEWER]: [
+      {
+        slug: "mem/core",
+        body: "このコミュニティのレビュー方針。[[mem/style/japanese]] と [[mem/policy/tests]] を守る。",
+        updatedAt: ago(60 * 24 * 12),
+      },
+      {
+        slug: "mem/style/japanese",
+        body: "レビューコメントは敬体。指摘は理由とセットで書く。",
+        updatedAt: ago(60 * 24 * 12),
+      },
+      {
+        slug: "mem/policy/tests",
+        body: "テストのない変更は原則指摘する。ただし設定ファイルのみの変更は除く。[[mem/policy/exceptions]]",
+        updatedAt: ago(60 * 24 * 3),
+      },
+      {
+        // Reachable from nothing — an orphan, which the viewer lists separately.
+        slug: "mem/notes/scratch",
+        body: "リリース手順のメモ。あとで整理する。",
+        updatedAt: ago(60 * 24 * 30),
+      },
+    ],
+    [AGENT_TRIAGE]: [
+      {
+        slug: "mem/core",
+        body: "受け付けた不具合の振り分け方。[[mem/labels]]",
+        updatedAt: ago(60 * 24 * 5),
+      },
+      {
+        slug: "mem/labels",
+        body: "bug / enhancement / question の三つに寄せる。判断に迷ったら question。",
+        updatedAt: ago(60 * 24 * 5),
+      },
+    ],
+  },
+
+  communities: [
+    {
+      id: "community-nuxx",
+      name: "Nuxx 開発",
+      relayUrl: "wss://relay.example.jp",
+      memberCount: 24,
+      hosted: false,
+      joinPolicy: "invite",
+    },
+    {
+      id: "community-design",
+      name: "デザイン部",
+      relayUrl: "wss://design.nuxx.host",
+      memberCount: 8,
+      hosted: true,
+      joinPolicy: "open",
     },
   ],
 };

@@ -85,6 +85,46 @@ export const KIND_FORUM_POST = 45001;
 export const KIND_FORUM_COMMENT = 45003;
 
 /**
+ * NIP-56 report — a member telling the moderators about an event or a person.
+ *
+ * The category rides the `e` tag's third element rather than the content, which
+ * is what lets the relay triage a report without reading prose.
+ */
+export const KIND_REPORT = 1984;
+
+/**
+ * Community moderation commands, signed by a moderator.
+ *
+ * Commands, not records: the relay validates each one against the actor's role,
+ * applies it, and exposes the outcome through `/moderation/*`. None of them
+ * carries an `h` tag — the community comes from the connection host, and a
+ * channel-scoped moderation command is rejected rather than narrowed.
+ */
+export const KIND_MODERATION_BAN = 9040;
+export const KIND_MODERATION_UNBAN = 9041;
+export const KIND_MODERATION_TIMEOUT = 9042;
+export const KIND_MODERATION_UNTIMEOUT = 9043;
+export const KIND_MODERATION_RESOLVE_REPORT = 9044;
+
+/**
+ * Product feedback.
+ *
+ * Accepted at ingest and sidecarred to the deployment's feedback table — never
+ * stored as an event and never fanned out. So this is the one kind a client
+ * publishes that nobody, including its author, can read back.
+ */
+export const KIND_PRODUCT_FEEDBACK = 42000;
+
+/**
+ * NIP-51 mute list — people this reader does not want to see.
+ *
+ * A personal list, unlike everything else above: nothing is asked of the relay
+ * and no moderator is involved, so muting works for an ordinary member and is
+ * invisible to the person muted.
+ */
+export const KIND_MUTE_LIST = 10000;
+
+/**
  * Relay-signed channel activity snapshot.
  *
  * One event carries the last-activity timestamp for a whole shard of channels,

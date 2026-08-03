@@ -20,6 +20,7 @@
 import {
   KIND_CHANNEL_ACTIVITY_SNAPSHOT,
   KIND_NIP29_GROUP_MEMBERS,
+  KIND_NIP29_GROUP_METADATA,
   KIND_PRESENCE_UPDATE,
   KIND_PROFILE,
   KIND_STREAM_MESSAGE,
@@ -32,8 +33,13 @@ import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
 
 import {
   ACTIVITY,
+  ADDRESSED_TO_VISITOR_IDS,
   CH_ANNOUNCE,
   CH_DESIGN,
+  CH_DM,
+  MODERATION_AUDIT,
+  MODERATION_REPORTS,
+  MODERATION_RESTRICTED,
   OLDER_MESSAGES,
   PRESENCE,
   SEEDED,
@@ -109,6 +115,7 @@ let enrolled: string | null = null;
 function enrolVisitor(pubkey: string): void {
   if (!pubkey || enrolled === pubkey) return;
   enrolled = pubkey;
+  addressVisitor(pubkey);
   for (let index = 0; index < store.length; index++) {
     const event = store[index];
     if (event.kind !== KIND_NIP29_GROUP_MEMBERS) continue;
@@ -119,8 +126,45 @@ function enrolVisitor(pubkey: string): void {
     if (event.tags.some((tag) => tag[0] === "p" && tag[1] === pubkey)) continue;
     store[index] = {
       ...event,
-      tags: [...event.tags, ["p", pubkey, "", "member"]],
+      // Admin, so the demo can show the moderator surfaces at all. A real
+      // visitor to a real community would be a member and would correctly find
+      // the report queue closed to them — this is the one place the demo grants
+      // itself something, and it grants it in the seeded membership rather than
+      // by weakening the client's gate.
+      tags: [...event.tags, ["p", pubkey, "", "admin"]],
     };
+  }
+}
+
+/**
+ * Address a couple of seeded events to the visitor, and put them in the DM.
+ *
+ * The notification list is built from `p` tags and DM membership, so a visitor
+ * nobody has ever addressed sees an empty one — truthfully, but it demonstrates
+ * nothing. Their key is ephemeral and unknown at seed time, which is why this
+ * runs at AUTH rather than living in `demo-data`.
+ *
+ * Only the two messages named here are rewritten. Tagging every message would
+ * make the demo look like a community that mentions one person constantly.
+ */
+function addressVisitor(pubkey: string): void {
+  for (let index = 0; index < store.length; index++) {
+    const event = store[index];
+    if (ADDRESSED_TO_VISITOR_IDS.includes(event.id)) {
+      store[index] = { ...event, tags: [...event.tags, ["p", pubkey]] };
+      continue;
+    }
+    // Join the seeded DM, so its messages read as DMs rather than as a room the
+    // visitor happens to be able to see.
+    const isDmChannel =
+      event.kind === KIND_NIP29_GROUP_METADATA &&
+      event.tags.some((tag) => tag[0] === "d" && tag[1] === CH_DM);
+    if (
+      isDmChannel &&
+      !event.tags.some((tag) => tag[0] === "p" && tag[1] === pubkey)
+    ) {
+      store[index] = { ...event, tags: [...event.tags, ["p", pubkey]] };
+    }
   }
 }
 
@@ -255,6 +299,21 @@ function answerQuery(filters: CursorFilter[]): NostrEvent[] {
 }
 
 /**
+ * Fixture rows for a `/moderation/*` read, or `null` when the URL is not one.
+ *
+ * These are not events, so they cannot come from the store — the relay derives
+ * them from its own tables. The demo serves them unauthenticated, which the real
+ * endpoints never do: there is nobody here to authorize against.
+ */
+function moderationFixture(url: string): unknown[] | null {
+  const path = new URL(url, window.location.origin).pathname;
+  if (path.endsWith("/moderation/reports")) return MODERATION_REPORTS;
+  if (path.endsWith("/moderation/restricted")) return MODERATION_RESTRICTED;
+  if (path.endsWith("/moderation/audit")) return MODERATION_AUDIT;
+  return null;
+}
+
+/**
  * Route `POST …/query` to the in-memory store; leave every other request to
  * the real `fetch`. Installed once, before the app mounts.
  */
@@ -279,6 +338,15 @@ function installMockQuery(): void {
     if (url.includes("/media/upload")) {
       return new Response("uploads are disabled in the static demo", {
         status: 403,
+      });
+    }
+    // The moderator reads. Matched on the path rather than the whole URL because
+    // two of them carry a query string.
+    const moderation = moderationFixture(url);
+    if (moderation) {
+      return new Response(JSON.stringify(moderation), {
+        status: 200,
+        headers: { "content-type": "application/json" },
       });
     }
     return realFetch(input, init);

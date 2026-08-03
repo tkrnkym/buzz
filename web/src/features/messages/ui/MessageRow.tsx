@@ -8,6 +8,7 @@ import { MessageEditor } from "@/features/messages/ui/MessageEditor";
 import { MessageReactions } from "@/features/messages/ui/MessageReactions";
 import { MessageTimestamp } from "@/features/messages/ui/MessageTimestamp";
 import { ThreadSummaryRow } from "@/features/messages/ui/ThreadSummaryRow";
+import { MessageModerationMenu } from "@/features/moderation/ui/MessageModerationMenu";
 import {
   resolveAvatarUrl,
   resolveUserLabel,
@@ -230,6 +231,16 @@ export function MessageRow({
           }}
           onReply={() => actions.onReply(row)}
           reactedEmojis={row.reactions.map((reaction) => reaction.emoji)}
+          // Omitted on the reader's own message: there is nothing on that menu
+          // that applies to yourself, and mounting it would still run its queries.
+          moderationMenu={
+            isMine ? undefined : (
+              <MessageModerationMenu
+                authorPubkey={message.pubkey}
+                messageId={message.id}
+              />
+            )
+          }
         />
       )}
     </div>
