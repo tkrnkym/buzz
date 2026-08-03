@@ -194,7 +194,20 @@ E2E tests live in `crates/nuxx-test-client/tests/`:
 - `e2e_media_extended.rs` — extended media scenarios
 - `e2e_nostr_interop.rs` — Nostr interop (NIP-50 search, NIP-10 threads, NIP-17 gift wraps)
 
-Web E2E: `cd web && pnpm exec playwright test`
+Web E2E: `just web-e2e` (or `pnpm -C web test:e2e`). Two Playwright projects
+over two bundles, because the mock-up screens only have data in one of them:
+
+- `smoke` — `tests/e2e/smoke.spec.ts` against the ordinary bundle (`dist/`,
+  port 4173). Run alone with `just web-e2e-smoke`.
+- `showcase` — `tests/e2e/showcase.spec.ts` against the demo bundle
+  (`VITE_MOCK_RELAY=1` → `dist-mock/`, port 4174), where `src/mock/showcase.ts`
+  backs Workflows / Agents / Projects / Forum / Reminders / members / huddle /
+  Pulse. Run alone with `just web-e2e-showcase`.
+
+Both `pnpm build` and `pnpm build:mock` run before either project, since
+Playwright starts both preview servers regardless of which project is selected.
+A new spec file needs a `testMatch` entry on one of the two projects in
+`web/playwright.config.ts` or it will not run at all.
 
 See [TESTING.md](TESTING.md) for the full multi-agent E2E guide.
 

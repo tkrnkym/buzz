@@ -2,6 +2,7 @@ import { useLocation, useParams, useSearch } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { ProfileStoreProvider } from "@/features/profile/profile-store";
+import { ShowcaseStoreProvider } from "@/features/showcase/showcase-store";
 import { ShellProvider, useShell } from "@/features/shell/shell-context";
 import { AppSidebar } from "@/features/shell/ui/AppSidebar";
 import { resolveShellView } from "@/features/shell/lib/shell-view";
@@ -32,9 +33,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     // is the same object the timeline reads — one fetch per identity, not one
     // per surface that mentions them.
     <ProfileStoreProvider>
-      <ShellProvider>
-        <AppShellFrame>{children}</AppShellFrame>
-      </ShellProvider>
+      {/* The mock-up fixtures, above the shell so something created on the
+          Workflows screen is still there after navigating to its detail page. */}
+      <ShowcaseStoreProvider>
+        <ShellProvider>
+          <AppShellFrame>{children}</AppShellFrame>
+        </ShellProvider>
+      </ShowcaseStoreProvider>
     </ProfileStoreProvider>
   );
 }

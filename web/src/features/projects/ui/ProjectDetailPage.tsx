@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CircleDot, GitPullRequest } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { openCounts } from "@/features/projects/project-model";
 import {
@@ -9,8 +10,20 @@ import {
   IssuesPanel,
   PullRequestsPanel,
 } from "@/features/projects/ui/ProjectPanels";
+import {
+  addIssue,
+  addPullRequest,
+  mergePullRequest,
+  setIssueState,
+} from "@/features/projects/project-mutations";
+import { useMyPubkey } from "@/features/chat/use-chat";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
+import { FormDialog } from "@/shared/ui/form-dialog";
 import { cn } from "@/shared/lib/cn";
 
 type Tab = "overview" | "issues" | "pulls" | "branches";
@@ -24,7 +37,10 @@ type Tab = "overview" | "issues" | "pulls" | "branches";
  */
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
   const [tab, setTab] = useState<Tab>("overview");
+  const [creating, setCreating] = useState<"issue" | "pull" | null>(null);
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
 
   const project = showcase?.projects.find(
@@ -56,13 +72,37 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   return (
     <ShowcasePage
       actions={
-        <Link
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-2xs font-medium hover:bg-accent"
-          to="/projects"
-        >
-          <ArrowLeft aria-hidden className="size-3" />
-          一覧へ
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {update && (
+            <>
+              <button
+                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-2xs font-medium hover:bg-accent"
+                data-testid="new-issue"
+                onClick={() => setCreating("issue")}
+                type="button"
+              >
+                <CircleDot aria-hidden className="size-3" />
+                Issue
+              </button>
+              <button
+                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-2xs font-medium hover:bg-accent"
+                data-testid="new-pull-request"
+                onClick={() => setCreating("pull")}
+                type="button"
+              >
+                <GitPullRequest aria-hidden className="size-3" />
+                PR
+              </button>
+            </>
+          )}
+          <Link
+            className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-2xs font-medium hover:bg-accent"
+            to="/projects"
+          >
+            <ArrowLeft aria-hidden className="size-3" />
+            一覧へ
+          </Link>
+        </div>
       }
       subtitle={project.repo}
       title={project.name}
@@ -106,11 +146,51 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           </div>
         )}
         {tab === "issues" && (
-          <IssuesPanel issues={project.issues} nowSeconds={nowSeconds} />
+          <IssuesPanel
+            issues={project.issues}
+            nowSeconds={nowSeconds}
+            onToggleState={
+              update
+                ? (issue) => {
+                    const next = issue.state === "open" ? "closed" : "open";
+                    update((current) =>
+                      setIssueState(
+                        current,
+                        project.id,
+                        issue.id,
+                        next,
+                        Math.floor(Date.now() / 1000),
+                      ),
+                    );
+                    toast.success(
+                      next === "closed"
+                        ? `#${issue.number} を閉じました`
+                        : `#${issue.number} を開き直しました`,
+                    );
+                  }
+                : undefined
+            }
+          />
         )}
         {tab === "pulls" && (
           <PullRequestsPanel
             nowSeconds={nowSeconds}
+            onMerge={
+              update
+                ? (pull) => {
+                    update((current) =>
+                      mergePullRequest(
+                        current,
+                        project.id,
+                        pull.id,
+                        myPubkey ?? "",
+                        Math.floor(Date.now() / 1000),
+                      ),
+                    );
+                    toast.success(`#${pull.number} をマージしました`);
+                  }
+                : undefined
+            }
             pullRequests={project.pullRequests}
           />
         )}
@@ -122,6 +202,90 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           />
         )}
       </div>
+
+      {creating === "issue" && update && (
+        <FormDialog
+          description="困っていることや、やることを書きます。"
+          fields={[
+            {
+              name: "title",
+              label: "タイトル",
+              placeholder: "起動時に一瞬白い画面が出る",
+              required: true,
+            },
+            {
+              name: "labels",
+              label: "ラベル",
+              placeholder: "bug, ui",
+              hint: "カンマで区切ります。",
+            },
+          ]}
+          onClose={() => setCreating(null)}
+          onSubmit={(values) => {
+            update((current) =>
+              addIssue(
+                current,
+                project.id,
+                {
+                  title: values.title,
+                  labels: (values.labels ?? "")
+                    .split(",")
+                    .map((label) => label.trim())
+                    .filter(Boolean),
+                },
+                nextMockId("issue"),
+                myPubkey ?? "",
+                Math.floor(Date.now() / 1000),
+              ),
+            );
+            setCreating(null);
+            setTab("issues");
+            toast.success("Issue を作りました");
+          }}
+          submitLabel="作成する"
+          testId="create-issue-dialog"
+          title="Issue を作る"
+        />
+      )}
+
+      {creating === "pull" && update && (
+        <FormDialog
+          description="変更をレビューに出します。"
+          fields={[
+            {
+              name: "title",
+              label: "タイトル",
+              placeholder: "白い画面が出るのを直す",
+              required: true,
+            },
+            {
+              name: "branch",
+              label: "ブランチ",
+              placeholder: "fix/flash-of-white",
+              required: true,
+            },
+          ]}
+          onClose={() => setCreating(null)}
+          onSubmit={(values) => {
+            update((current) =>
+              addPullRequest(
+                current,
+                project.id,
+                { title: values.title, branch: values.branch },
+                nextMockId("pull"),
+                myPubkey ?? "",
+                Math.floor(Date.now() / 1000),
+              ),
+            );
+            setCreating(null);
+            setTab("pulls");
+            toast.success("PR を作りました");
+          }}
+          submitLabel="作成する"
+          testId="create-pull-dialog"
+          title="PR を作る"
+        />
+      )}
     </ShowcasePage>
   );
 }

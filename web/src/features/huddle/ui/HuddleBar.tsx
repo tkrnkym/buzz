@@ -1,13 +1,23 @@
-import { Bot, Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
+import { Bot, Mic, MicOff, PhoneOff, UserPlus, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { formatRelativeTime } from "@/features/agents/agent-model";
 import {
   resolveAvatarUrl,
   resolveUserLabel,
 } from "@/features/profile/profile-model";
+import { useMyPubkey } from "@/features/chat/use-chat";
 import { useProfiles } from "@/features/profile/profile-store";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  addHuddleParticipant,
+  setHuddleMuted,
+} from "@/features/showcase/showcase-mutations";
+import {
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
+import { Menu, MenuItem } from "@/shared/ui/menu";
 import { cn } from "@/shared/lib/cn";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
@@ -23,6 +33,8 @@ import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
  */
 export function HuddleBar() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
   const [dismissed, setDismissed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [nowSeconds, setNowSeconds] = useState(() =>
@@ -98,11 +110,66 @@ export function HuddleBar() {
       </ul>
 
       <div className="ml-auto flex items-center gap-2">
+        {update && (
+          <Menu
+            label="ハドルにエージェントを呼ぶ"
+            testId="huddle-add-agent"
+            trigger={<UserPlus />}
+          >
+            {(close) => {
+              // Only agents not already in the call: offering someone who is
+              // standing there is a menu item that cannot do anything.
+              const candidates = (showcase?.agents ?? []).filter(
+                (agent) =>
+                  !participants.some((row) => row.pubkey === agent.pubkey),
+              );
+              if (candidates.length === 0) {
+                return (
+                  <p className="px-2 py-1.5 text-badge text-muted-foreground">
+                    呼べるエージェントがいません。
+                  </p>
+                );
+              }
+              return candidates.map((agent) => (
+                <MenuItem
+                  icon={<Bot />}
+                  key={agent.id}
+                  onClick={() => {
+                    close();
+                    update((current) =>
+                      addHuddleParticipant(current, {
+                        pubkey: agent.pubkey,
+                        speaking: false,
+                        // An agent joins listening, with a transcript — it is not
+                        // talking the moment it arrives.
+                        muted: true,
+                        isAgent: true,
+                      }),
+                    );
+                    toast.success(`${agent.name} を呼びました`);
+                  }}
+                  testId={`huddle-invite-${agent.id}`}
+                >
+                  {agent.name}
+                </MenuItem>
+              ));
+            }}
+          </Menu>
+        )}
         <button
           aria-label={muted ? "ミュートを解除" : "ミュート"}
           className="flex size-7 items-center justify-center rounded-md border border-border hover:bg-accent"
           data-testid="huddle-mute"
-          onClick={() => setMuted((current) => !current)}
+          onClick={() => {
+            const next = !muted;
+            setMuted(next);
+            // Reflected on the reader's own avatar too, when they are in the
+            // call: a mute button that leaves your own badge unmuted is telling
+            // two stories about one microphone.
+            if (myPubkey) {
+              update?.((current) => setHuddleMuted(current, myPubkey, next));
+            }
+          }}
           type="button"
         >
           {muted ? (

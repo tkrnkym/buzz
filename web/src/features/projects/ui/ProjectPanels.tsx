@@ -43,9 +43,12 @@ function StatePill({ state }: { state: ProjectIssue["state"] }) {
 export function IssuesPanel({
   issues,
   nowSeconds,
+  onToggleState,
 }: {
   issues: ProjectIssue[];
   nowSeconds: number;
+  /** Omitted when there is nothing to write to. */
+  onToggleState?: (issue: ProjectIssue) => void;
 }) {
   const profiles = useProfiles(
     issues.flatMap((issue) =>
@@ -108,7 +111,19 @@ export function IssuesPanel({
               )}
             </div>
           </div>
-          <StatePill state={issue.state} />
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <StatePill state={issue.state} />
+            {onToggleState && (
+              <button
+                className="rounded-md border border-border px-2 py-0.5 text-badge hover:bg-accent"
+                data-testid={`toggle-issue-${issue.id}`}
+                onClick={() => onToggleState(issue)}
+                type="button"
+              >
+                {issue.state === "open" ? "閉じる" : "開き直す"}
+              </button>
+            )}
+          </div>
         </li>
       ))}
     </ul>
@@ -117,9 +132,12 @@ export function IssuesPanel({
 
 export function PullRequestsPanel({
   nowSeconds,
+  onMerge,
   pullRequests,
 }: {
   nowSeconds: number;
+  /** Omitted when there is nothing to write to. */
+  onMerge?: (pull: ProjectPullRequest) => void;
   pullRequests: ProjectPullRequest[];
 }) {
   const profiles = useProfiles(pullRequests.map((pr) => pr.authorPubkey));
@@ -179,7 +197,21 @@ export function PullRequestsPanel({
               </span>
             </div>
           </div>
-          <StatePill state={pr.state} />
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <StatePill state={pr.state} />
+            {onMerge && pr.state !== "merged" && pr.state !== "closed" && (
+              <button
+                // Not disabled on a red CI: merging anyway is a decision someone
+                // is allowed to make, and the state is already on the row above.
+                className="rounded-md border border-border px-2 py-0.5 text-badge hover:bg-accent"
+                data-testid={`merge-pull-${pr.id}`}
+                onClick={() => onMerge(pr)}
+                type="button"
+              >
+                マージ
+              </button>
+            )}
+          </div>
         </li>
       ))}
     </ul>

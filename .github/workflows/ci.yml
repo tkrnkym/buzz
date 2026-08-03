@@ -445,7 +445,9 @@ jobs:
           path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Web smoke e2e
-        run: just web-e2e-smoke
+        # Both browser projects: the smoke suite against the ordinary bundle,
+        # and the mock-up screens against the VITE_MOCK_RELAY=1 one.
+        run: just web-e2e
       - name: Upload web smoke e2e artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

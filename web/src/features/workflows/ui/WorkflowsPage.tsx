@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Clock, Hash, Plus, Webhook, Zap } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { formatRelativeTime } from "@/features/agents/agent-model";
 import {
@@ -10,8 +11,18 @@ import {
   sortWorkflows,
   totalPendingApprovals,
 } from "@/features/workflows/workflow-model";
+import { emptyWorkflowForm } from "@/features/workflows/workflow-form";
+import {
+  addWorkflow,
+  workflowFromForm,
+} from "@/features/workflows/workflow-mutations";
+import { WorkflowFormDialog } from "@/features/workflows/ui/WorkflowFormDialog";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import { cn } from "@/shared/lib/cn";
 
 /**
@@ -23,6 +34,8 @@ import { cn } from "@/shared/lib/cn";
  */
 export function WorkflowsPage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const [creating, setCreating] = useState(false);
   const workflows = useMemo(
     () => sortWorkflows(showcase?.workflows ?? []),
     [showcase],
@@ -44,7 +57,9 @@ export function WorkflowsPage() {
       actions={
         <button
           className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
-          disabled
+          data-testid="create-workflow"
+          disabled={update === null}
+          onClick={() => setCreating(true)}
           type="button"
         >
           <Plus aria-hidden className="size-3" />
@@ -134,6 +149,23 @@ export function WorkflowsPage() {
           );
         })}
       </ul>
+
+      {creating && update && (
+        <WorkflowFormDialog
+          initial={emptyWorkflowForm()}
+          onClose={() => setCreating(false)}
+          onSave={(form) => {
+            update((current) =>
+              addWorkflow(
+                current,
+                workflowFromForm(form, nextMockId("workflow")),
+              ),
+            );
+            setCreating(false);
+            toast.success(`${form.name} を作成しました`);
+          }}
+        />
+      )}
     </ShowcasePage>
   );
 }

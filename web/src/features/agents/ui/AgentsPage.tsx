@@ -1,15 +1,33 @@
 import { Plus, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import {
   groupAgentsByChannel,
   sortAgents,
   workingCount,
 } from "@/features/agents/agent-model";
+import {
+  addAgent,
+  agentFromDraft,
+  removeAgent,
+  replaceAgent,
+  setAgentPaused,
+} from "@/features/agents/agent-mutations";
 import { AgentCard } from "@/features/agents/ui/AgentCard";
 import { AgentDetailPanel } from "@/features/agents/ui/AgentDetailPanel";
+import {
+  AgentFormDialog,
+  type AgentDraft,
+  draftFromAgent,
+} from "@/features/agents/ui/AgentFormDialog";
+import { useMyPubkey } from "@/features/chat/use-chat";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import { cn } from "@/shared/lib/cn";
 
 type Grouping = "status" | "channel";
@@ -23,8 +41,17 @@ type Grouping = "status" | "channel";
  */
 export function AgentsPage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
   const [grouping, setGrouping] = useState<Grouping>("status");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // `null` means "not editing"; a draft means the dialog is open with it. One
+  // piece of state rather than two, so the two cannot disagree about which agent
+  // is being edited.
+  const [editing, setEditing] = useState<{
+    agentId: string | null;
+    draft: AgentDraft | null;
+  } | null>(null);
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
 
   const agents = showcase?.agents ?? [];
@@ -49,7 +76,8 @@ export function AgentsPage() {
           <button
             className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
             data-testid="create-agent"
-            disabled
+            disabled={update === null}
+            onClick={() => setEditing({ agentId: null, draft: null })}
             type="button"
           >
             <Plus aria-hidden className="size-3" />
@@ -158,7 +186,94 @@ export function AgentsPage() {
       </ShowcasePage>
 
       {selected && (
-        <AgentDetailPanel agent={selected} nowSeconds={nowSeconds} />
+        <AgentDetailPanel
+          agent={selected}
+          nowSeconds={nowSeconds}
+          onDelete={
+            update
+              ? () => {
+                  update((current) => removeAgent(current, selected.id));
+                  // Back to no explicit selection, which falls through to the
+                  // first remaining agent — the same thing the page shows on
+                  // arrival. The toast names who was deleted, so the panel
+                  // changing to someone else does not read as the wrong one going.
+                  setSelectedId(null);
+                  toast.success(`${selected.name} を削除しました`);
+                }
+              : undefined
+          }
+          onEdit={
+            update
+              ? () => {
+                  setSelectedId(selected.id);
+                  setEditing({
+                    agentId: selected.id,
+                    draft: draftFromAgent(selected),
+                  });
+                }
+              : undefined
+          }
+          onTogglePaused={
+            update
+              ? () => {
+                  const paused = selected.status !== "paused";
+                  // Pin the selection before changing anything. The list is
+                  // sorted by status, so pausing reorders it — and with no
+                  // explicit selection the panel would fall through to whichever
+                  // agent is now first, reading as though the wrong one was
+                  // paused.
+                  setSelectedId(selected.id);
+                  update((current) =>
+                    setAgentPaused(current, selected.id, paused),
+                  );
+                  toast.success(
+                    paused
+                      ? `${selected.name} を一時停止しました`
+                      : `${selected.name} を再開しました`,
+                  );
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {editing && update && (
+        <AgentFormDialog
+          initial={editing.draft}
+          onClose={() => setEditing(null)}
+          onSave={(draft) => {
+            const editingId = editing.agentId;
+            if (editingId === null) {
+              const id = nextMockId("agent");
+              update((current) =>
+                addAgent(
+                  current,
+                  agentFromDraft(draft, id, myPubkey ?? "", nowSeconds),
+                ),
+              );
+              // Select it, so the panel shows what was just made rather than
+              // leaving the reader to find it in the list.
+              setSelectedId(id);
+              toast.success(`${draft.name} を作りました`);
+            } else {
+              const existing = agents.find((row) => row.id === editingId);
+              update((current) =>
+                replaceAgent(
+                  current,
+                  agentFromDraft(
+                    draft,
+                    editingId,
+                    myPubkey ?? "",
+                    nowSeconds,
+                    existing,
+                  ),
+                ),
+              );
+              toast.success("保存しました");
+            }
+            setEditing(null);
+          }}
+        />
       )}
     </div>
   );
