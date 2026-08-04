@@ -74,21 +74,11 @@ export function AgentCard({
       )}
       data-testid={`agent-card-${agent.name}`}
     >
-      {/* The whole card selects. It sits under the badge and the menu rather
-          than wrapping them, because a button inside a button is not a thing. */}
-      <button
-        aria-label={agent.name}
-        className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        data-testid={`agent-select-${agent.name}`}
-        onClick={onSelect}
-        type="button"
-      />
-
       {hasMenu && (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger
             aria-label={`${agent.name} の操作`}
-            className="absolute right-1.5 top-1.5 z-10 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="absolute right-1.5 top-1.5 z-20 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             data-testid={`agent-menu-${agent.name}`}
             type="button"
           >
@@ -136,7 +126,7 @@ export function AgentCard({
                   paused ? `${agent.name} を再開` : `${agent.name} を一時停止`
                 }
                 className={cn(
-                  "absolute -bottom-0.5 -right-0.5 z-10 flex size-8 items-center justify-center rounded-full border-2 border-background transition-colors",
+                  "absolute -bottom-0.5 -right-0.5 z-20 flex size-8 items-center justify-center rounded-full border-2 border-background transition-colors",
                   paused
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -201,6 +191,22 @@ export function AgentCard({
           </span>
         </div>
       </div>
+
+      {/* The whole card selects, via an overlay rather than a wrapper, because a
+          button inside a button is not a thing.
+          It must come last and carry `z-10`: the avatar is `relative` (it hosts
+          the badge), so a positioned sibling earlier in the DOM paints *under*
+          it, and the avatar sits exactly at the card's centre — where a person
+          clicks. Rendered first, the card looked selectable everywhere and was
+          dead in the middle. The badge and the menu are `z-20` to stay above it,
+          since those two are separate actions rather than "select this agent". */}
+      <button
+        aria-label={agent.name}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        data-testid={`agent-select-${agent.name}`}
+        onClick={onSelect}
+        type="button"
+      />
     </div>
   );
 }

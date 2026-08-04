@@ -324,6 +324,70 @@ export interface ArchivedIdentity {
 }
 
 /** One of an agent's memories (NIP kind 30174 engram). */
+/**
+ * One thing an agent did, as the transcript shows it.
+ *
+ * Modelled on the desktop client's `AgentActivityDescriptor`: a render class
+ * decides the shape of the row, and a tone says whether the action read
+ * something, wrote something, or touched the community's configuration. Those
+ * are separate because "wrote a file" and "renamed a channel" are both writes
+ * but want different colours, and because an operator scanning a long run is
+ * looking for the writes.
+ */
+export type SessionRenderClass =
+  | "message"
+  | "shell"
+  | "file-edit"
+  | "file-read"
+  | "relay-op"
+  | "thought"
+  | "plan"
+  | "permission"
+  | "error";
+
+export type SessionTone = "read" | "write" | "admin" | "neutral";
+
+export type SessionStatus = "running" | "done" | "failed";
+
+/** A shell command and what it printed. */
+export interface ShellDetail {
+  kind: "shell";
+  command: string;
+  output: string;
+  exitCode: number;
+}
+
+/** An edit, as the lines that changed. */
+export interface DiffDetail {
+  kind: "diff";
+  path: string;
+  /** `+`/`-`/` ` prefixed lines, the way a unified diff carries them. */
+  lines: string[];
+}
+
+/** A plan, as the steps and which one is current. */
+export interface TodoDetail {
+  kind: "todo";
+  items: { text: string; done: boolean }[];
+}
+
+export type SessionDetail = ShellDetail | DiffDetail | TodoDetail;
+
+export interface AgentSessionEvent {
+  /** Monotonic within one agent's session, which is what orders the list. */
+  seq: number;
+  at: number;
+  renderClass: SessionRenderClass;
+  tone: SessionTone;
+  status: SessionStatus;
+  /** The one-line summary, always shown. */
+  label: string;
+  /** A second line, shown when there is something worth previewing. */
+  preview: string | null;
+  /** The expandable body. Absent for rows that are only a label. */
+  detail?: SessionDetail;
+}
+
 export interface MemoryEntry {
   slug: string;
   body: string;
@@ -359,6 +423,8 @@ export interface Showcase {
   archivedIdentities: ArchivedIdentity[];
   /** Keyed by agent pubkey. */
   agentMemories: Record<string, MemoryEntry[]>;
+  /** Keyed by agent id — what each one has been doing, oldest first. */
+  agentSessions: Record<string, AgentSessionEvent[]>;
   communities: ShowcaseCommunity[];
 }
 
@@ -1026,6 +1092,169 @@ export const SHOWCASE: Showcase = {
         slug: "mem/labels",
         body: "bug / enhancement / question の三つに寄せる。判断に迷ったら question。",
         updatedAt: ago(60 * 24 * 5),
+      },
+    ],
+  },
+
+  // What each agent has been doing. Oldest first, so the list reads downward like
+  // a log rather than a feed — an operator following a run wants the newest at the
+  // bottom, where the cursor already is.
+  agentSessions: {
+    "agent-reviewer": [
+      {
+        seq: 1,
+        at: ago(9),
+        renderClass: "plan",
+        tone: "neutral",
+        status: "done",
+        label: "やることを決めました",
+        preview: "PR #218 を読む → 危ない箇所を拾う → #dev に返す",
+        detail: {
+          kind: "todo",
+          items: [
+            { text: "差分を読む", done: true },
+            { text: "テストの有無を確認する", done: true },
+            { text: "指摘を #dev に書く", done: false },
+          ],
+        },
+      },
+      {
+        seq: 2,
+        at: ago(8),
+        renderClass: "shell",
+        tone: "read",
+        status: "done",
+        label: "git diff を実行しました",
+        preview: "3 ファイル / +128 −14",
+        detail: {
+          kind: "shell",
+          command: "git diff --stat origin/main...HEAD",
+          output: [
+            " crates/nuxx-relay/src/router.rs   | 96 ++++++++++++++---",
+            " crates/nuxx-relay/src/read.rs     | 32 +++---",
+            " crates/nuxx-core/src/kind.rs      | 14 ++-",
+            " 3 files changed, 128 insertions(+), 14 deletions(-)",
+          ].join("\n"),
+          exitCode: 0,
+        },
+      },
+      {
+        seq: 3,
+        at: ago(7),
+        renderClass: "file-read",
+        tone: "read",
+        status: "done",
+        label: "crates/nuxx-relay/src/read.rs を読みました",
+        preview: "32 行の変更を含む範囲",
+      },
+      {
+        seq: 4,
+        at: ago(6),
+        renderClass: "thought",
+        tone: "neutral",
+        status: "done",
+        label: "読み取りカーソルの更新が、公開の成否を待っていません",
+        preview:
+          "拒否されたときにカーソルだけ進むので、次に開いたとき既読になってしまいます",
+      },
+      {
+        seq: 5,
+        at: ago(5),
+        renderClass: "file-edit",
+        tone: "write",
+        status: "done",
+        label: "crates/nuxx-relay/src/read.rs を直しました",
+        preview: "+4 −2",
+        detail: {
+          kind: "diff",
+          path: "crates/nuxx-relay/src/read.rs",
+          lines: [
+            " async fn advance_cursor(&self, req: CursorReq) -> Result<()> {",
+            "-    self.store.set_cursor(req.channel, req.at).await?;",
+            "-    self.publish(req).await",
+            "+    // The cursor is what the reader sees as \"already read\", so it must",
+            "+    // not move until the relay has taken the event.",
+            "+    self.publish(req.clone()).await?;",
+            "+    self.store.set_cursor(req.channel, req.at).await",
+            " }",
+          ],
+        },
+      },
+      {
+        seq: 6,
+        at: ago(2),
+        renderClass: "permission",
+        tone: "admin",
+        status: "done",
+        label: "#dev への書き込みを許可されました",
+        preview: "佐藤 美咲 が承認",
+      },
+      {
+        seq: 7,
+        at: ago(1),
+        renderClass: "message",
+        tone: "write",
+        status: "running",
+        label: "#dev に返信しています",
+        preview: "read.rs の 41 行目、カーソルの更新が公開より先です",
+      },
+    ],
+    "agent-release": [
+      {
+        seq: 1,
+        at: ago(190),
+        renderClass: "shell",
+        tone: "read",
+        status: "done",
+        label: "タグを確認しました",
+        preview: "v0.9.3 が最新",
+        detail: {
+          kind: "shell",
+          command: "git tag --sort=-v:refname | head -3",
+          output: "v0.9.3\nv0.9.2\nv0.9.1",
+          exitCode: 0,
+        },
+      },
+      {
+        seq: 2,
+        at: ago(185),
+        renderClass: "relay-op",
+        tone: "admin",
+        status: "done",
+        label: "#announcements に下書きを置きました",
+        preview: "リリースノート v0.9.4（下書き）",
+      },
+    ],
+    "agent-triage": [
+      {
+        seq: 1,
+        at: ago(55),
+        renderClass: "shell",
+        tone: "read",
+        status: "done",
+        label: "ハーネスを起動しました",
+        preview: "./bin/triage --once",
+        detail: {
+          kind: "shell",
+          command: "./bin/triage --once",
+          output: "loading model claude-haiku-4-5…",
+          exitCode: 0,
+        },
+      },
+      {
+        seq: 2,
+        at: ago(52),
+        renderClass: "error",
+        tone: "neutral",
+        status: "failed",
+        label: "ハーネスが終了しました",
+        preview: "exit 127: ./bin/triage: No such file or directory",
+        detail: {
+          kind: "shell",
+          command: "./bin/triage --once",
+          output: "sh: ./bin/triage: No such file or directory",
+          exitCode: 127,
+        },
       },
     ],
   },

@@ -287,6 +287,59 @@ test("the card's own badge and menu run the same actions as the panel", async ({
   );
 });
 
+test("an agent's run is shown as what it actually did", async ({ page }) => {
+  // The surface the desktop client had and this one did not. Without it the screen
+  // can say an agent is working but never what it is doing.
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-レビュー係").click();
+  await page.getByTestId("agent-tab-session").click();
+
+  const transcript = page.getByTestId("agent-session-transcript");
+  await expect(transcript).toBeVisible();
+  await expect(transcript).toContainText("git diff を実行しました");
+  await expect(transcript).toContainText("#dev に返信しています");
+
+  // A shell command's output is behind a disclosure, because eight of them open
+  // at once is a wall.
+  await expect(page.getByTestId("session-detail-2")).toHaveCount(0);
+  await page.getByTestId("session-toggle-2").click();
+  await expect(page.getByTestId("session-detail-2")).toContainText(
+    "3 files changed",
+  );
+
+  // An edit shows the lines that changed, with its own +/− count.
+  await page.getByTestId("session-toggle-5").click();
+  const diff = page.getByTestId("session-detail-5");
+  await expect(diff).toContainText("crates/nuxx-relay/src/read.rs");
+  await expect(diff).toContainText("+4");
+  await expect(diff).toContainText("−2");
+});
+
+test("a failed run opens its reason without being asked", async ({ page }) => {
+  // The reason is the only thing the reader came for, so it is not behind a click.
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-トリアージ").click();
+  await page.getByTestId("agent-tab-session").click();
+  await expect(page.getByTestId("session-detail-2")).toContainText("exit 127");
+});
+
+test("replaying a run reveals it one step at a time", async ({ page }) => {
+  // A transcript that is complete on arrival shows the shape of the feature but
+  // not the thing it is for. The count is state the panel owns, so nothing here
+  // waits on a timer.
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-リリース番").click();
+  await page.getByTestId("agent-tab-session").click();
+  await expect(page.getByTestId("session-event-2")).toBeVisible();
+
+  // At the end the control restarts, which is what makes it demonstrable twice.
+  await page.getByTestId("replay-session").click();
+  await expect(page.getByTestId("session-event-1")).toBeVisible();
+  await expect(page.getByTestId("session-event-2")).toHaveCount(0);
+  await page.getByTestId("replay-session").click();
+  await expect(page.getByTestId("session-event-2")).toBeVisible();
+});
+
 test("the grid's add card creates an agent too", async ({ page }) => {
   // On a screen whose subject is a grid, the way to get another one belongs in
   // the grid — not only in the header.

@@ -1,16 +1,34 @@
-import { Bot, Pause, Pencil, Play, Trash2 } from "lucide-react";
+import {
+  Bot,
+  Pause,
+  Pencil,
+  Play,
+  RotateCcw,
+  SkipForward,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 import {
   AGENT_STATUS_DOT,
   AGENT_STATUS_LABELS,
   formatRelativeTime,
 } from "@/features/agents/agent-model";
+import {
+  sessionSummary,
+  eventsUpTo,
+} from "@/features/agents/agent-session-model";
+import { AgentSessionTranscript } from "@/features/agents/ui/AgentSessionTranscript";
 import { MemorySection } from "@/features/agents/ui/MemorySection";
+import { useShowcase } from "@/features/showcase/use-showcase";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import type { ShowcaseAgent } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 import { truncatePubkey } from "@/shared/lib/pubkey";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+
+type PanelTab = "overview" | "session" | "memory";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -47,6 +65,16 @@ export function AgentDetailPanel({
   onEdit?: () => void;
   onTogglePaused?: () => void;
 }) {
+  const showcase = useShowcase();
+  const events = showcase?.agentSessions[agent.id] ?? [];
+  const [tab, setTab] = useState<PanelTab>("overview");
+  // How much of the run is revealed. Reset when the panel changes agent, or the
+  // next agent would open part-way through a run that is not theirs.
+  const [visible, setVisible] = useState(events.length);
+  useEffect(() => setVisible(events.length), [agent.id, events.length]);
+  const shown = eventsUpTo(events, visible);
+  const summary = sessionSummary(events);
+
   const profiles = useProfiles([agent.ownerPubkey]);
   const owner = resolveUserLabel({
     pubkey: agent.ownerPubkey,
@@ -86,23 +114,89 @@ export function AgentDetailPanel({
         </p>
       )}
 
-      <dl className="flex flex-col gap-3">
-        <Field label="役割" value={agent.purpose} />
-        <Field label="ハーネス" value={agent.harness} />
-        <Field label="モデル" value={agent.model} />
-        <Field label="作成者" value={owner} />
-        <Field label="公開鍵" value={truncatePubkey(agent.pubkey)} />
-        <Field
-          label="参加チャンネル"
-          value={agent.channels.map((name) => `#${name}`).join("、") || "なし"}
-        />
-        <Field label="今日のターン数" value={`${agent.turnsToday}`} />
-      </dl>
+      {/* Three tabs rather than one long column: the configuration, the run, and
+          the memory answer different questions, and stacking them meant the run —
+          the thing an operator opens the panel for — sat below a fold. */}
+      <Tabs
+        className="flex min-h-0 flex-1 flex-col"
+        onValueChange={(next) => setTab(next as PanelTab)}
+        value={tab}
+      >
+        <TabsList data-testid="agent-panel-tabs">
+          <TabsTrigger data-testid="agent-tab-overview" value="overview">
+            概要
+          </TabsTrigger>
+          <TabsTrigger data-testid="agent-tab-session" value="session">
+            記録
+          </TabsTrigger>
+          <TabsTrigger data-testid="agent-tab-memory" value="memory">
+            メモリ
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex flex-col gap-2 border-t border-border pt-3">
-        <h3 className="text-2xs font-medium text-muted-foreground">メモリ</h3>
-        <MemorySection agentPubkey={agent.pubkey} />
-      </div>
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+          <TabsContent value="overview">
+            <dl className="flex flex-col gap-3">
+              <Field label="役割" value={agent.purpose} />
+              <Field label="ハーネス" value={agent.harness} />
+              <Field label="モデル" value={agent.model} />
+              <Field label="作成者" value={owner} />
+              <Field label="公開鍵" value={truncatePubkey(agent.pubkey)} />
+              <Field
+                label="参加チャンネル"
+                value={
+                  agent.channels.map((name) => `#${name}`).join("、") || "なし"
+                }
+              />
+              <Field label="今日のターン数" value={`${agent.turnsToday}`} />
+            </dl>
+          </TabsContent>
+
+          <TabsContent value="session">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-2xs text-muted-foreground">
+                  {summary.status === "empty"
+                    ? summary.label
+                    : `いまのところ ${shown.length} / ${events.length} 件`}
+                </p>
+                {/* Replay is what makes this read as an agent working rather than
+                    a finished log. The count is state the panel owns, so nothing
+                    here waits on a timer — see `eventsUpTo`. */}
+                {events.length > 0 && (
+                  <button
+                    className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-badge font-medium hover:bg-accent"
+                    data-testid="replay-session"
+                    onClick={() =>
+                      setVisible((current) =>
+                        current >= events.length ? 1 : current + 1,
+                      )
+                    }
+                    type="button"
+                  >
+                    {shown.length >= events.length ? (
+                      <>
+                        <RotateCcw aria-hidden className="size-3" />
+                        最初から
+                      </>
+                    ) : (
+                      <>
+                        <SkipForward aria-hidden className="size-3" />
+                        次へ
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              <AgentSessionTranscript events={shown} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="memory">
+            <MemorySection agentPubkey={agent.pubkey} />
+          </TabsContent>
+        </div>
+      </Tabs>
 
       <div className="mt-auto flex flex-col gap-2">
         <div className="flex gap-2">
