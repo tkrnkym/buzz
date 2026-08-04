@@ -1,3 +1,4 @@
+import { Globe, Hash, Lock, MessagesSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -6,9 +7,32 @@ import {
   type ChannelVisibility,
 } from "@/features/channels/channel-ops";
 import { cn } from "@/shared/lib/cn";
+import {
+  Field,
+  FIELD_CONTROL_CLASS,
+  ValueRow,
+  type ValueOption,
+} from "@/shared/ui/field-row";
 
-const FIELD_CLASS =
-  "h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+const TYPE_OPTIONS: ReadonlyArray<ValueOption<ChannelKind>> = [
+  { value: "stream", label: "Ongoing", icon: Hash, hint: "A live timeline" },
+  {
+    value: "forum",
+    label: "Forum",
+    icon: MessagesSquare,
+    hint: "Threaded posts",
+  },
+];
+
+const VISIBILITY_OPTIONS: ReadonlyArray<ValueOption<ChannelVisibility>> = [
+  {
+    value: "open",
+    label: "Public",
+    icon: Globe,
+    hint: "Anyone here can find and join",
+  },
+  { value: "private", label: "Private", icon: Lock, hint: "Invite only" },
+];
 
 /**
  * Create-channel dialog, ported from the desktop client.
@@ -17,6 +41,12 @@ const FIELD_CLASS =
  * canonicalization, so a reader typing `#Design Review` should see the room they
  * are about to get before they commit. The preview runs the *same* rule the
  * relay does — see `canonicalChannelName`.
+ *
+ * Type and visibility are value rows rather than the pair of tiles this dialog
+ * used to show. Tiles spend the dialog's whole width on two options and force
+ * every choice to be visible at once, which does not survive a third one; a row
+ * states the question and its current answer in a single line, which is the form
+ * the original used and the reason `shared/ui/field-row.tsx` exists.
  */
 export function CreateChannelDialog({
   error,
@@ -39,7 +69,6 @@ export function CreateChannelDialog({
   const [visibility, setVisibility] = useState<ChannelVisibility>("open");
   const [channelType, setChannelType] = useState<ChannelKind>("stream");
   const nameRef = useRef<HTMLInputElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -66,35 +95,42 @@ export function CreateChannelDialog({
       <div
         aria-labelledby="create-channel-title"
         aria-modal="true"
-        className="relative w-full max-w-md rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl"
+        className="relative w-full max-w-md rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-xl"
         data-testid="create-channel-dialog"
-        ref={panelRef}
         role="dialog"
       >
-        <h2 className="text-sm font-semibold" id="create-channel-title">
-          Create a channel
+        <h2 className="text-xl font-semibold" id="create-channel-title">
+          Create a new channel
         </h2>
 
         <form
-          className="mt-3 flex flex-col gap-3"
+          className="mt-5 flex flex-col gap-5"
           onSubmit={(event) => {
             event.preventDefault();
             if (!canonical) return;
             onCreate({ name, about, visibility, channelType });
           }}
         >
-          <label className="flex flex-col gap-1">
-            <span className="text-2xs font-medium text-muted-foreground">
-              Name
-            </span>
-            <input
-              className={FIELD_CLASS}
-              data-testid="create-channel-name"
-              onChange={(event) => setName(event.target.value)}
-              placeholder="design-review"
-              ref={nameRef}
-              value={name}
-            />
+          <div className="flex flex-col gap-1.5">
+            <Field htmlFor="create-channel-name" label="Name">
+              <input
+                autoCapitalize="none"
+                autoComplete="off"
+                autoCorrect="off"
+                className={cn(FIELD_CONTROL_CLASS, "h-11 px-3")}
+                data-testid="create-channel-name"
+                id="create-channel-name"
+                onChange={(event) => setName(event.target.value)}
+                placeholder={
+                  channelType === "forum"
+                    ? "design-discussions"
+                    : "release-notes"
+                }
+                ref={nameRef}
+                spellCheck={false}
+                value={name}
+              />
+            </Field>
             {renamed && (
               <span
                 className="text-2xs text-muted-foreground"
@@ -104,94 +140,37 @@ export function CreateChannelDialog({
                 <code className="font-mono">{canonical}</code>
               </span>
             )}
-          </label>
+          </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-2xs font-medium text-muted-foreground">
-              Description
-            </span>
-            <input
-              className={FIELD_CLASS}
+          <Field htmlFor="create-channel-about" label="Description" optional>
+            <textarea
+              className={cn(FIELD_CONTROL_CLASS, "min-h-20 resize-none p-3")}
               data-testid="create-channel-about"
+              id="create-channel-about"
               onChange={(event) => setAbout(event.target.value)}
-              placeholder="What is this channel for?"
+              placeholder="What this channel is for"
+              rows={2}
               value={about}
             />
-          </label>
+          </Field>
 
-          <fieldset className="flex flex-col gap-1">
-            <legend className="text-2xs font-medium text-muted-foreground">
-              Type
-            </legend>
-            <div className="flex gap-2">
-              {(
-                [
-                  { value: "stream", label: "Stream", hint: "A live timeline" },
-                  { value: "forum", label: "Forum", hint: "Threaded posts" },
-                ] as const
-              ).map((option) => (
-                <button
-                  aria-pressed={channelType === option.value}
-                  className={cn(
-                    "flex flex-1 flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors",
-                    channelType === option.value
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-accent",
-                  )}
-                  data-testid={`create-channel-type-${option.value}`}
-                  key={option.value}
-                  onClick={() => setChannelType(option.value)}
-                  type="button"
-                >
-                  <span className="text-2xs font-semibold">{option.label}</span>
-                  <span className="text-2xs text-muted-foreground">
-                    {option.hint}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <ValueRow
+            disabled={pending}
+            label="Channel type"
+            onChange={setChannelType}
+            options={TYPE_OPTIONS}
+            testId="create-channel-type"
+            value={channelType}
+          />
 
-          <fieldset className="flex flex-col gap-1">
-            <legend className="text-2xs font-medium text-muted-foreground">
-              Visibility
-            </legend>
-            <div className="flex gap-2">
-              {(
-                [
-                  {
-                    value: "open",
-                    label: "Open",
-                    hint: "Anyone here can find and join",
-                  },
-                  {
-                    value: "private",
-                    label: "Private",
-                    hint: "Invite only",
-                  },
-                ] as const
-              ).map((option) => (
-                <button
-                  aria-pressed={visibility === option.value}
-                  className={cn(
-                    "flex flex-1 flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors",
-                    visibility === option.value
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-accent",
-                  )}
-                  data-testid={`create-channel-visibility-${option.value}`}
-                  key={option.value}
-                  onClick={() => setVisibility(option.value)}
-                  type="button"
-                >
-                  <span className="text-2xs font-semibold">{option.label}</span>
-                  <span className="text-2xs text-muted-foreground">
-                    {option.hint}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <ValueRow
+            disabled={pending}
+            label="Visibility"
+            onChange={setVisibility}
+            options={VISIBILITY_OPTIONS}
+            testId="create-channel-visibility"
+            value={visibility}
+          />
 
           {error && (
             <p className="text-2xs text-destructive" role="alert">
@@ -201,19 +180,19 @@ export function CreateChannelDialog({
 
           <div className="flex items-center justify-end gap-2">
             <button
-              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
               onClick={onClose}
               type="button"
             >
               Cancel
             </button>
             <button
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
               data-testid="create-channel-submit"
               disabled={pending || canonical.length === 0}
               type="submit"
             >
-              {pending ? "Creating…" : "Create"}
+              {pending ? "Creating…" : "Create channel"}
             </button>
           </div>
         </form>

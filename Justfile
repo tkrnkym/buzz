@@ -251,9 +251,17 @@ web-test:
 web-build:
     cd {{web_dir}} && pnpm build
 
-# Run web browser smoke tests
+# Run all web browser tests (smoke + showcase)
+web-e2e:
+    cd {{web_dir}} && pnpm test:e2e
+
+# Run web browser smoke tests only
 web-e2e-smoke:
     cd {{web_dir}} && pnpm test:e2e:smoke
+
+# Run the mock-up screen tests only (needs the VITE_MOCK_RELAY=1 bundle)
+web-e2e-showcase:
+    cd {{web_dir}} && pnpm test:e2e:showcase
 
 # ─── Mobile ──────────────────────────────────────────────────────────────────
 

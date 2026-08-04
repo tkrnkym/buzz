@@ -1,12 +1,23 @@
 import { Link } from "@tanstack/react-router";
 import { CircleDot, GitPullRequest, Plus } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { openCounts, sortProjects } from "@/features/projects/project-model";
 import { resolveAvatarUrl } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
+import {
+  addProject,
+  projectFromDraft,
+} from "@/features/projects/project-mutations";
+import { useMyPubkey } from "@/features/chat/use-chat";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
+import { FormDialog } from "@/shared/ui/form-dialog";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
 /**
@@ -18,6 +29,9 @@ import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
  */
 export function ProjectsPage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
+  const [creating, setCreating] = useState(false);
   const projects = useMemo(
     () => sortProjects(showcase?.projects ?? []),
     [showcase],
@@ -41,7 +55,9 @@ export function ProjectsPage() {
       actions={
         <button
           className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
-          disabled
+          data-testid="create-project"
+          disabled={update === null}
+          onClick={() => setCreating(true)}
           type="button"
         >
           <Plus aria-hidden className="size-3" />
@@ -99,6 +115,61 @@ export function ProjectsPage() {
           );
         })}
       </ul>
+
+      {creating && update && (
+        <FormDialog
+          description="リポジトリと、その周りの作業をまとめる場所です。"
+          fields={[
+            {
+              name: "name",
+              label: "名前",
+              placeholder: "リレー",
+              required: true,
+            },
+            {
+              name: "repo",
+              label: "リポジトリ",
+              placeholder: "tkrnkym/nuxx",
+              required: true,
+            },
+            {
+              name: "description",
+              label: "説明",
+              placeholder: "何のプロジェクトか",
+            },
+            {
+              name: "defaultBranch",
+              label: "既定のブランチ",
+              initial: "main",
+              hint: "空にすると main になります。",
+            },
+          ]}
+          onClose={() => setCreating(false)}
+          onSubmit={(values) => {
+            update((current) =>
+              addProject(
+                current,
+                projectFromDraft(
+                  {
+                    name: values.name,
+                    description: values.description ?? "",
+                    repo: values.repo,
+                    defaultBranch: values.defaultBranch ?? "main",
+                  },
+                  nextMockId("project"),
+                  myPubkey ?? "",
+                  Math.floor(Date.now() / 1000),
+                ),
+              ),
+            );
+            setCreating(false);
+            toast.success(`${values.name} を作りました`);
+          }}
+          submitLabel="作成する"
+          testId="create-project-dialog"
+          title="プロジェクトを作る"
+        />
+      )}
     </ShowcasePage>
   );
 }

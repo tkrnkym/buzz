@@ -194,7 +194,20 @@ E2E tests live in `crates/nuxx-test-client/tests/`:
 - `e2e_media_extended.rs` — extended media scenarios
 - `e2e_nostr_interop.rs` — Nostr interop (NIP-50 search, NIP-10 threads, NIP-17 gift wraps)
 
-Web E2E: `cd web && pnpm exec playwright test`
+Web E2E: `just web-e2e` (or `pnpm -C web test:e2e`). Two Playwright projects
+over two bundles, because the mock-up screens only have data in one of them:
+
+- `smoke` — `tests/e2e/smoke.spec.ts` against the ordinary bundle (`dist/`,
+  port 4173). Run alone with `just web-e2e-smoke`.
+- `showcase` — `tests/e2e/showcase.spec.ts` against the demo bundle
+  (`VITE_MOCK_RELAY=1` → `dist-mock/`, port 4174), where `src/mock/showcase.ts`
+  backs Workflows / Agents / Projects / Forum / Reminders / members / huddle /
+  Pulse. Run alone with `just web-e2e-showcase`.
+
+Both `pnpm build` and `pnpm build:mock` run before either project, since
+Playwright starts both preview servers regardless of which project is selected.
+A new spec file needs a `testMatch` entry on one of the two projects in
+`web/playwright.config.ts` or it will not run at all.
 
 See [TESTING.md](TESTING.md) for the full multi-agent E2E guide.
 
@@ -298,6 +311,8 @@ description.
 3. **`messages search` must include `--kinds`** — an open-ended search (no kinds) hits the relay p-gate and returns 403. Pass at least `--kinds 9,45001,45003` to scope the query.
 4. **Worktrees: `cd` in the same command** — shell CWD doesn't persist between tool calls. Use `cd /path && cargo build` as one command.
 5. **React render perf: `React.memo` is all-or-nothing** — it only skips a re-render when *every* prop is reference-stable; one unstable prop (inline arrow/JSX, or a hook returning a fresh `{}`/`[]`/`Map` each render) defeats it. Two repeat offenders: (a) React Query results (`useMutation`/`useQuery`) are a **new object each render** — depend on the stable method (`mutation.mutateAsync`), not the object; (b) derived `Map`/array state that recomputes on a version bump — wrap in a content-equality ref cache (`shared/hooks/useStableReference.ts`). When chasing interaction lag, **measure with DevTools closed and no perf probes** (an open Web Inspector + per-keystroke `console.log` inflate the numbers), and isolate by removing one suspect at a time rather than guessing.
+6. **A popup inside a dialog must portal into the dialog** — `shared/ui/dialog.tsx` uses the native `<dialog>` with `showModal()`, which promotes it to the browser's **top layer**. The top layer paints above the entire document regardless of `z-index`, so a menu portalled to `document.body` (Radix's default) renders *underneath* the dialog and receives no clicks at all — it is present in the DOM and visible to a locator, which is why this reads as "the click is intercepted" rather than "the menu is missing". `DropdownMenuContent` handles it by portalling into the dialog element via `useDialogContainer()`; anything new that portals needs the same treatment.
+7. **UI primitives: use the one that exists** — `shared/ui/` has a Radix-backed `dropdown-menu` (anchored, collision-aware, width-matched via `--radix-dropdown-menu-trigger-width`) *and* a hand-rolled `menu.tsx` (portalled, flat, no collision handling). Prefer `dropdown-menu` for new work. For avatars there is exactly one component — `PubkeyAvatar` — and it is the only place allowed to slice a pubkey (the truncation guard allowlists that single line by **line number**, so moving it means updating `web/scripts/check-pubkey-truncation.mjs`). For form controls, `shared/ui/field-row.tsx` carries the app's field language: `Field`/`FieldShell` for a bordered text field, `ValueRow` for the label-left/value-right choice row. Reach for those before adding a native `<select>`.
 
 ---
 
@@ -310,6 +325,40 @@ organized under `web/src/features/`. Biome handles linting and formatting.
 just web         # dev server (port derived from the worktree)
 just relay-web   # relay serving the built web bundle
 ```
+
+### The palette is computed at runtime, not written in CSS
+
+**Do not read `web/src/shared/styles/globals.css` to learn the app's colors.**
+The palette there is the pre-hydration fallback. What actually paints is derived
+in JS from the selected syntax theme:
+
+- `shared/theme/theme-loader.ts` — loads a **Shiki theme JSON** (the `shiki`
+  dependency) and pulls out bg / fg / comment / git colors. 62 themes, each its
+  own lazy chunk. `nuxx` / `nuxx-dark` are aliases that borrow the GitHub Light /
+  GitHub Dark palettes.
+- `shared/theme/adaptive-theme.ts` — derives the whole variable set from those
+  four colors, including `--background`, `--foreground`, `--card`, `--border`,
+  `--muted`, `--popover` and the sidebar tokens.
+- `shared/theme/ThemeProvider.tsx` — writes them onto `:root` as inline custom
+  properties, which beat everything in the stylesheet. Caches the last palette in
+  `localStorage` so a reload does not flash.
+- `shared/theme/accent.ts` — the one color that is *chosen* rather than derived
+  (primary buttons, active nav row). `nuxx` / `nuxx-dark` pin it to the theme
+  foreground; every other theme uses the reader's pick.
+
+So a component must consume semantic tokens (`bg-background`, `text-foreground`,
+`border-border`). **A hardcoded hex or a raw Tailwind color (`bg-zinc-900`) does
+not follow the theme and will be wrong under 61 of the 62.**
+
+The Nuxx themes add a gradient canvas with a rounded content card floating on
+it, via `data-nuxx-sidebar` on `<html>` plus `GradientLayer` / `ContentSurface`
+in `shared/theme/ThemeSurfaces.tsx`. The gradient layer sits at `-z-10`, so the
+shell root must stay `isolate` — without a stacking context it paints behind its
+own background and vanishes while still reporting `opacity: 1`.
+
+**Adding a token means adding its consumer in the same change.** Several
+`--nuxx-*` tokens were once copied over without the rules that read them and sat
+dead for months, which is why the client rendered in the fallback palette.
 
 ### Text sizing & zoom (use rem, never px)
 
@@ -348,7 +397,9 @@ The mobile app lives in `mobile/` — a Flutter app using Riverpod + Hooks.
 ### Architecture
 
 - **State management:** Riverpod + `flutter_hooks` (`HookConsumerWidget`)
-- **Theme:** Catppuccin Latte (light) / Macchiato (dark) — matches web
+- **Theme:** Catppuccin Latte (light) / Macchiato (dark). This no longer matches
+  web, which derives its palette from a selectable Shiki theme and defaults to
+  the branded `nuxx` pair — see the web client's theme section above.
 - **Features:** Isolated under `lib/features/`, shared code in `lib/shared/`
 - **Nostr models:** `lib/shared/relay/nostr_models.dart` — event kinds must
   stay in sync with `web/src/shared/constants/kinds.ts`

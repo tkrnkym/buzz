@@ -1,5 +1,6 @@
-import { Hash, MessageSquare, Pin, Plus } from "lucide-react";
+import { Hash, MessageSquare, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { formatRelativeTime } from "@/features/agents/agent-model";
 import {
@@ -7,8 +8,20 @@ import {
   resolveUserLabel,
 } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
+import { useMyPubkey } from "@/features/chat/use-chat";
+import {
+  addForumComment,
+  addForumPost,
+  removeForumPost,
+  setForumPinned,
+} from "@/features/showcase/showcase-mutations";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
+import { FormDialog } from "@/shared/ui/form-dialog";
 import { cn } from "@/shared/lib/cn";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
@@ -25,7 +38,11 @@ import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
  */
 export function ForumPage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [composing, setComposing] = useState(false);
+  const [comment, setComment] = useState("");
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
 
   const posts = useMemo(() => {
@@ -64,7 +81,9 @@ export function ForumPage() {
         actions={
           <button
             className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
-            disabled
+            data-testid="create-forum-post"
+            disabled={update === null}
+            onClick={() => setComposing(true)}
             type="button"
           >
             <Plus aria-hidden className="size-3" />
@@ -145,11 +164,53 @@ export function ForumPage() {
           data-testid="forum-thread-panel"
         >
           <header className="shrink-0 border-b border-border px-4 py-3">
-            <h2 className="text-sm font-semibold">{open.title}</h2>
-            <p className="mt-0.5 text-badge text-muted-foreground">
-              {nameOf(open.authorPubkey)} ·{" "}
-              {formatRelativeTime(open.at, nowSeconds)}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold">{open.title}</h2>
+                <p className="mt-0.5 text-badge text-muted-foreground">
+                  {nameOf(open.authorPubkey)} ·{" "}
+                  {formatRelativeTime(open.at, nowSeconds)}
+                </p>
+              </div>
+              {update && (
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    aria-label={open.pinned ? "固定を解除" : "固定する"}
+                    className="flex size-7 items-center justify-center rounded-md border border-border hover:bg-accent"
+                    data-testid="toggle-pin"
+                    onClick={() => {
+                      update((current) =>
+                        setForumPinned(current, open.id, !open.pinned),
+                      );
+                      toast.success(
+                        open.pinned ? "固定を解除しました" : "固定しました",
+                      );
+                    }}
+                    type="button"
+                  >
+                    {open.pinned ? (
+                      <PinOff aria-hidden className="size-3" />
+                    ) : (
+                      <Pin aria-hidden className="size-3" />
+                    )}
+                  </button>
+                  <button
+                    aria-label="投稿を削除"
+                    className="flex size-7 items-center justify-center rounded-md border border-border text-destructive hover:bg-destructive/10"
+                    data-testid="delete-forum-post"
+                    onClick={() => {
+                      update((current) => removeForumPost(current, open.id));
+                      // Close the panel: it is about to have nothing to show.
+                      setOpenId(null);
+                      toast.success("削除しました");
+                    }}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden className="size-3" />
+                  </button>
+                </div>
+              )}
+            </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -188,14 +249,89 @@ export function ForumPage() {
             )}
           </div>
 
-          <div className="shrink-0 border-t border-border px-4 py-3">
+          <form
+            className="flex shrink-0 gap-2 border-t border-border px-4 py-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const body = comment.trim();
+              if (!body || !update) return;
+              update((current) =>
+                addForumComment(current, open.id, {
+                  id: nextMockId("comment"),
+                  authorPubkey: myPubkey ?? "",
+                  body,
+                  at: Math.floor(Date.now() / 1000),
+                }),
+              );
+              setComment("");
+            }}
+          >
             <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-2xs disabled:opacity-60"
-              disabled
+              className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-2xs disabled:opacity-60"
+              data-testid="forum-comment-input"
+              disabled={update === null}
+              onChange={(event) => setComment(event.target.value)}
               placeholder="コメントする"
+              value={comment}
             />
-          </div>
+            <button
+              className="shrink-0 rounded-md bg-primary px-3 text-2xs font-medium text-primary-foreground disabled:opacity-60"
+              data-testid="forum-comment-submit"
+              disabled={!comment.trim() || update === null}
+              type="submit"
+            >
+              送信
+            </button>
+          </form>
         </aside>
+      )}
+
+      {composing && update && (
+        <FormDialog
+          description="流れていかない場所に書きます。チャンネルの会話とは別に残ります。"
+          fields={[
+            {
+              name: "title",
+              label: "タイトル",
+              placeholder: "リリース手順を見直したい",
+              required: true,
+            },
+            {
+              name: "channel",
+              label: "チャンネル",
+              initial: "general",
+              required: true,
+            },
+            {
+              name: "body",
+              label: "本文",
+              multiline: true,
+              placeholder: "何を、なぜ",
+              required: true,
+            },
+          ]}
+          onClose={() => setComposing(false)}
+          onSubmit={(values) => {
+            const id = nextMockId("forum");
+            update((current) =>
+              addForumPost(current, {
+                id,
+                title: values.title,
+                body: values.body,
+                channel: values.channel.replace(/^#/, ""),
+                authorPubkey: myPubkey ?? "",
+                at: Math.floor(Date.now() / 1000),
+              }),
+            );
+            setComposing(false);
+            // Open it, so the reader lands on what they just wrote.
+            setOpenId(id);
+            toast.success("投稿しました");
+          }}
+          submitLabel="投稿する"
+          testId="create-forum-dialog"
+          title="フォーラムに投稿"
+        />
       )}
     </div>
   );

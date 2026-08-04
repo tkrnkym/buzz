@@ -3,6 +3,16 @@
 @plugin "@tailwindcss/typography";
 @config "../../../tailwind.config.js";
 
+/*
+ * The palette below is the PRE-HYDRATION FALLBACK, not the app's colors.
+ *
+ * `shared/theme/ThemeProvider.tsx` derives the real values from the selected
+ * syntax theme and writes them onto `:root` as inline custom properties, which
+ * beat everything here. These values are what paints for the frames before that
+ * lands on a first visit (afterwards a cached palette is applied synchronously),
+ * so they should stay a sane neutral rather than drift into a third palette
+ * nobody chose.
+ */
 @layer base {
   :root {
     /* Catppuccin Latte (mauve accent) */
@@ -145,4 +155,213 @@
     background-color: rgb(0 0 0 / 0.5);
     backdrop-filter: blur(2px);
   }
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Nuxx theme — the sidebar gradient and the inset content surface.
+ *
+ * Nuxx borrows GitHub Light / GitHub Dark for every base color; its one
+ * distinguishing feature is this gradient painted across the sidebar/nav canvas,
+ * replacing GitHub's flat grey. `ThemeProvider` sets `data-nuxx-sidebar` on
+ * <html> when a Nuxx theme is active.
+ *
+ * These rules are intentionally UNLAYERED: the `bg-sidebar` background-color
+ * lives in Tailwind's `utilities` layer, and unlayered declarations win over any
+ * layered ones, so this overrides it without an `!important`.
+ *
+ * The gradient is painted once on the full app surface (`GradientLayer` in
+ * `shared/theme/ThemeSurfaces.tsx`). Child chrome canvases stay transparent so
+ * the rail, sidebar, and header all reveal the same continuous ramp.
+ *
+ * Ported from the desktop client's `globals/theme.css` (commit 02749b3^). Left
+ * behind: the macOS translucency treatment, which needs a native vibrancy layer
+ * behind the webview, and the per-row-type foreground vars, whose desktop
+ * selectors have no counterpart in this shell — both defaulted to no visible
+ * change anyway.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+:root[data-nuxx-sidebar] {
+  --nuxx-gradient-top: var(--nuxx-gradient-light-top);
+  --nuxx-gradient-bottom: var(--nuxx-gradient-light-bottom);
+  --nuxx-muted-foreground: rgb(0 0 0 / 40%);
+  --nuxx-search-surface: rgb(0 0 0 / 4%);
+  --nuxx-hover-surface: rgb(0 0 0 / 4%);
+  --nuxx-active-fill: 0 0% 0%;
+  --nuxx-active-surface: rgb(0 0 0 / 7%);
+  --nuxx-active-foreground: var(--foreground);
+}
+
+/*
+ * Dark variant. Only the Nuxx color tokens change, so every downstream rule
+ * (gradient fill, hover, search box, muted labels, active pill) adapts on its
+ * own. The `.dark` class is set on the root whenever a dark theme is active.
+ */
+:root[data-nuxx-sidebar].dark {
+  --nuxx-gradient-top: var(--nuxx-gradient-dark-top);
+  --nuxx-gradient-bottom: var(--nuxx-gradient-dark-bottom);
+  --nuxx-muted-foreground: rgb(255 255 255 / 40%);
+  --nuxx-search-surface: rgb(255 255 255 / 4%);
+  --nuxx-hover-surface: rgb(255 255 255 / 4%);
+  --nuxx-active-fill: 0 0% 100%;
+  --nuxx-active-surface: color-mix(
+    in srgb,
+    hsl(var(--nuxx-active-fill)) 16%,
+    transparent
+  );
+  --nuxx-active-foreground: 0 0% 100%;
+}
+
+/*
+ * Keep both gradients painted and switch only which layer is visible, rather
+ * than swapping `background-image` on one element — a replaced background image
+ * can be held as a stale raster when the app changes appearance without a
+ * reload.
+ */
+:root[data-nuxx-sidebar] .nuxx-theme-gradient-layer-light {
+  background-image: linear-gradient(
+    to bottom,
+    var(--nuxx-gradient-light-top),
+    var(--nuxx-gradient-light-bottom)
+  );
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+}
+
+:root[data-nuxx-sidebar] .nuxx-theme-gradient-layer-dark {
+  background-image: linear-gradient(
+    to bottom,
+    var(--nuxx-gradient-dark-top),
+    var(--nuxx-gradient-dark-bottom)
+  );
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+}
+
+:root[data-nuxx-sidebar]:not(.dark) .nuxx-theme-gradient-layer-light,
+:root[data-nuxx-sidebar].dark .nuxx-theme-gradient-layer-dark {
+  opacity: 1;
+}
+
+/*
+ * All in-shell chrome reveals the single gradient painted above.
+ *
+ * The `.bg-sidebar` clause is what makes this hold as the shell grows: any
+ * chrome canvas inside the wrapper opts in by using the token it already would
+ * have. Small transient `bg-sidebar` chips that are NOT canvases (a floating
+ * drag pill) opt out with `data-nuxx-flat` — they should keep their own fill
+ * rather than turning transparent over the gradient.
+ */
+:root[data-nuxx-sidebar] .group\/sidebar-wrapper,
+:root[data-nuxx-sidebar] [data-testid="community-rail"],
+:root[data-nuxx-sidebar] [data-sidebar="sidebar"]:not([data-mobile="true"]),
+:root[data-nuxx-sidebar] [data-sidebar="footer"],
+:root[data-nuxx-sidebar] [data-testid="sidebar-pinned-header"],
+:root[data-nuxx-sidebar]
+  .group\/sidebar-wrapper
+  .bg-sidebar:not([data-nuxx-flat]) {
+  background-color: transparent;
+  background-image: none;
+}
+
+/*
+ * The mobile sidebar is portaled outside the app surface, so it is the one
+ * chrome canvas that has to paint the gradient itself.
+ */
+:root[data-nuxx-sidebar]:not(.dark)
+  [data-sidebar="sidebar"][data-mobile="true"] {
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    var(--nuxx-gradient-light-top),
+    var(--nuxx-gradient-light-bottom)
+  );
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+}
+
+:root[data-nuxx-sidebar].dark [data-sidebar="sidebar"][data-mobile="true"] {
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    var(--nuxx-gradient-dark-top),
+    var(--nuxx-gradient-dark-bottom)
+  );
+  background-size: 100vw 100vh;
+  background-repeat: no-repeat;
+}
+
+/* Keep the subtle content-card lift in Nuxx Light only — in the dark variant a
+   black shadow against the gradient reads as nothing. */
+:root[data-nuxx-sidebar]:not(.dark) [data-nuxx-content-surface] {
+  box-shadow:
+    -1px -1px 0 0 hsl(var(--sidebar-border) / 0.45),
+    0 0 4px 0 rgb(0 0 0 / 7%);
+}
+
+/*
+ * Nuxx Dark uses a warmer, much darker neutral for the inset content canvas than
+ * the theme's own background. `--background` is overridden locally as well as the
+ * surface fill, so descendant headers and panes using `bg-background` stay
+ * visually continuous with the card they sit in.
+ */
+:root[data-nuxx-sidebar].dark [data-nuxx-content-surface] {
+  --background: var(--nuxx-content-dark);
+  background-color: hsl(var(--background));
+}
+
+/*
+ * Active nav row. The accent system sets `--sidebar-active` to the theme
+ * foreground as an inline style on :root, which renders the selected page as a
+ * solid black pill under GitHub Light. Nuxx wants a subtle theme-specific tint
+ * instead, so the two active tokens are overridden on the sidebar element —
+ * element-local custom properties beat the inherited inline values.
+ *
+ * SCOPED to the sidebar, not :root: `bg-sidebar-active` is also consumed by
+ * controls elsewhere, and a root-level override turned those white-on-white.
+ */
+:root[data-nuxx-sidebar] [data-sidebar="sidebar"] {
+  --sidebar-active: var(--nuxx-active-fill);
+  --sidebar-active-foreground: var(--nuxx-active-foreground);
+}
+
+/* Sit the selection flat on the gradient: a tint, and no drop shadow. */
+:root[data-nuxx-sidebar] [data-sidebar="sidebar"] [data-active="true"] {
+  background-color: var(--nuxx-active-surface);
+  box-shadow: none;
+}
+
+/*
+ * Hover on non-active rows uses the theme-specific translucent neutral fill
+ * instead of the grey `--sidebar-accent`. Active rows are excluded so they keep
+ * the active surface. The `menu-item` rule covers sibling row actions, which
+ * trigger the row's `group-hover` treatment without being the button.
+ */
+:root[data-nuxx-sidebar]
+  [data-sidebar="sidebar"]
+  [data-sidebar="menu-button"]:not([data-active="true"]):hover,
+:root[data-nuxx-sidebar]
+  [data-sidebar="sidebar"]
+  :where([data-sidebar="menu-item"]:hover)
+  > [data-sidebar="menu-button"]:not([data-active="true"]) {
+  background-color: var(--nuxx-hover-surface);
+}
+
+/* Section headings and the secondary line of the profile card share the muted
+   tint; navigation rows keep the theme foreground. */
+:root[data-nuxx-sidebar] [data-sidebar="sidebar"] [data-sidebar="group-label"],
+:root[data-nuxx-sidebar] [data-testid="sidebar-profile-secondary"] {
+  color: var(--nuxx-muted-foreground);
+}
+
+/*
+ * The search field. The desktop client had a button here and gave it a
+ * translucent neutral fill so it read as part of the nav rather than a control
+ * dropped onto it; this shell has a real input, so the same tint is applied to
+ * the input and its border is dropped — against the gradient, an opaque
+ * `bg-background` field looks like a card sitting on the sidebar.
+ */
+:root[data-nuxx-sidebar] [data-testid="sidebar-pinned-header"] input {
+  background-color: var(--nuxx-search-surface);
+  border-color: transparent;
 }

@@ -10,6 +10,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={isDark ? "dark" : "light"}
       className="toaster group"
+      // Top-centre rather than Sonner's bottom-right default. Every primary
+      // send control in this app sits bottom-right — the message composer's
+      // send button, the forum thread's comment submit — so a toast there
+      // covers the very control the reader reaches for next, and swallows the
+      // click while it does. The top centre of a screen here is header
+      // whitespace in every layout.
+      position="top-center"
       toastOptions={{
         classNames: {
           toast:

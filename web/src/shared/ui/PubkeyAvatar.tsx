@@ -47,12 +47,23 @@ function initialsOf(label: string): string {
  * initials rather than leaving a broken-image box: kind:0 is self-asserted, so
  * the URL in it may be gone, wrong, or blocked.
  */
+const SIZE_CLASSES = {
+  // Every size is a rem token, so the initials scale with browser zoom rather
+  // than freezing against it.
+  sm: "size-6 text-badge",
+  md: "size-8 text-xs",
+  // The card portrait: an agent or a person shown as a subject rather than as a
+  // row's leading glyph.
+  xl: "size-24 text-2xl",
+} as const;
+
 export function PubkeyAvatar({
   avatarUrl,
   badge,
   className,
   label,
   pubkey,
+  shape = "square",
   size = "md",
 }: {
   /** Profile picture, from kind:0 `picture`. */
@@ -63,13 +74,16 @@ export function PubkeyAvatar({
   /** Display name, for the initials and the tooltip. */
   label?: string | null;
   pubkey: string;
-  size?: "sm" | "md";
+  /**
+   * `square` is the rounded-rectangle disc used in rows and headers. `circle` is
+   * for the card portrait, where the subject is the avatar itself.
+   */
+  shape?: "square" | "circle";
+  size?: "sm" | "md" | "xl";
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const hue = pubkeyToHue(pubkey);
-  // `text-badge` (0.625rem) is a rem token, so the initials scale with browser
-  // zoom rather than freezing against it.
-  const sizeClasses = size === "sm" ? "size-6 text-badge" : "size-8 text-xs";
+  const sizeClasses = SIZE_CLASSES[size];
   const initials = (label ? initialsOf(label) : "") || pubkey.slice(0, 2);
   const showImage = Boolean(avatarUrl) && !imageFailed;
 
@@ -79,7 +93,8 @@ export function PubkeyAvatar({
         <span className="relative inline-flex shrink-0">
           <span
             className={cn(
-              "flex items-center justify-center overflow-hidden rounded-lg font-medium text-white",
+              "flex items-center justify-center overflow-hidden font-medium text-white",
+              shape === "circle" ? "rounded-full" : "rounded-lg",
               sizeClasses,
               className,
             )}

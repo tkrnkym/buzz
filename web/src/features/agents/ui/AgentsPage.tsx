@@ -1,18 +1,45 @@
 import { Plus, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import {
   groupAgentsByChannel,
   sortAgents,
   workingCount,
 } from "@/features/agents/agent-model";
+import {
+  addAgent,
+  agentFromDraft,
+  removeAgent,
+  replaceAgent,
+  setAgentPaused,
+} from "@/features/agents/agent-mutations";
 import { AgentCard } from "@/features/agents/ui/AgentCard";
 import { AgentDetailPanel } from "@/features/agents/ui/AgentDetailPanel";
+import {
+  AgentFormDialog,
+  type AgentDraft,
+  draftFromAgent,
+} from "@/features/agents/ui/AgentFormDialog";
+import { useMyPubkey } from "@/features/chat/use-chat";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
+import type { ShowcaseAgent } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 
 type Grouping = "status" | "channel";
+
+/**
+ * The card grid. Cards rather than rows means the column count is a function of
+ * the window, and `items-stretch` (the grid default) keeps a card with two
+ * channel chips the same height as one with none.
+ */
+const CARD_GRID_CLASS =
+  "mt-4 grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3";
 
 /**
  * The Agents screen.
@@ -23,8 +50,17 @@ type Grouping = "status" | "channel";
  */
 export function AgentsPage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
   const [grouping, setGrouping] = useState<Grouping>("status");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // `null` means "not editing"; a draft means the dialog is open with it. One
+  // piece of state rather than two, so the two cannot disagree about which agent
+  // is being edited.
+  const [editing, setEditing] = useState<{
+    agentId: string | null;
+    draft: AgentDraft | null;
+  } | null>(null);
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
 
   const agents = showcase?.agents ?? [];
@@ -33,6 +69,54 @@ export function AgentsPage() {
   const byChannel = useMemo(() => groupAgentsByChannel(agents), [agents]);
   const selected =
     sorted.find((agent) => agent.id === selectedId) ?? sorted[0] ?? null;
+
+  // The three mutations, written once and handed to both the card menu and the
+  // detail panel. They were inline on the panel; a card that offers the same
+  // actions must run the same code, not a second copy of the selection-pinning
+  // rule below.
+  const startEdit = (agent: ShowcaseAgent) => {
+    setSelectedId(agent.id);
+    setEditing({ agentId: agent.id, draft: draftFromAgent(agent) });
+  };
+
+  const doDelete = (agent: ShowcaseAgent) => {
+    if (!update) return;
+    update((current) => removeAgent(current, agent.id));
+    // Back to no explicit selection, which falls through to the first remaining
+    // agent — the same thing the page shows on arrival. The toast names who was
+    // deleted, so the panel changing to someone else does not read as the wrong
+    // one going.
+    setSelectedId(null);
+    toast.success(`${agent.name} を削除しました`);
+  };
+
+  const doTogglePaused = (agent: ShowcaseAgent) => {
+    if (!update) return;
+    const paused = agent.status !== "paused";
+    // Pin the selection before changing anything. The list is sorted by status,
+    // so pausing reorders it — and with no explicit selection the panel would
+    // fall through to whichever agent is now first, reading as though the wrong
+    // one was paused.
+    setSelectedId(agent.id);
+    update((current) => setAgentPaused(current, agent.id, paused));
+    toast.success(
+      paused
+        ? `${agent.name} を一時停止しました`
+        : `${agent.name} を再開しました`,
+    );
+  };
+
+  const renderCard = (agent: ShowcaseAgent) => (
+    <AgentCard
+      agent={agent}
+      nowSeconds={nowSeconds}
+      onDelete={update ? () => doDelete(agent) : undefined}
+      onEdit={update ? () => startEdit(agent) : undefined}
+      onSelect={() => setSelectedId(agent.id)}
+      onTogglePaused={update ? () => doTogglePaused(agent) : undefined}
+      selected={selected?.id === agent.id}
+    />
+  );
 
   if (!showcase) {
     return (
@@ -49,7 +133,8 @@ export function AgentsPage() {
           <button
             className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
             data-testid="create-agent"
-            disabled
+            disabled={update === null}
+            onClick={() => setEditing({ agentId: null, draft: null })}
             type="button"
           >
             <Plus aria-hidden className="size-3" />
@@ -83,17 +168,26 @@ export function AgentsPage() {
         </div>
 
         {grouping === "status" ? (
-          <ul className="mt-4 flex flex-col gap-2" data-testid="agent-list">
+          <ul className={CARD_GRID_CLASS} data-testid="agent-list">
             {sorted.map((agent) => (
-              <li key={agent.id}>
-                <AgentCard
-                  agent={agent}
-                  nowSeconds={nowSeconds}
-                  onSelect={() => setSelectedId(agent.id)}
-                  selected={selected?.id === agent.id}
-                />
-              </li>
+              <li key={agent.id}>{renderCard(agent)}</li>
             ))}
+            {/* The add card closes the grid rather than living only in the
+                header: on a screen whose subject is a grid of things, the way to
+                get another one belongs in the grid. */}
+            {update && (
+              <li>
+                <button
+                  className="flex size-full min-h-56 items-center justify-center rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-muted-foreground/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  data-testid="create-agent-card"
+                  onClick={() => setEditing({ agentId: null, draft: null })}
+                  type="button"
+                >
+                  <Plus aria-hidden className="size-5" />
+                  <span className="sr-only">エージェントを作る</span>
+                </button>
+              </li>
+            )}
           </ul>
         ) : (
           <div className="mt-4 flex flex-col gap-5" data-testid="agent-list">
@@ -102,15 +196,10 @@ export function AgentsPage() {
                 <h2 className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
                   #{group.channel}
                 </h2>
-                <ul className="mt-2 flex flex-col gap-2">
+                <ul className={CARD_GRID_CLASS}>
                   {group.agents.map((agent) => (
                     <li key={`${group.channel}:${agent.id}`}>
-                      <AgentCard
-                        agent={agent}
-                        nowSeconds={nowSeconds}
-                        onSelect={() => setSelectedId(agent.id)}
-                        selected={selected?.id === agent.id}
-                      />
+                      {renderCard(agent)}
                     </li>
                   ))}
                 </ul>
@@ -158,7 +247,52 @@ export function AgentsPage() {
       </ShowcasePage>
 
       {selected && (
-        <AgentDetailPanel agent={selected} nowSeconds={nowSeconds} />
+        <AgentDetailPanel
+          agent={selected}
+          nowSeconds={nowSeconds}
+          onDelete={update ? () => doDelete(selected) : undefined}
+          onEdit={update ? () => startEdit(selected) : undefined}
+          onTogglePaused={update ? () => doTogglePaused(selected) : undefined}
+        />
+      )}
+
+      {editing && update && (
+        <AgentFormDialog
+          initial={editing.draft}
+          onClose={() => setEditing(null)}
+          onSave={(draft) => {
+            const editingId = editing.agentId;
+            if (editingId === null) {
+              const id = nextMockId("agent");
+              update((current) =>
+                addAgent(
+                  current,
+                  agentFromDraft(draft, id, myPubkey ?? "", nowSeconds),
+                ),
+              );
+              // Select it, so the panel shows what was just made rather than
+              // leaving the reader to find it in the list.
+              setSelectedId(id);
+              toast.success(`${draft.name} を作りました`);
+            } else {
+              const existing = agents.find((row) => row.id === editingId);
+              update((current) =>
+                replaceAgent(
+                  current,
+                  agentFromDraft(
+                    draft,
+                    editingId,
+                    myPubkey ?? "",
+                    nowSeconds,
+                    existing,
+                  ),
+                ),
+              );
+              toast.success("保存しました");
+            }
+            setEditing(null);
+          }}
+        />
       )}
     </div>
   );

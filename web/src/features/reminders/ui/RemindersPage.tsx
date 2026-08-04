@@ -1,5 +1,6 @@
-import { Bell, Check, Clock, Hash } from "lucide-react";
+import { Bell, Check, Clock, Hash, Trash2 } from "lucide-react";
 import { useMemo } from "react";
+import { toast } from "sonner";
 
 import {
   dueCount,
@@ -8,8 +9,16 @@ import {
   SNOOZE_OPTIONS,
   sortReminders,
 } from "@/features/reminders/reminder-model";
+import {
+  removeReminder,
+  setReminderDone,
+  snoozeReminder,
+} from "@/features/showcase/showcase-mutations";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import { cn } from "@/shared/lib/cn";
 
 /**
@@ -21,6 +30,7 @@ import { cn } from "@/shared/lib/cn";
  */
 export function RemindersPage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
   const reminders = useMemo(
     () => sortReminders(showcase?.reminders ?? [], nowSeconds),
@@ -57,22 +67,36 @@ export function RemindersPage() {
               data-testid={`reminder-${reminder.id}`}
               key={reminder.id}
             >
-              <span
+              {/* The marker is the control. A reminder is finished by ticking
+                  it off, and a separate button beside an icon that already means
+                  "done" would be two things saying one thing. */}
+              <button
+                aria-label={reminder.done ? "未完了に戻す" : "完了にする"}
                 className={cn(
-                  "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full",
+                  "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full transition-colors",
                   reminder.done
                     ? "bg-secondary text-secondary-foreground"
                     : overdue
                       ? "bg-primary text-primary-foreground"
                       : "bg-secondary text-secondary-foreground",
+                  update && "hover:opacity-80",
                 )}
+                data-testid={`toggle-reminder-${reminder.id}`}
+                disabled={update === null}
+                onClick={() => {
+                  update?.((current) =>
+                    setReminderDone(current, reminder.id, !reminder.done),
+                  );
+                  if (!reminder.done) toast.success("完了にしました");
+                }}
+                type="button"
               >
                 {reminder.done ? (
                   <Check aria-hidden className="size-3" />
                 ) : (
                   <Bell aria-hidden className="size-3" />
                 )}
-              </span>
+              </button>
 
               <div className="min-w-0 flex-1">
                 <p
@@ -98,14 +122,41 @@ export function RemindersPage() {
                   <div className="mt-2 flex flex-wrap gap-1">
                     {SNOOZE_OPTIONS.map((option) => (
                       <button
-                        className="rounded-md border border-border px-2 py-0.5 text-badge text-muted-foreground disabled:opacity-60"
-                        disabled
+                        className="rounded-md border border-border px-2 py-0.5 text-badge text-muted-foreground hover:bg-accent disabled:opacity-60"
+                        data-testid={`snooze-${option.minutes}-${reminder.id}`}
+                        disabled={update === null}
                         key={option.label}
+                        onClick={() => {
+                          update?.((current) =>
+                            snoozeReminder(
+                              current,
+                              reminder.id,
+                              option.minutes * 60,
+                              Math.floor(Date.now() / 1000),
+                            ),
+                          );
+                          toast.success(`${option.label}に持ち越しました`);
+                        }}
                         type="button"
                       >
                         {option.label}
                       </button>
                     ))}
+                    <button
+                      aria-label="このリマインダーを消す"
+                      className="rounded-md border border-border px-2 py-0.5 text-badge text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                      data-testid={`remove-reminder-${reminder.id}`}
+                      disabled={update === null}
+                      onClick={() => {
+                        update?.((current) =>
+                          removeReminder(current, reminder.id),
+                        );
+                        toast.success("消しました");
+                      }}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden className="size-2.5" />
+                    </button>
                   </div>
                 )}
               </div>

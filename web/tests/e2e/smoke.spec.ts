@@ -1053,8 +1053,16 @@ test("creating a channel publishes kind:9007 and opens the room", async ({
     "Design Review",
   );
 
+  // Type and visibility are value rows: the row shows the current answer and
+  // opens a menu of the alternatives.
+  await page.getByTestId("create-channel-visibility").click();
   await page.getByTestId("create-channel-visibility-private").click();
+  await expect(page.getByTestId("create-channel-visibility")).toContainText(
+    "Private",
+  );
+  await page.getByTestId("create-channel-type").click();
   await page.getByTestId("create-channel-type-forum").click();
+  await expect(page.getByTestId("create-channel-type")).toContainText("Forum");
   await page.getByTestId("create-channel-about").fill("weekly");
   await page.getByTestId("create-channel-submit").click();
 
@@ -1798,6 +1806,116 @@ test("the theme choice survives a reload", async ({ page }) => {
     "aria-pressed",
     "true",
   );
+});
+
+test("the palette is derived from the theme, not read from the stylesheet", async ({
+  page,
+}) => {
+  // This is the whole point of the theme engine, and it is invisible to every
+  // other assertion in this file: if `ThemeProvider` stopped applying derived
+  // vars, the app would still render — just in the fallback palette nobody
+  // chose. So assert the mechanism, not a color.
+  const relay = mockRelay(page);
+  await relay.install();
+  await page.goto("/");
+
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.documentElement.style.getPropertyValue("--background").trim(),
+      ),
+    )
+    .not.toBe("");
+
+  const applied = await page.evaluate(() => ({
+    // An inline value on :root can only have come from the theme engine.
+    inlineBackground: document.documentElement.style
+      .getPropertyValue("--background")
+      .trim(),
+    nuxxTheme: document.documentElement.getAttribute("data-nuxx-theme"),
+  }));
+
+  // The pre-hydration fallback in globals.css. Seeing it here means the derived
+  // vars never landed.
+  expect(applied.inlineBackground).not.toBe("220 23.08% 94.9%");
+  expect(applied.inlineBackground).not.toBe("232 23.4% 18.43%");
+  // The default theme is the branded one, which is what carries the gradient.
+  expect(applied.nuxxTheme).toBe("nuxx");
+});
+
+test("the branded theme paints its gradient, and other themes do not", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+  await page.goto("/");
+
+  const lightLayer = page.locator('[data-nuxx-gradient="light"]');
+  await expect(lightLayer).toHaveCSS("opacity", "1");
+  await expect(lightLayer).not.toHaveCSS("background-image", "none");
+
+  // The layer sits at a negative z-index, so it needs the shell root to be a
+  // stacking context — without one it paints behind the root's own background
+  // and disappears while staying fully opaque. Opacity alone cannot see that,
+  // which is why the precondition is asserted directly.
+  await expect(page.getByTestId("app-surface")).toHaveCSS(
+    "isolation",
+    "isolate",
+  );
+
+  // A theme outside the Nuxx pair has no gradient of its own: both layers stay
+  // transparent rather than one bleeding through the wrong palette.
+  await page.evaluate(() => {
+    localStorage.setItem("nuxx-theme", "vitesse-dark");
+    localStorage.setItem("nuxx-follow-system", "false");
+  });
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-nuxx-sidebar",
+    /.*/,
+  );
+  await expect(lightLayer).toHaveCSS("opacity", "0");
+  await expect(page.locator('[data-nuxx-gradient="dark"]')).toHaveCSS(
+    "opacity",
+    "0",
+  );
+});
+
+test("a chosen theme brings its own palette, and the accent is separate", async ({
+  page,
+}) => {
+  const relay = mockRelay(page);
+  await relay.install();
+  await page.goto("/settings");
+
+  await page.getByTestId("theme-name").selectOption("vitesse-dark");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  // Vitesse Dark is cream on near-black: a warm hue on the foreground is the
+  // cheapest way to assert the palette actually came from the theme JSON rather
+  // than from a hardcoded dark mode.
+  const foregroundHue = await page.evaluate(() =>
+    Number(
+      document.documentElement.style
+        .getPropertyValue("--foreground")
+        .trim()
+        .split(" ")[0],
+    ),
+  );
+  expect(foregroundHue).toBeGreaterThan(20);
+  expect(foregroundHue).toBeLessThan(70);
+
+  // The accent is chosen, not derived, so it survives the theme deciding
+  // everything else.
+  await page.getByTestId("accent-6366f1").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.documentElement.style.getPropertyValue("--primary").trim(),
+      ),
+    )
+    .toMatch(/^238/);
 });
 
 test("settings names the key custody honestly", async ({ page }) => {

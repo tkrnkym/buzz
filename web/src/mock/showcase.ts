@@ -16,6 +16,7 @@
  * so replacing this module with a relay-backed hook is a swap and not a rewrite.
  */
 
+import type { StepForm, TriggerForm } from "@/features/workflows/workflow-form";
 import {
   AGENT_RELEASE,
   AGENT_REVIEWER,
@@ -142,6 +143,19 @@ export interface WorkflowRun {
   steps: WorkflowStep[];
 }
 
+/**
+ * The definition a workflow was built with, kept so it can be edited again.
+ *
+ * Type-only, from the builder's own model rather than restated here: a copy would
+ * drift the moment a step field is added, and drift in this direction is silent —
+ * the extra field would simply not survive a round-trip. `workflow-form.ts` imports
+ * nothing, so this does not put the fixtures in a cycle.
+ */
+export interface WorkflowDefinition {
+  trigger: TriggerForm;
+  steps: StepForm[];
+}
+
 export interface ShowcaseWorkflow {
   id: string;
   name: string;
@@ -151,6 +165,14 @@ export interface ShowcaseWorkflow {
   triggerDetail: string;
   enabled: boolean;
   channel: string;
+  /**
+   * What the builder submitted, when this row came from the builder.
+   *
+   * Absent on seeded rows, which only ever recorded what *ran* — those still open
+   * with their steps approximated from history. Present means the definition is
+   * authoritative and edits round-trip exactly.
+   */
+  definition?: WorkflowDefinition;
   lastRun: WorkflowRun | null;
   runs: WorkflowRun[];
   /** Runs held for a human decision. */
@@ -167,7 +189,13 @@ export interface PulseEntry {
   body: string;
   channel: string | null;
   at: number;
-  reactions: { emoji: string; count: number }[];
+  /**
+   * `count` is everyone; `mine` is whether the reader is one of them.
+   *
+   * Without the second field a chip cannot tell joining from withdrawing, and a
+   * click on a reaction two other people hold reads as removing one of theirs.
+   */
+  reactions: { emoji: string; count: number; mine?: boolean }[];
 }
 
 export interface Reminder {

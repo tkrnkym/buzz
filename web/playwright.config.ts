@@ -29,11 +29,35 @@ export default defineConfig({
         ...(executablePath ? { launchOptions: { executablePath } } : {}),
       },
     },
+    {
+      // The mock-up screens (Workflows, Agents, Projects, Forum, Reminders,
+      // members, huddle, Pulse) only have data behind them when the bundle is
+      // built with VITE_MOCK_RELAY=1 — outside that build their fixtures are
+      // deliberately null, so the smoke project cannot reach them at all. Hence
+      // a second bundle and a second preview server rather than a flag.
+      name: "showcase",
+      testMatch: ["**/showcase.spec.ts"],
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(executablePath ? { launchOptions: { executablePath } } : {}),
+        baseURL: "http://127.0.0.1:4174",
+      },
+    },
   ],
-  webServer: {
-    command: "pnpm exec vite preview --port 4173 --strictPort --host 127.0.0.1",
-    cwd: ".",
-    reuseExistingServer: !process.env.CI,
-    url: "http://127.0.0.1:4173",
-  },
+  webServer: [
+    {
+      command:
+        "pnpm exec vite preview --port 4173 --strictPort --host 127.0.0.1",
+      cwd: ".",
+      reuseExistingServer: !process.env.CI,
+      url: "http://127.0.0.1:4173",
+    },
+    {
+      command:
+        "pnpm exec vite preview --outDir dist-mock --port 4174 --strictPort --host 127.0.0.1",
+      cwd: ".",
+      reuseExistingServer: !process.env.CI,
+      url: "http://127.0.0.1:4174",
+    },
+  ],
 });

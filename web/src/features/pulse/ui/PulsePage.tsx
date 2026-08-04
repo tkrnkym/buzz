@@ -7,8 +7,12 @@ import {
   resolveUserLabel,
 } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
+import { togglePulseReaction } from "@/features/showcase/showcase-mutations";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import type { PulseTab } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
@@ -27,8 +31,12 @@ const TABS: { value: PulseTab; label: string }[] = [
  * reasons — a note is something to remember, an agent report is something that
  * just happened — and mixing them by default buries the shorter list.
  */
+/** Offered on every entry, so reacting is one click rather than a picker. */
+const QUICK_REACTIONS = ["👍", "🎉", "👀"];
+
 export function PulsePage() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
   const [tab, setTab] = useState<PulseTab>("all");
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
 
@@ -121,21 +129,61 @@ export function PulsePage() {
                 <p className="mt-1 whitespace-pre-wrap text-2xs text-muted-foreground">
                   {entry.body}
                 </p>
-                {entry.reactions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {entry.reactions.map((reaction) => (
-                      <span
-                        className="inline-flex h-6 items-center gap-1 rounded-full border border-border bg-secondary px-2 text-2xs leading-none"
-                        key={reaction.emoji}
-                      >
-                        {reaction.emoji}
-                        <span className="tabular-nums text-muted-foreground">
-                          {reaction.count}
-                        </span>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {entry.reactions.map((reaction) => (
+                    <button
+                      aria-label={`${reaction.emoji} ${reaction.count}`}
+                      aria-pressed={reaction.mine ?? false}
+                      className={cn(
+                        "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs leading-none disabled:opacity-60",
+                        // Same distinction the real timeline draws on its own
+                        // reactions, so a chip says whether the next click joins
+                        // or withdraws.
+                        reaction.mine
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-secondary hover:bg-accent",
+                      )}
+                      data-testid={`pulse-reaction-${entry.id}-${reaction.emoji}`}
+                      disabled={update === null}
+                      key={reaction.emoji}
+                      onClick={() =>
+                        update?.((current) =>
+                          togglePulseReaction(
+                            current,
+                            entry.id,
+                            reaction.emoji,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {reaction.emoji}
+                      <span className="tabular-nums text-muted-foreground">
+                        {reaction.count}
                       </span>
+                    </button>
+                  ))}
+                  {update &&
+                    QUICK_REACTIONS.filter(
+                      (emoji) =>
+                        !entry.reactions.some((row) => row.emoji === emoji),
+                    ).map((emoji) => (
+                      <button
+                        aria-label={`${emoji} で反応する`}
+                        className="inline-flex h-6 items-center rounded-full border border-dashed border-border px-2 text-2xs leading-none text-muted-foreground hover:bg-accent"
+                        data-testid={`pulse-add-reaction-${entry.id}-${emoji}`}
+                        key={emoji}
+                        onClick={() =>
+                          update((current) =>
+                            togglePulseReaction(current, entry.id, emoji),
+                          )
+                        }
+                        type="button"
+                      >
+                        {emoji}
+                      </button>
                     ))}
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           </li>

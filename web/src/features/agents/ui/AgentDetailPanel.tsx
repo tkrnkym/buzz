@@ -1,4 +1,4 @@
-import { Bot, Pause, Play, Trash2 } from "lucide-react";
+import { Bot, Pause, Pencil, Play, Trash2 } from "lucide-react";
 
 import {
   AGENT_STATUS_DOT,
@@ -29,15 +29,23 @@ function Field({ label, value }: { label: string; value: string }) {
  * behaviour is not visible from its name and every question about one starts
  * there.
  *
- * The controls are inert: this screen has no relay path yet, and a Pause button
- * that silently does nothing is worse than one that says so.
+ * The controls act on the demo's own fixtures. Without a store to write to they
+ * are disabled and the panel says why — a Pause button that silently does nothing
+ * is worse than one that admits it.
  */
 export function AgentDetailPanel({
   agent,
   nowSeconds,
+  onDelete,
+  onEdit,
+  onTogglePaused,
 }: {
   agent: ShowcaseAgent;
   nowSeconds: number;
+  /** Omitted when there is nothing to write to; the controls then say so. */
+  onDelete?: () => void;
+  onEdit?: () => void;
+  onTogglePaused?: () => void;
 }) {
   const profiles = useProfiles([agent.ownerPubkey]);
   const owner = resolveUserLabel({
@@ -100,7 +108,9 @@ export function AgentDetailPanel({
         <div className="flex gap-2">
           <button
             className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-2xs font-medium disabled:opacity-60"
-            disabled
+            data-testid="toggle-agent-paused"
+            disabled={!onTogglePaused}
+            onClick={onTogglePaused}
             type="button"
           >
             {agent.status === "paused" ? (
@@ -111,17 +121,31 @@ export function AgentDetailPanel({
             {agent.status === "paused" ? "再開" : "一時停止"}
           </button>
           <button
+            className="flex items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-2xs font-medium disabled:opacity-60"
+            data-testid="edit-agent"
+            disabled={!onEdit}
+            onClick={onEdit}
+            type="button"
+          >
+            <Pencil aria-hidden className="size-3" />
+            編集
+          </button>
+          <button
             className="flex items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-2xs font-medium text-destructive disabled:opacity-60"
-            disabled
+            data-testid="delete-agent"
+            disabled={!onDelete}
+            onClick={onDelete}
             type="button"
           >
             <Trash2 aria-hidden className="size-3" />
             削除
           </button>
         </div>
-        <p className="text-badge text-muted-foreground">
-          操作はまだリレーにつながっていません。
-        </p>
+        {!onEdit && (
+          <p className="text-badge text-muted-foreground">
+            操作はまだリレーにつながっていません。
+          </p>
+        )}
       </div>
     </aside>
   );

@@ -63,7 +63,14 @@ jobs:
               - 'scripts/test-mobile-release-candidate-publisher.sh'
               - 'scripts/test-mobile-worktree-overrides.sh'
               - '.github/workflows/mobile-release-candidate.yml'
-              - '.github/workflows/ci.yml'
+              # Deliberately NOT '.github/workflows/ci.yml'. Every other filter
+              # watches this file so that editing a job re-runs it, but that also
+              # pulled the six-minute Android build into changes that cannot
+              # affect the app — a web or relay author editing a CI step got
+              # Mobile whether it was relevant or not. The cost of leaving it out
+              # is that a change to the Mobile job itself is not validated on the
+              # PR that makes it; it is caught on the next push to main. Re-add
+              # this line only if that trade stops being worth it.
       - name: Release workflow source contract
         run: scripts/test-release-ref-contract.sh
       - name: Mobile release contract
@@ -445,7 +452,9 @@ jobs:
           path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Web smoke e2e
-        run: just web-e2e-smoke
+        # Both browser projects: the smoke suite against the ordinary bundle,
+        # and the mock-up screens against the VITE_MOCK_RELAY=1 one.
+        run: just web-e2e
       - name: Upload web smoke e2e artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
