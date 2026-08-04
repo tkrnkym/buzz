@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { AtSign, MessageSquareReply, Send } from "lucide-react";
 import { useMemo } from "react";
 
@@ -32,14 +31,23 @@ const VISIBLE_LIMIT = 30;
 /**
  * Messages addressed to this reader — mentions, DMs, and replies.
  *
- * Each row links to the message, not just the room, so following one lands on the
- * thing that was said rather than at the bottom of a busy channel.
+ * A row selects rather than navigates. It used to link straight into the channel,
+ * which meant reading one mention cost the reader the list they were working
+ * through — the detail pane beside it is what the link became, and the way out to
+ * the channel lives there, still anchored on the message rather than the room.
  *
  * Unread is derived from the channel cursor, so reading the room clears these
  * too. There is no dismiss button, deliberately: a second read state to keep in
  * step with the first is how the two end up disagreeing.
  */
-export function NotificationList() {
+export function NotificationList({
+  onSelect,
+  selectedId,
+}: {
+  onSelect: (id: string) => void;
+  /** The row currently in the detail pane, or `null` when there is none. */
+  selectedId: string | null;
+}) {
   const { items, loaded, unreadCount } = useNotifications();
   const { channels, dms, readState } = useShell();
 
@@ -159,28 +167,20 @@ export function NotificationList() {
 
           return (
             <li key={item.id}>
-              {item.channelId ? (
-                <Link
-                  className="flex items-start gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-accent hover:text-accent-foreground"
-                  data-testid={`notification-${item.id}`}
-                  params={{ channelId: item.channelId }}
-                  // The message id, so following the row lands on what was said
-                  // rather than at the bottom of the room.
-                  search={{ m: item.id }}
-                  to="/c/$channelId"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                // No channel tag: nothing to link to, but the message still
-                // happened and hiding it would be the worse lie.
-                <div
-                  className="flex items-start gap-3 px-2 py-2.5"
-                  data-testid={`notification-${item.id}`}
-                >
-                  {inner}
-                </div>
-              )}
+              <button
+                aria-current={selectedId === item.id}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+                  selectedId === item.id
+                    ? "bg-accent text-accent-foreground"
+                    : "hover:bg-accent/50",
+                )}
+                data-testid={`notification-${item.id}`}
+                onClick={() => onSelect(item.id)}
+                type="button"
+              >
+                {inner}
+              </button>
             </li>
           );
         })}

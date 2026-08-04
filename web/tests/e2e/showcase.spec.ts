@@ -700,3 +700,70 @@ test("the invite link is copied from where a missing person is noticed", async (
     "/invite/demo-code",
   );
 });
+
+// --- Inbox -----------------------------------------------------------------
+
+test("a mention is read in its conversation without leaving the inbox", async ({
+  page,
+}) => {
+  // The rows used to be links, so reading one mention cost the reader the list
+  // they were working through and landed them in a busy channel.
+  await page.goto("/home");
+  const rows = page.getByTestId("notification-rows");
+  await expect(rows).toBeVisible();
+  await rows
+    .getByTestId(/^notification-/)
+    .first()
+    .click();
+
+  await expect(page).toHaveURL(/\/home$/);
+  const detail = page.getByTestId("inbox-detail");
+  await expect(detail.getByTestId("inbox-detail-notification")).toBeVisible();
+  // The point of the pane: the message that named the reader, marked, among the
+  // messages around it — a mention on its own often answers a question one row up.
+  await expect(detail.getByTestId("inbox-detail-subject")).toBeVisible();
+  await expect(detail.getByTestId("inbox-open-in-channel")).toBeVisible();
+});
+
+test("the inbox opens on a notification rather than on nothing", async ({
+  page,
+}) => {
+  // A pane that starts empty makes the reader click twice to see anything, and a
+  // message with their name on it outranks the news that a room moved.
+  await page.goto("/home");
+  await expect(
+    page.getByTestId("inbox-detail").getByTestId("inbox-detail-notification"),
+  ).toBeVisible();
+  await expect(page.getByTestId("inbox-detail-empty")).toHaveCount(0);
+});
+
+test("a room row says only what a room row can know", async ({ page }) => {
+  await page.goto("/home");
+  await page.getByTestId("inbox-row-design").click();
+
+  const room = page.getByTestId("inbox-detail-room");
+  await expect(room).toBeVisible();
+  // Room rows come from per-channel activity snapshots, which report that a
+  // channel moved and nothing about who said what — so the pane says that
+  // instead of inventing a message to preview.
+  await expect(room).toContainText("開いて確かめてください");
+  await expect(page.getByTestId("inbox-detail-notification")).toHaveCount(0);
+});
+
+test("selecting a room and then a mention moves the pane both ways", async ({
+  page,
+}) => {
+  await page.goto("/home");
+  await page.getByTestId("inbox-row-design").click();
+  await expect(page.getByTestId("inbox-detail-room")).toBeVisible();
+
+  const first = page
+    .getByTestId("notification-rows")
+    .getByTestId(/^notification-/)
+    .first();
+  await first.click();
+  await expect(page.getByTestId("inbox-detail-notification")).toBeVisible();
+  await expect(page.getByTestId("inbox-detail-room")).toHaveCount(0);
+  // The selected row is the one lit, so the list still says what the pane shows.
+  await expect(first).toHaveAttribute("aria-current", "true");
+});

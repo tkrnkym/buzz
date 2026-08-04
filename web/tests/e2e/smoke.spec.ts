@@ -3485,7 +3485,7 @@ test("an ordinary channel message is not a notification", async ({ page }) => {
   await expect(page.getByTestId("notifications-empty")).toBeVisible();
 });
 
-test("a notification links to the message, not just the room", async ({
+test("a notification opens beside the list, and its way out anchors on the message", async ({
   page,
 }) => {
   const mention = {
@@ -3500,11 +3500,19 @@ test("a notification links to the message, not just the room", async ({
   await relay.install();
 
   await page.goto("/home");
+  // The row selects rather than navigating: an inbox is for triage, and reading
+  // one mention used to cost the reader the list they were working through.
   await page.getByTestId(`notification-${mention.id}`).click();
-  // `m` anchors the view on the message, so following one lands on what was said
-  // rather than at the bottom of a busy channel. The router JSON-encodes search
-  // values, so the id arrives quoted — asserted on the parsed value rather than
-  // the raw string, which is what the route actually reads.
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(
+    page.getByTestId("inbox-detail").getByText("ここを見てください"),
+  ).toBeVisible();
+
+  // The link out is still on the message rather than the room. `m` anchors the
+  // view on it, so it lands on what was said rather than at the bottom of a busy
+  // channel. The router JSON-encodes search values, so the id arrives quoted —
+  // asserted on the parsed value, which is what the route actually reads.
+  await page.getByTestId("inbox-open-in-channel").click();
   await expect(page).toHaveURL(new RegExp(`/c/${CHANNEL_UUID}\\?m=`));
   const anchored = await page.evaluate(() => {
     const raw = new URL(window.location.href).searchParams.get("m");
