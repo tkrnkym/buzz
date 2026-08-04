@@ -1,3 +1,4 @@
+import { Users } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -19,7 +20,12 @@ import {
 import { usePresence, useTyping } from "@/features/chat/use-presence";
 import { useEmojiCatalog } from "@/features/emoji/use-emoji";
 import { HuddleBar } from "@/features/huddle/ui/HuddleBar";
+import {
+  togglePane,
+  type ChannelPane,
+} from "@/features/channels/channel-roster-model";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
+import { ChannelRosterPanel } from "@/features/channels/ui/ChannelRosterPanel";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
 import { useMuteList } from "@/features/moderation/use-moderation";
 import { useProfiles } from "@/features/profile/profile-store";
@@ -30,6 +36,7 @@ import { useUnreadFrontier } from "@/features/messages/use-unread-frontier";
 import { SearchResults } from "@/features/search/ui/SearchResults";
 import { useShell } from "@/features/shell/shell-context";
 import { ChannelWelcome } from "@/features/shell/ui/ChannelWelcome";
+import { cn } from "@/shared/lib/cn";
 import { SidebarTrigger } from "@/shared/ui/sidebar";
 
 /** First line of a message, for the reply banner. */
@@ -103,14 +110,18 @@ export function ChatPage({
     target: ReplyTarget;
   } | null>(null);
   const replyTo = reply?.channelId === channelId ? reply.target : null;
-  // Same discipline for the open thread: a root id from another channel would
-  // render a panel of messages that are not in this room.
-  const [thread, setThread] = useState<{
+  // Same discipline for the side pane: a thread root from another channel would
+  // render a panel of messages that are not in this room, and a roster left open
+  // from a channel is still the right pane for the next one.
+  //
+  // One pane rather than two booleans — see `togglePane`. Two 288–384px panels
+  // beside the timeline on a 1280px window leave it narrower than either.
+  const [pane, setPane] = useState<{
     channelId: string;
-    rootId: string;
+    pane: ChannelPane;
   } | null>(null);
-  const openThreadRootId =
-    thread?.channelId === channelId ? thread.rootId : null;
+  const openPane = pane?.channelId === channelId ? pane.pane : null;
+  const openThreadRootId = openPane?.kind === "thread" ? openPane.rootId : null;
 
   // Searched across both lists: a DM is not in `channels` (the relay marks it
   // hidden), and a header that could not find it would title the room "Channels".
@@ -185,8 +196,9 @@ export function ChatPage({
       });
       // Open the thread being replied to: replies do not appear in the channel
       // timeline, so without this the reader would send into a thread they
-      // cannot see.
-      setThread({ channelId, rootId });
+      // cannot see. Opened outright rather than toggled — hitting reply must
+      // never be the click that hides the thread being replied to.
+      setPane({ channelId, pane: { kind: "thread", rootId } });
     },
     [channelId],
   );
@@ -197,11 +209,23 @@ export function ChatPage({
    * The two have to move together. A panel open with the composer still aimed at
    * the channel is the trap: the reader is looking at a thread, types, and the
    * message lands in the room instead — the one place they could not see it.
+   *
+   * The summary row is a toggle, so clicking the thread that is already open
+   * closes it; that also returns the composer to the channel, for the same
+   * reason it has to follow the panel open.
    */
   const onOpenThread = useCallback(
     (rootId: string) => {
       if (!channelId) return;
-      setThread({ channelId, rootId });
+      const next = togglePane(
+        pane?.channelId === channelId ? pane.pane : null,
+        { kind: "thread", rootId },
+      );
+      setPane(next === null ? null : { channelId, pane: next });
+      if (next === null) {
+        setReply(null);
+        return;
+      }
       const root = timelineRowsRef.current.find(
         (candidate) => candidate.message.id === rootId,
       );
@@ -216,14 +240,27 @@ export function ChatPage({
         },
       });
     },
-    [channelId],
+    [channelId, pane],
   );
 
-  /** Close the thread and return the composer to the channel. */
-  const onCloseThread = useCallback(() => {
-    setThread(null);
+  /** Close the side pane and return the composer to the channel. */
+  const onClosePane = useCallback(() => {
+    setPane(null);
     setReply(null);
   }, []);
+
+  /** The roster, which replaces an open thread rather than crowding it. */
+  const onToggleRoster = useCallback(() => {
+    if (!channelId) return;
+    const next = togglePane(pane?.channelId === channelId ? pane.pane : null, {
+      kind: "roster",
+    });
+    setPane(next === null ? null : { channelId, pane: next });
+    // The composer follows the thread panel, so a thread being replaced has to
+    // let go of it — otherwise the reader is looking at the roster with the
+    // composer still aimed at a thread they can no longer see.
+    if (next === null || next.kind === "roster") setReply(null);
+  }, [channelId, pane]);
 
   const onCopyLink = useCallback(
     (row: TimelineRow) => {
@@ -322,6 +359,25 @@ export function ChatPage({
               error={readState.error}
             />
             <RelayStatus />
+            {/* Only where there is a room to have members. A search has no
+                roster, and neither does the welcome screen. */}
+            {channelId && !query && (
+              <button
+                aria-label="メンバー"
+                aria-pressed={openPane?.kind === "roster"}
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  openPane?.kind === "roster"
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground",
+                )}
+                data-testid="toggle-roster"
+                onClick={onToggleRoster}
+                type="button"
+              >
+                <Users aria-hidden className="size-4" />
+              </button>
+            )}
           </div>
         </header>
 
@@ -351,7 +407,7 @@ export function ChatPage({
               channelName={activeLabel ?? channelId}
               channelParticipants={activeChannel?.participantPubkeys}
               isDm={isDm}
-              onCancelReply={onCloseThread}
+              onCancelReply={onClosePane}
               onComposing={typing.announce}
               onSent={typing.complete}
               replyTo={replyTo}
@@ -362,12 +418,21 @@ export function ChatPage({
         )}
       </section>
 
-      {openThreadRootId !== null && !query && (
+      {!query && openThreadRootId !== null && (
         <ThreadPanel
           actions={rowActions}
-          onClose={onCloseThread}
+          onClose={onClosePane}
           rootId={openThreadRootId}
           rows={rows}
+        />
+      )}
+
+      {!query && openPane?.kind === "roster" && (
+        <ChannelRosterPanel
+          // A DM has no roster to name: the two people in it are the title.
+          channelName={isDm ? null : activeLabel}
+          onClose={onClosePane}
+          statusOf={presence.statusOf}
         />
       )}
     </div>

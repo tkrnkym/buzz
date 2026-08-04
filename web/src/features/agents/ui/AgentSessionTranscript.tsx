@@ -14,7 +14,7 @@ import {
 import { useState } from "react";
 
 import {
-  diffLineParts,
+  diffRows,
   diffStat,
   groupSessionEvents,
   readsLabel,
@@ -91,28 +91,22 @@ function DiffBody({ lines, path }: { lines: string[]; path: string }) {
         <span className="text-badge text-status-deleted">−{removed}</span>
       </div>
       <div className="overflow-x-auto rounded-md border border-border">
-        {lines.map((line, index) => {
-          const { sign, text } = diffLineParts(line);
-          return (
-            <div
-              className={cn(
-                "whitespace-pre px-2 py-0.5 font-mono text-2xs",
-                sign === "add" && "bg-status-added/10 text-foreground",
-                sign === "remove" &&
-                  "bg-status-deleted/10 text-muted-foreground",
-                sign === "context" && "text-muted-foreground",
-              )}
-              // The line's own text is not unique in a diff — two identical
-              // context lines are normal — so the index is the honest key here.
-              key={`${index}-${line}`}
-            >
-              <span className="select-none text-muted-foreground">
-                {sign === "add" ? "+" : sign === "remove" ? "−" : " "}
-              </span>
-              {text}
-            </div>
-          );
-        })}
+        {diffRows(lines).map(({ key, sign, text }) => (
+          <div
+            className={cn(
+              "whitespace-pre px-2 py-0.5 font-mono text-2xs",
+              sign === "add" && "bg-status-added/10 text-foreground",
+              sign === "remove" && "bg-status-deleted/10 text-muted-foreground",
+              sign === "context" && "text-muted-foreground",
+            )}
+            key={key}
+          >
+            <span className="select-none text-muted-foreground">
+              {sign === "add" ? "+" : sign === "remove" ? "−" : " "}
+            </span>
+            {text}
+          </div>
+        ))}
       </div>
     </div>
   );

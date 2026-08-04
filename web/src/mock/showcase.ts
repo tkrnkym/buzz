@@ -30,6 +30,8 @@ import {
 const now = Math.floor(Date.now() / 1000);
 /** Minutes ago, so the demo always looks alive regardless of when it loads. */
 const ago = (minutes: number) => now - minutes * 60;
+/** Minutes from now, for the states that are still running when the demo opens. */
+const ahead = (minutes: number) => now + minutes * 60;
 
 export type AgentStatus = "working" | "idle" | "paused" | "error";
 
@@ -931,8 +933,12 @@ export const SHOWCASE: Showcase = {
     {
       pubkey: AYA,
       role: "member",
+      // One member under a running timeout. `timeoutUntil` existed on the type
+      // from the start and nothing ever rendered it, so the state a moderator
+      // creates was invisible everywhere in the client — the roster is where it
+      // belongs, since "can this person speak here" is the roster's question.
       joinedAt: ago(60 * 24 * 90),
-      timeoutUntil: null,
+      timeoutUntil: ahead(23),
     },
     {
       pubkey: RELAY,
@@ -1172,7 +1178,7 @@ export const SHOWCASE: Showcase = {
             " async fn advance_cursor(&self, req: CursorReq) -> Result<()> {",
             "-    self.store.set_cursor(req.channel, req.at).await?;",
             "-    self.publish(req).await",
-            "+    // The cursor is what the reader sees as \"already read\", so it must",
+            '+    // The cursor is what the reader sees as "already read", so it must',
             "+    // not move until the relay has taken the event.",
             "+    self.publish(req.clone()).await?;",
             "+    self.store.set_cursor(req.channel, req.at).await",

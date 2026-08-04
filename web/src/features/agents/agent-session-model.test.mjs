@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   diffLineParts,
+  diffRows,
   diffStat,
   eventsUpTo,
   groupSessionEvents,
@@ -147,6 +148,17 @@ test("diff lines are split so the sign is not printed twice", () => {
   // A context line with no leading space still reads as context rather than
   // losing its first character.
   assert.deepEqual(diffLineParts("kept"), { sign: "context", text: "kept" });
+});
+
+test("every diff row gets its own identity, even when the text repeats", () => {
+  // A diff has no ids and its text is not unique — two identical context lines
+  // are normal — so "the third added line" has to be constructed.
+  const rows = diffRows([" same", " same", "+x", "+x"]);
+  assert.deepEqual(
+    rows.map((row) => row.key),
+    ["context:1", "context:2", "add:1", "add:2"],
+  );
+  assert.equal(new Set(rows.map((row) => row.key)).size, rows.length);
 });
 
 test("the diff stat counts only changed lines", () => {

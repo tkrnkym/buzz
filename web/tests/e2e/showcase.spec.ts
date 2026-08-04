@@ -538,7 +538,10 @@ test("the last owner cannot be demoted or removed", async ({ page }) => {
 
 // --- Huddle ----------------------------------------------------------------
 
-/** #dev, where the fixture huddle is. The bar only renders inside a channel. */
+/**
+ * #dev, where the fixture huddle is and the two assigned agents are. The huddle
+ * bar and the roster both only render inside a channel.
+ */
 const CH_DEV = "22222222-2222-4222-8222-222222222222";
 
 test("an agent is called into the huddle, and joins muted", async ({
@@ -612,4 +615,88 @@ test("an existing reaction can be joined, then withdrawn", async ({ page }) => {
   await chip.click();
   await expect(chip).toContainText(String(before));
   await expect(chip).toHaveAttribute("aria-pressed", "false");
+});
+
+// --- Channel roster --------------------------------------------------------
+
+test("a channel says who is in it, with agents kept apart from people", async ({
+  page,
+}) => {
+  // Membership used to be reachable only from Settings, which answers "who is in
+  // the community" and not the question someone reading a room has.
+  await page.goto(`/c/${CH_DEV}`);
+  await page.getByTestId("toggle-roster").click();
+
+  const roster = page.getByTestId("roster-panel");
+  await expect(roster).toBeVisible();
+  // Counted separately: "6人" for four people and two agents would overstate how
+  // many humans are in the room.
+  await expect(roster).toContainText("4人・エージェント2");
+  await expect(roster.getByTestId(/^roster-person-/)).toHaveCount(4);
+  await expect(roster.getByTestId("roster-agent-レビュー係")).toBeVisible();
+  await expect(roster.getByTestId("roster-agent-トリアージ")).toBeVisible();
+  // An agent assigned only to #announcements is not in this room.
+  await expect(roster.getByTestId("roster-agent-リリース番")).toHaveCount(0);
+});
+
+test("a channel with no agents shows only its people", async ({ page }) => {
+  await page.goto("/c/33333333-3333-4333-8333-333333333333");
+  await page.getByTestId("toggle-roster").click();
+
+  const roster = page.getByTestId("roster-panel");
+  await expect(roster).toContainText("4人");
+  await expect(roster.getByTestId(/^roster-agent-/)).toHaveCount(0);
+});
+
+test("a member under a timeout is shown as one", async ({ page }) => {
+  // `timeoutUntil` was on the member type from the start and nothing rendered
+  // it, so a moderator's timeout was invisible everywhere in the client.
+  await page.goto(`/c/${CH_DEV}`);
+  await page.getByTestId("toggle-roster").click();
+
+  const timeout = page.getByTestId(/^roster-timeout-/);
+  await expect(timeout).toHaveCount(1);
+  await expect(timeout).toContainText("タイムアウト中");
+});
+
+test("the roster and a thread take turns rather than crowding the timeline", async ({
+  page,
+}) => {
+  // Two 288–384px panels beside the timeline on a 1280px window leave it
+  // narrower than either, so opening one has to close the other.
+  await page.goto(`/c/${CH_DEV}`);
+  // The first row that actually has a reply control: the sidebar's own list
+  // items come first in the document, and the timeline's own first item is the
+  // "Load older messages" button.
+  const row = page
+    .getByRole("listitem")
+    .filter({ has: page.getByTestId("reply-in-thread") })
+    .first();
+  await row.hover();
+  await row.getByTestId("reply-in-thread").click();
+  await expect(page.getByTestId("thread-panel")).toBeVisible();
+
+  await page.getByTestId("toggle-roster").click();
+  await expect(page.getByTestId("roster-panel")).toBeVisible();
+  await expect(page.getByTestId("thread-panel")).toHaveCount(0);
+
+  // And the button it was opened from closes it again.
+  await page.getByTestId("toggle-roster").click();
+  await expect(page.getByTestId("roster-panel")).toHaveCount(0);
+});
+
+test("the invite link is copied from where a missing person is noticed", async ({
+  page,
+}) => {
+  await page.goto(`/c/${CH_DEV}`);
+  await page.getByTestId("toggle-roster").click();
+  await page.getByTestId("roster-invite").click();
+
+  // The toast rather than the clipboard: reading it back needs a permission this
+  // suite does not grant, and the assertion under test is that the row copies
+  // something and says so.
+  await expect(page.getByText("招待リンクをコピーしました")).toBeVisible();
+  await expect(page.getByTestId("roster-invite")).toContainText(
+    "/invite/demo-code",
+  );
 });

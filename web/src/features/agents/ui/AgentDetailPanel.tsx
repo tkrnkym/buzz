@@ -7,7 +7,7 @@ import {
   SkipForward,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   AGENT_STATUS_DOT,
@@ -68,10 +68,16 @@ export function AgentDetailPanel({
   const showcase = useShowcase();
   const events = showcase?.agentSessions[agent.id] ?? [];
   const [tab, setTab] = useState<PanelTab>("overview");
-  // How much of the run is revealed. Reset when the panel changes agent, or the
-  // next agent would open part-way through a run that is not theirs.
-  const [visible, setVisible] = useState(events.length);
-  useEffect(() => setVisible(events.length), [agent.id, events.length]);
+  // How much of the run is revealed, stored with the agent it belongs to and
+  // read back only for a match — the same discipline the chat pane uses for its
+  // reply target. Two agents can have the same number of events, so keying an
+  // effect on the count alone would open the next agent's panel part-way through
+  // a run that is not theirs; deriving it means there is no stale state to reset.
+  const [replay, setReplay] = useState<{
+    agentId: string;
+    visible: number;
+  } | null>(null);
+  const visible = replay?.agentId === agent.id ? replay.visible : events.length;
   const shown = eventsUpTo(events, visible);
   const summary = sessionSummary(events);
 
@@ -168,9 +174,13 @@ export function AgentDetailPanel({
                     className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-badge font-medium hover:bg-accent"
                     data-testid="replay-session"
                     onClick={() =>
-                      setVisible((current) =>
-                        current >= events.length ? 1 : current + 1,
-                      )
+                      setReplay({
+                        agentId: agent.id,
+                        // Past the end, start over: the control is there to watch
+                        // the run unfold, and a button that does nothing once the
+                        // transcript is complete is a dead control.
+                        visible: visible >= events.length ? 1 : visible + 1,
+                      })
                     }
                     type="button"
                   >

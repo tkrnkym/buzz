@@ -151,6 +151,25 @@ export function diffLineParts(line: string): {
   return { sign: "context", text: line.startsWith(" ") ? line.slice(1) : line };
 }
 
+/**
+ * Diff lines with a stable identity each.
+ *
+ * A diff has no ids of its own and its text is not unique — two identical context
+ * lines are normal — so identity has to be constructed. "The third added line" is
+ * what a row actually is, and it stays that under any re-render, which is more
+ * than the array index can promise.
+ */
+export function diffRows(
+  lines: string[],
+): { key: string; sign: "add" | "remove" | "context"; text: string }[] {
+  const seen = { add: 0, remove: 0, context: 0 };
+  return lines.map((line) => {
+    const { sign, text } = diffLineParts(line);
+    seen[sign] += 1;
+    return { key: `${sign}:${seen[sign]}`, sign, text };
+  });
+}
+
 /** `+n −m` for a diff, which is what a reader checks before opening it. */
 export function diffStat(lines: string[]): { added: number; removed: number } {
   let added = 0;
