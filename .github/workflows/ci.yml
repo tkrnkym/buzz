@@ -63,7 +63,14 @@ jobs:
               - 'scripts/test-mobile-release-candidate-publisher.sh'
               - 'scripts/test-mobile-worktree-overrides.sh'
               - '.github/workflows/mobile-release-candidate.yml'
-              - '.github/workflows/ci.yml'
+              # Deliberately NOT '.github/workflows/ci.yml'. Every other filter
+              # watches this file so that editing a job re-runs it, but that also
+              # pulled the six-minute Android build into changes that cannot
+              # affect the app — a web or relay author editing a CI step got
+              # Mobile whether it was relevant or not. The cost of leaving it out
+              # is that a change to the Mobile job itself is not validated on the
+              # PR that makes it; it is caught on the next push to main. Re-add
+              # this line only if that trade stops being worth it.
       - name: Release workflow source contract
         run: scripts/test-release-ref-contract.sh
       - name: Mobile release contract
