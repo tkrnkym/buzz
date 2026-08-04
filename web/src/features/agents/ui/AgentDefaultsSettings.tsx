@@ -2,7 +2,11 @@ import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useShowcase } from "@/features/showcase/use-showcase";
+import { setAgentDefaults } from "@/features/agents/agent-mutations";
+import {
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import type { AgentDefaults } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 
@@ -28,10 +32,14 @@ const EFFORTS: { value: AgentDefaults["effort"]; label: string }[] = [
  */
 export function AgentDefaultsSettings() {
   const showcase = useShowcase();
-  const [defaults, setDefaults] = useState<AgentDefaults | null>(
-    showcase?.agentDefaults ?? null,
-  );
+  const store = useShowcaseUpdate();
+  // A working copy, deliberately: this panel has a save button, so an edit is not
+  // committed until it is pressed. What changed is that the commit now goes to the
+  // shared fixtures instead of nowhere — before, "保存しました" left the working
+  // copy as the only record and the next visit showed the old values back.
+  const [draft, setDraft] = useState<AgentDefaults | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  const defaults = draft ?? showcase?.agentDefaults ?? null;
 
   if (!showcase || !defaults) {
     return (
@@ -42,7 +50,8 @@ export function AgentDefaultsSettings() {
   }
 
   const update = (patch: Partial<AgentDefaults>) =>
-    setDefaults({ ...defaults, ...patch });
+    setDraft({ ...defaults, ...patch });
+  const dirty = draft !== null;
 
   const toggleReveal = (key: string) =>
     setRevealed((current) => {
@@ -203,18 +212,32 @@ export function AgentDefaultsSettings() {
 
       <div className="flex items-center gap-3 border-t border-border pt-4">
         <button
-          className="rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground"
+          className="rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
           data-testid="save-agent-defaults"
-          onClick={() =>
-            toast.success("既定値を保存しました（この画面はモックです）")
-          }
+          disabled={store === null || !dirty}
+          onClick={() => {
+            store?.((current) => setAgentDefaults(current, defaults));
+            // Drop the working copy so the panel reads from the committed values
+            // again; keeping it would hide the next change made elsewhere.
+            setDraft(null);
+            toast.success("既定値を保存しました");
+          }}
           type="button"
         >
           保存する
         </button>
-        <p className="text-badge text-muted-foreground">
-          保存先はまだつながっていません。
-        </p>
+        {dirty ? (
+          <button
+            className="rounded-md px-3 py-1.5 text-2xs font-medium text-muted-foreground hover:text-foreground"
+            data-testid="discard-agent-defaults"
+            onClick={() => setDraft(null)}
+            type="button"
+          >
+            変更を捨てる
+          </button>
+        ) : (
+          <p className="text-badge text-muted-foreground">変更はありません。</p>
+        )}
       </div>
     </div>
   );

@@ -2,7 +2,17 @@ import { Bot, Copy, Hash, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  addChannelTemplate,
+  duplicateChannelTemplate,
+  removeChannelTemplate,
+  updateChannelTemplate,
+} from "@/features/channels/channel-template-mutations";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import type { ChannelTemplate } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 import { Dialog } from "@/shared/ui/dialog";
@@ -179,9 +189,8 @@ function TemplateDialog({
  */
 export function ChannelTemplatesSettings() {
   const showcase = useShowcase();
-  const [templates, setTemplates] = useState<ChannelTemplate[] | null>(
-    showcase?.channelTemplates ?? null,
-  );
+  const update = useShowcaseUpdate();
+  const templates = showcase?.channelTemplates ?? null;
   const [editing, setEditing] = useState<ChannelTemplate | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ChannelTemplate | null>(
     null,
@@ -204,14 +213,12 @@ export function ChannelTemplatesSettings() {
 
   const save = (draft: ChannelTemplate) => {
     if (draft.id === "") {
-      // A local id, since there is nothing to allocate one. Mock state lives in
-      // this component so the list actually changes when you use it.
-      const id = `tpl-${Date.now().toString(36)}`;
-      setTemplates([...templates, { ...draft, id }]);
-      toast.success("テンプレートを作りました（保存はされません）");
+      const id = nextMockId("tpl");
+      update?.((current) => addChannelTemplate(current, { ...draft, id }));
+      toast.success("テンプレートを作りました");
     } else {
-      setTemplates(templates.map((row) => (row.id === draft.id ? draft : row)));
-      toast.success("テンプレートを更新しました（保存はされません）");
+      update?.((current) => updateChannelTemplate(current, draft));
+      toast.success("テンプレートを更新しました");
     }
     setEditing(null);
   };
@@ -264,17 +271,15 @@ export function ChannelTemplatesSettings() {
                 aria-label={`${template.name} を複製`}
                 className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border hover:bg-accent"
                 data-testid={`duplicate-template-${template.id}`}
+                disabled={update === null}
                 onClick={() => {
-                  setTemplates([
-                    ...templates,
-                    {
-                      ...template,
-                      id: `tpl-${Date.now().toString(36)}`,
-                      name: `${template.name} のコピー`,
-                      // A copy has its own history, which starts empty.
-                      usedCount: 0,
-                    },
-                  ]);
+                  update?.((current) =>
+                    duplicateChannelTemplate(
+                      current,
+                      template.id,
+                      nextMockId("tpl"),
+                    ),
+                  );
                   toast.success("複製しました");
                 }}
                 type="button"
@@ -331,8 +336,8 @@ export function ChannelTemplatesSettings() {
                 className="rounded-md bg-destructive px-3 py-1.5 text-2xs font-medium text-destructive-foreground"
                 data-testid="confirm-delete-template"
                 onClick={() => {
-                  setTemplates(
-                    templates.filter((row) => row.id !== confirmDelete.id),
+                  update?.((current) =>
+                    removeChannelTemplate(current, confirmDelete.id),
                   );
                   setConfirmDelete(null);
                   toast.success("削除しました");

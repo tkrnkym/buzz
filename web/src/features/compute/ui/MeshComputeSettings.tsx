@@ -1,7 +1,15 @@
 import { Cpu, Download } from "lucide-react";
 import { useState } from "react";
 
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  setMeshModel,
+  setMeshSharing,
+  setMeshVram,
+} from "@/features/compute/mesh-mutations";
+import {
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import type { MeshNode } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 import { Switch } from "@/shared/ui/switch";
@@ -34,13 +42,11 @@ const STATUS_LABELS: Record<MeshNode["status"], string> = {
  */
 export function MeshComputeSettings() {
   const showcase = useShowcase();
-  const [sharing, setSharing] = useState(
-    showcase?.mesh.status === "serving" || showcase?.mesh.status === "starting",
-  );
-  const [model, setModel] = useState(showcase?.mesh.model ?? "");
-  const [maxVramGb, setMaxVramGb] = useState(
-    String(showcase?.mesh.maxVramGb ?? 8),
-  );
+  const update = useShowcaseUpdate();
+  // The VRAM field is the one control that cannot read straight from the
+  // fixtures: it is a number input, and "" and "1" have to be typeable on the way
+  // to "16". So the text is local while the committed value is not — see `onBlur`.
+  const [vramText, setVramText] = useState<string | null>(null);
 
   if (!showcase) {
     return (
@@ -51,7 +57,8 @@ export function MeshComputeSettings() {
   }
 
   const mesh = showcase.mesh;
-  const status = sharing ? mesh.status : "off";
+  const sharing = mesh.status !== "off";
+  const status = mesh.status;
 
   return (
     <div className="flex flex-col gap-4" data-testid="mesh-settings">
@@ -71,8 +78,11 @@ export function MeshComputeSettings() {
           checked={sharing}
           className="mt-0.5 shrink-0"
           data-testid="mesh-share"
+          disabled={update === null}
           id="mesh-share"
-          onCheckedChange={setSharing}
+          onCheckedChange={(on) =>
+            update?.((current) => setMeshSharing(current, on))
+          }
         />
       </div>
 
@@ -106,9 +116,14 @@ export function MeshComputeSettings() {
               <input
                 className={FIELD_CLASS}
                 data-testid="mesh-model"
+                disabled={update === null}
                 list="mesh-installed-models"
-                onChange={(event) => setModel(event.target.value)}
-                value={model}
+                onChange={(event) =>
+                  update?.((current) =>
+                    setMeshModel(current, event.target.value),
+                  )
+                }
+                value={mesh.model}
               />
               {/* Installed models offered as suggestions rather than a closed
                   select: a model can be pulled on demand, so restricting the
@@ -127,10 +142,21 @@ export function MeshComputeSettings() {
               <input
                 className={FIELD_CLASS}
                 data-testid="mesh-vram"
+                disabled={update === null}
                 min={1}
-                onChange={(event) => setMaxVramGb(event.target.value)}
+                // Committed on blur rather than per keystroke: clamping to 1 while
+                // someone is still typing turns a half-entered "16" into "1" and
+                // eats the 6.
+                onBlur={() => {
+                  if (vramText === null) return;
+                  update?.((current) =>
+                    setMeshVram(current, Number.parseInt(vramText, 10)),
+                  );
+                  setVramText(null);
+                }}
+                onChange={(event) => setVramText(event.target.value)}
                 type="number"
-                value={maxVramGb}
+                value={vramText ?? String(mesh.maxVramGb)}
               />
               <span className="text-badge text-muted-foreground">
                 自分の作業に必要な分を残しておくための上限です。

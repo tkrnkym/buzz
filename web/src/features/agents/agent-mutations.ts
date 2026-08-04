@@ -6,7 +6,7 @@
  */
 
 import type { AgentDraft } from "@/features/agents/ui/AgentFormDialog";
-import type { Showcase, ShowcaseAgent } from "@/mock/showcase";
+import type { AgentDefaults, Showcase, ShowcaseAgent } from "@/mock/showcase";
 
 /**
  * A pubkey for a newly created agent.
@@ -104,4 +104,18 @@ export function setAgentPaused(
         : row,
     ),
   };
+}
+
+/**
+ * The defaults every local agent inherits.
+ *
+ * Replaced whole rather than patched field by field: the panel edits a working
+ * copy and commits it on save, so a partial merge would let a field the reader
+ * cleared quietly keep its old value.
+ */
+export function setAgentDefaults(
+  current: Showcase,
+  defaults: AgentDefaults,
+): Showcase {
+  return { ...current, agentDefaults: defaults };
 }
