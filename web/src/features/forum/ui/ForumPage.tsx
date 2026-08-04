@@ -172,7 +172,7 @@ export function ForumPage() {
       {open && (
         <aside
           aria-label={open.title}
-          className="flex w-96 shrink-0 flex-col border-l border-border"
+          className="flex w-96 shrink-0 flex-col bg-background shadow-panel-left"
           data-testid="forum-thread-panel"
         >
           <header className="shrink-0 border-b border-border px-4 py-3">

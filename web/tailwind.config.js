@@ -11,10 +11,12 @@ export default {
         "2xs": "0.6875rem", // 11px — meta-text workhorse (timestamps, badges)
         "3xs": "0.5rem", // 8px — tiny glyphs / micro labels
         badge: "0.625rem", // 10px — compact status badges
-        // 40px — onboarding page titles (tightened tracking for large display type)
-        title: ["2.5rem", { lineHeight: "1.15", letterSpacing: "-0.02em" }],
-        // 36px — the backup-step private key, shown large in monospace
-        "nsec-key": ["2.25rem", { lineHeight: "1.3" }],
+        // `title` (40px) and `nsec-key` (36px) were removed: both were copied from
+        // the desktop client for screens this one does not have. Onboarding here is
+        // a max-w-md card with a `text-lg` heading, and it never shows a minted
+        // `nsec` at all — a browser has nowhere safe to keep a secret key, which is
+        // a deliberate design decision rather than a missing feature. Adding a
+        // display size back means adding the screen that needs it.
       },
       boxShadow: {
         "content-edge": "-1px -1px 0 0 hsl(var(--sidebar-border) / 0.45)",

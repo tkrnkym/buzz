@@ -932,3 +932,204 @@ test("the setup flow keeps its light palette rather than following the theme", a
     "rgb(23, 23, 23)",
   );
 });
+
+// --- Settings panels -------------------------------------------------------
+
+/**
+ * These five panels had no coverage in this project at all, which is how they
+ * came to behave differently from every other mock-up surface: three controls
+ * raised a toast and changed nothing, and four kept their own copy of the list so
+ * every edit was discarded when the reader opened another section. Each test below
+ * therefore leaves the panel and comes back — the assertion is persistence, not
+ * that the click had a visible effect.
+ */
+async function openSettings(page, panel: string) {
+  await page.goto("/settings");
+  await page.getByTestId(`settings-nav-${panel}`).click();
+}
+
+/** Leave the panel and return, which is what used to throw the change away. */
+async function leaveAndReturn(page, panel: string) {
+  await page.getByTestId("settings-nav-notifications").click();
+  await page.getByTestId(`settings-nav-${panel}`).click();
+}
+
+test("a harness the reader adds stays in the catalog", async ({ page }) => {
+  await openSettings(page, "agents");
+  await page.getByTestId("add-harness").click();
+  await page.getByTestId("harness-name").fill("My CLI");
+  await page.getByTestId("harness-command").fill("my-agent --acp");
+  await page.getByTestId("save-harness").click();
+
+  const row = page.getByTestId("harness-settings").getByText("My CLI");
+  await expect(row).toBeVisible();
+  await leaveAndReturn(page, "agents");
+  await expect(row).toBeVisible();
+});
+
+test("only a harness the reader added offers a delete", async ({ page }) => {
+  // The shipped catalog states what exists. Removing an uninstalled entry from it
+  // would turn "not installed" into "does not exist".
+  await openSettings(page, "agents");
+  await expect(page.getByTestId("remove-harness-claude-code")).toHaveCount(0);
+
+  await page.getByTestId("add-harness").click();
+  await page.getByTestId("harness-name").fill("Mine");
+  await page.getByTestId("harness-command").fill("mine");
+  await page.getByTestId("save-harness").click();
+
+  const remove = page.getByTestId(/^remove-harness-harness-/);
+  await expect(remove).toHaveCount(1);
+  await remove.click();
+  await expect(
+    page.getByTestId("harness-settings").getByText("Mine"),
+  ).toHaveCount(0);
+});
+
+test("saved agent defaults survive leaving the panel", async ({ page }) => {
+  await openSettings(page, "agents");
+  // Nothing to save until something changes.
+  await expect(page.getByTestId("save-agent-defaults")).toBeDisabled();
+
+  await page.getByTestId("defaults-model").fill("claude-opus-4");
+  await expect(page.getByTestId("save-agent-defaults")).toBeEnabled();
+  await page.getByTestId("save-agent-defaults").click();
+
+  await leaveAndReturn(page, "agents");
+  await expect(page.getByTestId("defaults-model")).toHaveValue("claude-opus-4");
+});
+
+test("discarding agent defaults puts the committed values back", async ({
+  page,
+}) => {
+  await openSettings(page, "agents");
+  const before = await page.getByTestId("defaults-model").inputValue();
+  await page.getByTestId("defaults-model").fill("throwaway");
+  await page.getByTestId("discard-agent-defaults").click();
+  await expect(page.getByTestId("defaults-model")).toHaveValue(before);
+});
+
+test("an unsaved edit to the defaults is not kept", async ({ page }) => {
+  // The panel has a save button, so an edit is a draft until it is pressed. What
+  // changed is where the commit goes, not that edits commit themselves.
+  await openSettings(page, "agents");
+  const before = await page.getByTestId("defaults-model").inputValue();
+  await page.getByTestId("defaults-model").fill("never-saved");
+  await leaveAndReturn(page, "agents");
+  await expect(page.getByTestId("defaults-model")).toHaveValue(before);
+});
+
+test("a channel template is created, copied, and deleted for good", async ({
+  page,
+}) => {
+  await openSettings(page, "channels");
+  await page.getByTestId("add-template").click();
+  await page.getByTestId("template-name").fill("週次の振り返り");
+  await page.getByTestId("save-template").click();
+
+  const templates = page.getByTestId("channel-templates");
+  await expect(templates).toContainText("週次の振り返り");
+  await leaveAndReturn(page, "channels");
+  await expect(templates).toContainText("週次の振り返り");
+
+  // A copy sits beside the original and starts with no usage history.
+  await page.getByTestId("duplicate-template-tpl-incident").click();
+  await expect(templates).toContainText("障害対応 のコピー");
+  await leaveAndReturn(page, "channels");
+  await expect(templates).toContainText("障害対応 のコピー");
+
+  await page.getByTestId("delete-template-tpl-incident").click();
+  await page.getByTestId("confirm-delete-template").click();
+  await leaveAndReturn(page, "channels");
+  // By row id, not by text: the copy inherited the original's topic, so the
+  // words are still on screen while the original itself is gone.
+  await expect(page.getByTestId("template-tpl-incident")).toHaveCount(0);
+});
+
+test("shared compute remembers the switch and the VRAM cap", async ({
+  page,
+}) => {
+  // The cap is the one control on this screen with a consequence attached, and it
+  // was the one that reverted.
+  await openSettings(page, "advanced");
+  await page.getByTestId("mesh-vram").fill("24");
+  await page.getByTestId("mesh-vram").blur();
+  await leaveAndReturn(page, "advanced");
+  await expect(page.getByTestId("mesh-vram")).toHaveValue("24");
+
+  await page.getByTestId("mesh-share").click();
+  await expect(page.getByTestId("mesh-status")).toContainText(
+    "共有していません",
+  );
+  await leaveAndReturn(page, "advanced");
+  await expect(page.getByTestId("mesh-status")).toContainText(
+    "共有していません",
+  );
+});
+
+test("turning sharing on says it is starting, not that it is serving", async ({
+  page,
+}) => {
+  // A node has to come up before it can answer anything.
+  await openSettings(page, "advanced");
+  await page.getByTestId("mesh-share").click();
+  await page.getByTestId("mesh-share").click();
+  await expect(page.getByTestId("mesh-status")).toContainText("起動中");
+});
+
+test("an archive subscription can be dropped and a new one started", async ({
+  page,
+}) => {
+  await openSettings(page, "advanced");
+  await page.getByTestId("remove-archive-arc-general").click();
+  const subscriptions = page.getByTestId("archive-subscriptions");
+  await expect(subscriptions).not.toContainText("#general");
+  await leaveAndReturn(page, "advanced");
+  await expect(subscriptions).not.toContainText("#general");
+
+  // The kind checkboxes had no action behind them at all, so choosing kinds was a
+  // decision the screen threw away.
+  await page.getByTestId("start-archiving").click();
+  await expect(subscriptions).toContainText("種類");
+  await leaveAndReturn(page, "advanced");
+  await expect(subscriptions).toContainText("種類");
+});
+
+test("restoring an archived member puts them back in the member list", async ({
+  page,
+}) => {
+  // An archive is a move, not a flag: doing only half of it would leave the person
+  // neither archived nor a member, and so visible nowhere.
+  await openSettings(page, "advanced");
+  const archived = page.getByTestId(/^archived-/);
+  await expect(archived).toHaveCount(1);
+  await page.getByTestId(/^unarchive-/).click();
+  await expect(
+    page.getByText("アーカイブされたメンバーはいません"),
+  ).toBeVisible();
+
+  await page.getByTestId("settings-nav-community").click();
+  await expect(
+    page.getByTestId("members-settings").getByTestId(/^member-role-9{64}$/),
+  ).toHaveCount(1);
+});
+
+test("a right-hand panel casts the sideways edge its token describes", async ({
+  page,
+}) => {
+  // `shadow-panel-left` was declared with nothing reading it. Tailwind's stock
+  // shadows are all y-offset, so a left-facing edge gets almost nothing from them
+  // — and a left-only border tapers out at each corner instead of turning it.
+  // Asserted on the computed value because a missing class is silent: the panel
+  // simply has no edge, which reads as a design choice rather than a bug.
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-レビュー係").click();
+
+  const shadow = await page
+    .getByTestId("agent-detail-panel")
+    .evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(shadow).not.toBe("none");
+  // Both layers run -x, so they wrap the rounded left corners.
+  expect(shadow).toContain("-1px");
+  expect(shadow).toContain("-16px");
+});

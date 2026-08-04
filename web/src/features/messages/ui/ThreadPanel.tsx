@@ -43,7 +43,7 @@ export function ThreadPanel({
     return (
       <aside
         aria-label="Thread"
-        className="flex w-96 shrink-0 flex-col border-l border-border bg-background"
+        className="flex w-96 shrink-0 flex-col bg-background shadow-panel-left"
         data-testid="thread-panel"
       >
         <ThreadHeader onClose={onClose} replyCount={0} />
@@ -60,7 +60,7 @@ export function ThreadPanel({
   return (
     <aside
       aria-label="Thread"
-      className="flex w-96 shrink-0 flex-col border-l border-border bg-background"
+      className="flex w-96 shrink-0 flex-col bg-background shadow-panel-left"
       data-testid="thread-panel"
     >
       <ThreadHeader onClose={onClose} replyCount={replies.length} />

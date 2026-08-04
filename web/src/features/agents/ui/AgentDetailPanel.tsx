@@ -91,7 +91,7 @@ export function AgentDetailPanel({
   return (
     <aside
       aria-label={`${agent.name} の設定`}
-      className="flex w-80 shrink-0 flex-col gap-4 border-l border-border p-4"
+      className="flex w-80 shrink-0 flex-col gap-4 bg-background p-4 shadow-panel-left"
       data-testid="agent-detail-panel"
     >
       <div className="flex items-start gap-3">

@@ -198,7 +198,7 @@ export function ChannelRosterPanel({
   return (
     <aside
       aria-label="メンバー"
-      className="flex w-72 shrink-0 flex-col border-l border-border bg-background"
+      className="flex w-72 shrink-0 flex-col bg-background shadow-panel-left"
       data-testid="roster-panel"
     >
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2.5">
