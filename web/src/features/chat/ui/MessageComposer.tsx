@@ -35,6 +35,7 @@ import {
 import { useProfiles } from "@/features/profile/profile-store";
 import { useUserLabels } from "@/features/profile/use-user-label";
 import { Button } from "@/shared/ui/button";
+import { Popover, PopoverAnchor, PopoverContent } from "@/shared/ui/popover";
 
 export interface ReplyTarget {
   rootId: string;
@@ -325,11 +326,30 @@ export function MessageComposer({
         </div>
       )}
 
-      {(emojiOpen || emojiQuery) && (
-        <div className="relative">
+      {/* Anchored to the composer rather than opened by a trigger: the picker
+          also appears from typing `:shortcode`, so its open state is the
+          composer's, not a button's. `onOpenAutoFocus` is prevented because the
+          reader is still typing into the editor — moving focus into the panel
+          would end the very query that opened it. */}
+      <Popover
+        onOpenChange={(open) => {
+          if (open) return;
+          // Both sources have to be cleared, or dismissing a panel that a typed
+          // `:shortcode` opened would reopen it on the next render.
+          setEmojiOpen(false);
+          setEmojiQuery(null);
+        }}
+        open={emojiOpen || emojiQuery !== null}
+      >
+        <PopoverAnchor />
+        <PopoverContent
+          align="start"
+          className="w-64 p-2"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          side="top"
+        >
           <EmojiPicker
             catalog={emojiCatalog}
-            className="absolute bottom-1 left-0"
             onPick={(choice) =>
               insertEmoji(
                 choice.emoji
@@ -338,8 +358,8 @@ export function MessageComposer({
               )
             }
           />
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
 
       <div className="flex items-center gap-2">
         <input

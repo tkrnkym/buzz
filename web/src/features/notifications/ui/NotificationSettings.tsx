@@ -14,6 +14,7 @@ import {
 } from "@/features/notifications/notifications-model";
 import { useNotificationPrefs } from "@/features/notifications/use-notifications";
 import { cn } from "@/shared/lib/cn";
+import { Switch } from "@/shared/ui/switch";
 
 const CATEGORIES: NotificationCategory[] = ["mention", "dm", "reply"];
 
@@ -31,23 +32,28 @@ function Toggle({
   testId: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5">
-      <input
-        checked={checked}
-        className="mt-0.5 size-4 shrink-0 accent-primary"
-        data-testid={testId}
-        onChange={(event) => onChange(event.target.checked)}
-        type="checkbox"
-      />
-      <span className="min-w-0">
+    // A switch, not a checkbox: these apply the moment they are flipped, with no
+    // Save to press. The control sits on the right, where a setting's current
+    // state is read down a column rather than hunted for beside each label.
+    // `htmlFor` rather than a wrapping label, because a Radix switch is a
+    // <button> — labelable, but not something a wrapper implicitly activates.
+    <div className="flex items-start justify-between gap-3">
+      <label className="min-w-0 cursor-pointer" htmlFor={testId}>
         <span className="block text-2xs font-medium">{label}</span>
         {description && (
           <span className="block text-badge text-muted-foreground">
             {description}
           </span>
         )}
-      </span>
-    </label>
+      </label>
+      <Switch
+        checked={checked}
+        className="mt-0.5 shrink-0"
+        data-testid={testId}
+        id={testId}
+        onCheckedChange={onChange}
+      />
+    </div>
   );
 }
 

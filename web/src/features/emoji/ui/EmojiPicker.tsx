@@ -60,13 +60,10 @@ export function EmojiPicker({
   }, [query]);
 
   return (
-    <div
-      className={cn(
-        "w-64 rounded-lg border border-border bg-popover p-2 shadow-lg",
-        className,
-      )}
-      data-testid="emoji-picker"
-    >
+    // Contents only: the surface — border, fill, shadow, placement — belongs to
+    // the `Popover` this is rendered inside, so the picker does not carry a
+    // second card of its own.
+    <div className={cn("w-full", className)} data-testid="emoji-picker">
       <input
         aria-label="Search emoji"
         autoComplete="off"
