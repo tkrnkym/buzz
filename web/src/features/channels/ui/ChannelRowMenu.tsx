@@ -1,120 +1,105 @@
-import { Bell, BellOff, Link2, LogOut, Star, StarOff } from "lucide-react";
-import { useEffect, useRef } from "react";
-
-import { cn } from "@/shared/lib/cn";
-
-const ITEM_CLASS =
-  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-2xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&>svg]:size-3.5 [&>svg]:shrink-0";
+import {
+  channelRowMenuItems,
+  type ChannelRowItem,
+} from "@/features/channels/ui/channel-row-menu-items";
+import {
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "@/shared/ui/context-menu";
+import {
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/shared/ui/dropdown-menu";
 
 /**
- * The per-channel menu, ported from the desktop client's channel context menu.
+ * The per-channel actions, offered in both of the row's menus.
  *
- * Positioned by the caller, dismissed on outside click or Escape, and rendered
- * only while open — a hidden menu that still holds focus is how a keyboard user
- * ends up somewhere they cannot see.
+ * Star and mute are local preferences (see `channel-flags`); leaving is a relay
+ * command. The item list itself lives in `channel-row-menu-items.ts` so the two
+ * menus cannot drift apart.
  *
- * Mute and star are local preferences (see `channel-flags`); leaving is a relay
- * command. The destructive item is last and separated, so it is not adjacent to
- * the one a reader reaches for most.
+ * Both are Radix now. The hand-rolled panel this replaced positioned itself with
+ * `absolute right-1 top-full`, which put it off the bottom of the window for the
+ * last room in a long sidebar, and re-implemented outside-click and Escape per
+ * instance.
  */
-export function ChannelRowMenu({
-  isMuted,
-  isStarred,
-  onClose,
-  onCopyLink,
-  onLeave,
-  onToggleMute,
-  onToggleStar,
-}: {
-  isMuted: boolean;
-  isStarred: boolean;
-  onClose: () => void;
-  onCopyLink: () => void;
-  onLeave: () => void;
-  onToggleMute: () => void;
-  onToggleStar: () => void;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
+export type ChannelRowMenuProps = Parameters<typeof channelRowMenuItems>[0];
 
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !ref.current?.contains(event.target)
-      ) {
-        onClose();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose]);
-
-  const run = (action: () => void) => () => {
-    action();
-    onClose();
+/** Split so the destructive item can sit after a separator in both menus. */
+function partition(items: ChannelRowItem[]) {
+  return {
+    normal: items.filter((item) => !item.destructive),
+    destructive: items.filter((item) => item.destructive),
   };
+}
+
+/** The `⋯` button's menu. */
+export function ChannelRowMenuContent(props: ChannelRowMenuProps) {
+  const { normal, destructive } = partition(channelRowMenuItems(props));
 
   return (
-    <div
-      aria-label="Channel actions"
-      className="absolute right-1 top-full z-50 mt-1 w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
-      data-testid="channel-row-menu"
-      ref={ref}
-      role="menu"
-    >
-      <button
-        className={ITEM_CLASS}
-        data-testid="menu-toggle-star"
-        onClick={run(onToggleStar)}
-        role="menuitem"
-        type="button"
-      >
-        {isStarred ? <StarOff /> : <Star />}
-        {isStarred ? "Remove star" : "Star channel"}
-      </button>
-      <button
-        className={ITEM_CLASS}
-        data-testid="menu-toggle-mute"
-        onClick={run(onToggleMute)}
-        role="menuitem"
-        type="button"
-      >
-        {isMuted ? <Bell /> : <BellOff />}
-        {isMuted ? "Unmute" : "Mute channel"}
-      </button>
-      <button
-        className={ITEM_CLASS}
-        data-testid="menu-copy-link"
-        onClick={run(onCopyLink)}
-        role="menuitem"
-        type="button"
-      >
-        <Link2 />
-        Copy link
-      </button>
+    <DropdownMenuContent align="end" className="w-44">
+      {normal.map((item) => (
+        <DropdownMenuItem
+          data-testid={`menu-${item.key}`}
+          key={item.key}
+          onSelect={item.onSelect}
+        >
+          <item.icon aria-hidden />
+          {item.label}
+        </DropdownMenuItem>
+      ))}
+      {destructive.length > 0 && <DropdownMenuSeparator />}
+      {destructive.map((item) => (
+        <DropdownMenuItem
+          data-testid={`menu-${item.key}`}
+          destructive
+          key={item.key}
+          onSelect={item.onSelect}
+        >
+          <item.icon aria-hidden />
+          {item.label}
+        </DropdownMenuItem>
+      ))}
+    </DropdownMenuContent>
+  );
+}
 
-      <div aria-hidden className="my-1 h-px bg-border" />
+/**
+ * The right-click menu.
+ *
+ * Its test ids are distinct from the dropdown's, because both are mounted for the
+ * same row and a locator matching either would be ambiguous.
+ */
+export function ChannelRowContextMenuContent(props: ChannelRowMenuProps) {
+  const { normal, destructive } = partition(channelRowMenuItems(props));
 
-      <button
-        className={cn(
-          ITEM_CLASS,
-          "hover:bg-destructive/10 hover:text-destructive",
-        )}
-        data-testid="menu-leave-channel"
-        onClick={run(onLeave)}
-        role="menuitem"
-        type="button"
-      >
-        <LogOut />
-        Leave channel
-      </button>
-    </div>
+  return (
+    <ContextMenuContent className="w-44">
+      {normal.map((item) => (
+        <ContextMenuItem
+          data-testid={`context-${item.key}`}
+          key={item.key}
+          onSelect={item.onSelect}
+        >
+          <item.icon aria-hidden />
+          {item.label}
+        </ContextMenuItem>
+      ))}
+      {destructive.length > 0 && <ContextMenuSeparator />}
+      {destructive.map((item) => (
+        <ContextMenuItem
+          data-testid={`context-${item.key}`}
+          destructive
+          key={item.key}
+          onSelect={item.onSelect}
+        >
+          <item.icon aria-hidden />
+          {item.label}
+        </ContextMenuItem>
+      ))}
+    </ContextMenuContent>
   );
 }

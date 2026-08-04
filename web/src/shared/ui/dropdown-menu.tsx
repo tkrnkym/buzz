@@ -21,6 +21,17 @@ import { useDialogContainer } from "@/shared/ui/dialog";
  * nested hover submenu is close to unusable with a touch screen, and the reason
  * `menu.tsx` went flat still applies.
  */
+/**
+ * No exit animation, deliberately.
+ *
+ * Radix keeps a closing panel mounted until its CSS animation ends. When the
+ * action behind a selected item re-renders the tree — which is the normal case,
+ * since that is what the item is for — the animation is interrupted and never
+ * reports `animationend`, so the panel and its dismissable layer are never
+ * removed. The stale layer then treats the next open as an outside click and
+ * closes it instantly, leaving a control that works exactly once. Entry
+ * animations are safe: nothing is waiting on them to unmount anything.
+ */
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 const DropdownMenuGroup = DropdownMenuPrimitive.Group;
@@ -42,7 +53,7 @@ const DropdownMenuContent = React.forwardRef<
     <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         className={cn(
-          "z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
+          "z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
           className,
         )}
         ref={ref}

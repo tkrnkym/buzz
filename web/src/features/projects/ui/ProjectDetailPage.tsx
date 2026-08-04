@@ -24,7 +24,7 @@ import {
   useShowcaseUpdate,
 } from "@/features/showcase/use-showcase";
 import { FormDialog } from "@/shared/ui/form-dialog";
-import { cn } from "@/shared/lib/cn";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 type Tab = "overview" | "issues" | "pulls" | "branches";
 
@@ -107,101 +107,100 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       subtitle={project.repo}
       title={project.name}
     >
-      <div className="flex items-center gap-1" data-testid="project-tabs">
-        {tabs.map((option) => (
-          <button
-            className={cn(
-              "rounded-md px-2.5 py-1 text-2xs font-medium transition-colors",
-              tab === option.value
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground hover:bg-accent",
-            )}
-            data-testid={`project-tab-${option.value}`}
-            key={option.value}
-            onClick={() => setTab(option.value)}
-            type="button"
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      {/* Real tabs: the list is one tab stop with the arrow keys moving inside
+          it, and each trigger names the panel it controls. The row of
+          independent buttons this replaced was four tab stops with no stated
+          relationship to what they switched. */}
+      <Tabs onValueChange={(next) => setTab(next as Tab)} value={tab}>
+        <TabsList data-testid="project-tabs">
+          {tabs.map((option) => (
+            <TabsTrigger
+              data-testid={`project-tab-${option.value}`}
+              key={option.value}
+              value={option.value}
+            >
+              {option.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <div className="mt-4">
-        {tab === "overview" && (
-          <div className="flex flex-col gap-6">
-            <p className="text-sm text-muted-foreground">
-              {project.description}
-            </p>
-            <section>
-              <h2 className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                最近の動き
-              </h2>
-              <div className="mt-3">
-                <ActivityPanel
-                  entries={project.activity}
-                  nowSeconds={nowSeconds}
-                />
-              </div>
-            </section>
-          </div>
-        )}
-        {tab === "issues" && (
-          <IssuesPanel
-            issues={project.issues}
-            nowSeconds={nowSeconds}
-            onToggleState={
-              update
-                ? (issue) => {
-                    const next = issue.state === "open" ? "closed" : "open";
-                    update((current) =>
-                      setIssueState(
-                        current,
-                        project.id,
-                        issue.id,
-                        next,
-                        Math.floor(Date.now() / 1000),
-                      ),
-                    );
-                    toast.success(
-                      next === "closed"
-                        ? `#${issue.number} を閉じました`
-                        : `#${issue.number} を開き直しました`,
-                    );
-                  }
-                : undefined
-            }
-          />
-        )}
-        {tab === "pulls" && (
-          <PullRequestsPanel
-            nowSeconds={nowSeconds}
-            onMerge={
-              update
-                ? (pull) => {
-                    update((current) =>
-                      mergePullRequest(
-                        current,
-                        project.id,
-                        pull.id,
-                        myPubkey ?? "",
-                        Math.floor(Date.now() / 1000),
-                      ),
-                    );
-                    toast.success(`#${pull.number} をマージしました`);
-                  }
-                : undefined
-            }
-            pullRequests={project.pullRequests}
-          />
-        )}
-        {tab === "branches" && (
-          <BranchesPanel
-            branches={project.branches}
-            defaultBranch={project.defaultBranch}
-            nowSeconds={nowSeconds}
-          />
-        )}
-      </div>
+        <div className="mt-4">
+          <TabsContent value="overview">
+            <div className="flex flex-col gap-6">
+              <p className="text-sm text-muted-foreground">
+                {project.description}
+              </p>
+              <section>
+                <h2 className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+                  最近の動き
+                </h2>
+                <div className="mt-3">
+                  <ActivityPanel
+                    entries={project.activity}
+                    nowSeconds={nowSeconds}
+                  />
+                </div>
+              </section>
+            </div>
+          </TabsContent>
+          <TabsContent value="issues">
+            <IssuesPanel
+              issues={project.issues}
+              nowSeconds={nowSeconds}
+              onToggleState={
+                update
+                  ? (issue) => {
+                      const next = issue.state === "open" ? "closed" : "open";
+                      update((current) =>
+                        setIssueState(
+                          current,
+                          project.id,
+                          issue.id,
+                          next,
+                          Math.floor(Date.now() / 1000),
+                        ),
+                      );
+                      toast.success(
+                        next === "closed"
+                          ? `#${issue.number} を閉じました`
+                          : `#${issue.number} を開き直しました`,
+                      );
+                    }
+                  : undefined
+              }
+            />
+          </TabsContent>
+          <TabsContent value="pulls">
+            <PullRequestsPanel
+              nowSeconds={nowSeconds}
+              onMerge={
+                update
+                  ? (pull) => {
+                      update((current) =>
+                        mergePullRequest(
+                          current,
+                          project.id,
+                          pull.id,
+                          myPubkey ?? "",
+                          Math.floor(Date.now() / 1000),
+                        ),
+                      );
+                      toast.success(`#${pull.number} をマージしました`);
+                    }
+                  : undefined
+              }
+              pullRequests={project.pullRequests}
+            />
+          </TabsContent>
+          <TabsContent value="branches">
+            <BranchesPanel
+              branches={project.branches}
+              defaultBranch={project.defaultBranch}
+              nowSeconds={nowSeconds}
+            />
+          </TabsContent>
+        </div>
+      </Tabs>
 
       {creating === "issue" && update && (
         <FormDialog

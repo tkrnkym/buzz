@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useShowcase } from "@/features/showcase/use-showcase";
 import type { MeshNode } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
+import { Switch } from "@/shared/ui/switch";
 
 const FIELD_CLASS =
   "h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -58,21 +59,22 @@ export function MeshComputeSettings() {
         ブラウザからはGPUを他の人に貸せません。この画面はデスクトップ版の設定を再現したものです。
       </p>
 
-      <label className="flex cursor-pointer items-start gap-2.5">
-        <input
-          checked={sharing}
-          className="mt-0.5 size-4 shrink-0 accent-primary"
-          data-testid="mesh-share"
-          onChange={(event) => setSharing(event.target.checked)}
-          type="checkbox"
-        />
-        <span className="min-w-0">
+      {/* A switch: sharing starts or stops when it is flipped. */}
+      <div className="flex items-start justify-between gap-3">
+        <label className="min-w-0 cursor-pointer" htmlFor="mesh-share">
           <span className="block text-2xs font-medium">計算資源を共有する</span>
           <span className="block text-badge text-muted-foreground">
             このマシンが、コミュニティのエージェントからの推論要求に応えます。
           </span>
-        </span>
-      </label>
+        </label>
+        <Switch
+          checked={sharing}
+          className="mt-0.5 shrink-0"
+          data-testid="mesh-share"
+          id="mesh-share"
+          onCheckedChange={setSharing}
+        />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span

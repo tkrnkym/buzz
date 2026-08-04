@@ -1099,9 +1099,35 @@ test("muting a channel dims it but keeps an unread room legible", async ({
   await expect(page.getByLabel("Muted")).toBeVisible();
 
   // Unmuting is the same menu item, now inverted.
+  // Reopening the same menu after acting in it is the case that broke: a closing
+  // panel whose exit animation was interrupted by its own action stayed mounted
+  // and dismissed every later open. See `shared/ui/dropdown-menu.tsx`.
   await page.getByTestId("channel-menu-general").click();
   await page.getByTestId("menu-toggle-mute").click();
   await expect(row).not.toHaveClass(dimmed);
+  await expect(page.getByLabel("Muted")).toHaveCount(0);
+});
+
+test("right-click reaches the same channel actions as the button", async ({
+  page,
+}) => {
+  // The button appears on hover, so it is a mouse-only path. Right-click is the
+  // one the desktop client had, and both menus are built from the same item list.
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("channel-general").click({ button: "right" });
+  await expect(page.getByTestId("context-toggle-mute")).toBeVisible();
+  await expect(page.getByTestId("context-toggle-star")).toBeVisible();
+  await expect(page.getByTestId("context-leave-channel")).toBeVisible();
+
+  await page.getByTestId("context-toggle-mute").click();
+  await expect(page.getByLabel("Muted")).toBeVisible();
+
+  // And it reopens, for the same reason the button's menu has to.
+  await page.getByTestId("channel-general").click({ button: "right" });
+  await page.getByTestId("context-toggle-mute").click();
   await expect(page.getByLabel("Muted")).toHaveCount(0);
 });
 
@@ -1401,6 +1427,42 @@ test("a custom reaction carries its definition", async ({ page }) => {
   // A kind:7 whose content is a shortcode and which carries no `emoji` tag is a
   // pill every other client draws as literal text.
   expect(reaction.tags).toContainEqual(["emoji", "shipit", SHIPIT_URL]);
+});
+
+test("the reaction picker is portalled, and reopens after being used", async ({
+  page,
+}) => {
+  // It used to be positioned with `absolute` inside the action bar, which clipped
+  // it in the scrolling timeline and needed the bar lifted above the next row's.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page, {
+    ...directoryOptions(),
+    emojiEvents: [emojiSet(MENTIONABLE, [["shipit", SHIPIT_URL]])],
+  });
+  await relay.install();
+
+  await page.goto(`/c/${CHANNEL_UUID}`);
+  const message = page.getByText("hello from the mocked relay");
+  await message.hover();
+  await page.getByTestId("open-reaction-picker").click();
+  await expect(page.getByTestId("emoji-picker")).toBeVisible();
+
+  // Outside the action bar entirely, which is what stops it being clipped.
+  expect(
+    await page
+      .getByTestId("emoji-picker")
+      .evaluate((node) =>
+        Boolean(node.closest('[data-testid="message-action-bar"]')),
+      ),
+  ).toBe(false);
+
+  // Picking an emoji re-renders the timeline, which is the interruption that used
+  // to strand a closing panel and leave the picker unopenable afterwards.
+  await page.getByTestId("emoji-shipit").click();
+  await expect(page.getByTestId("emoji-picker")).toHaveCount(0);
+  await message.hover();
+  await page.getByTestId("open-reaction-picker").click();
+  await expect(page.getByTestId("emoji-picker")).toBeVisible();
 });
 
 test("adding a custom emoji publishes the whole kind:30030 set", async ({

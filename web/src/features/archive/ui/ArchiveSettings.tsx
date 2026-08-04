@@ -7,6 +7,7 @@ import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import { useShowcase } from "@/features/showcase/use-showcase";
 import { truncatePubkey } from "@/shared/lib/pubkey";
+import { Checkbox } from "@/shared/ui/checkbox";
 
 /**
  * Kinds a reader can choose to keep locally, grouped the way they think about
@@ -149,28 +150,31 @@ export function LocalArchiveSettings() {
         {KIND_GROUPS.map((group) => {
           const allOn = group.kinds.every((kind) => selected.has(kind));
           return (
-            <label
-              className="flex cursor-pointer items-start gap-2.5"
-              key={group.label}
-            >
-              <input
+            // Checkboxes, not switches: these pick which kinds go in one set,
+            // which is what a checkbox means. The primitive rather than a raw
+            // input so the box carries the accent fill like every other one.
+            <div className="flex items-start gap-2.5" key={group.label}>
+              <Checkbox
                 checked={allOn}
-                className="mt-0.5 size-4 shrink-0 accent-primary"
+                className="mt-0.5"
                 data-testid={`archive-group-${group.kinds[0]}`}
-                onChange={(event) =>
-                  toggleGroup(group.kinds, event.target.checked)
+                id={`archive-group-${group.kinds[0]}`}
+                onCheckedChange={(checked) =>
+                  toggleGroup(group.kinds, checked === true)
                 }
-                type="checkbox"
               />
-              <span className="min-w-0">
+              <label
+                className="min-w-0 cursor-pointer"
+                htmlFor={`archive-group-${group.kinds[0]}`}
+              >
                 <span className="block text-2xs font-medium">
                   {group.label}
                 </span>
                 <span className="block text-badge text-muted-foreground">
                   {group.description} · kind {group.kinds.join(", ")}
                 </span>
-              </span>
-            </label>
+              </label>
+            </div>
           );
         })}
       </fieldset>

@@ -10,6 +10,7 @@ import { useState } from "react";
 import type { CustomEmoji, EmojiCatalog } from "@/features/emoji/emoji-model";
 import { EmojiPicker } from "@/features/emoji/ui/EmojiPicker";
 import { cn } from "@/shared/lib/cn";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 /**
@@ -118,11 +119,11 @@ export function MessageActionBar({
       className={cn(
         "absolute -top-3 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm",
         "opacity-0 transition-opacity group-focus-within/message:opacity-100 group-hover/message:opacity-100",
-        // Lifted while the picker is open: it renders as a child of this bar,
-        // and this bar is a stacking context — at z-10 the next row's bar paints
-        // over the open grid and swallows clicks aimed at it. The moderation menu
-        // needs no equivalent because it portals out (see `shared/ui/menu.tsx`).
-        pickerOpen && "z-30 opacity-100",
+        // Kept visible while the picker is open, so the bar does not fade out
+        // from under an open panel. It no longer needs lifting above the next
+        // row's bar: the picker is portalled now, not a child of this stacking
+        // context.
+        pickerOpen && "opacity-100",
       )}
       data-testid="message-action-bar"
     >
@@ -142,26 +143,34 @@ export function MessageActionBar({
         </button>
       ))}
 
-      <div className="relative">
-        <Action
-          disabled={disabled}
-          label="Add reaction"
-          onClick={() => setPickerOpen((open) => !open)}
-          testId="open-reaction-picker"
-        >
-          <SmilePlus />
-        </Action>
-        {pickerOpen && (
+      <Popover onOpenChange={setPickerOpen} open={pickerOpen}>
+        {/* Tooltip outside, popover inside, both `asChild` onto the same button:
+            each merges its own props, and reversing the order would have the
+            popover trying to clone onto a context provider. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger
+              aria-label="Add reaction"
+              className={ACTION_CLASS}
+              data-testid="open-reaction-picker"
+              disabled={disabled}
+              type="button"
+            >
+              <SmilePlus />
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top">Add reaction</TooltipContent>
+        </Tooltip>
+        <PopoverContent align="end" className="w-64 p-2" side="top">
           <EmojiPicker
             catalog={emojiCatalog}
-            className="absolute right-0 top-full z-20 mt-1"
             onPick={(choice) => {
               onReact(choice.text, choice.emoji);
               setPickerOpen(false);
             }}
           />
-        )}
-      </div>
+        </PopoverContent>
+      </Popover>
 
       <Action
         disabled={disabled}

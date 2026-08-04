@@ -8,10 +8,15 @@ import {
   MoreHorizontal,
   Pencil,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { Channel } from "@/features/chat/chat-model";
-import { ChannelRowMenu } from "@/features/channels/ui/ChannelRowMenu";
+import {
+  ChannelRowContextMenuContent,
+  ChannelRowMenuContent,
+} from "@/features/channels/ui/ChannelRowMenu";
+import { ContextMenu, ContextMenuTrigger } from "@/shared/ui/context-menu";
+import { DropdownMenu, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import {
   resolveAvatarUrl,
   type ProfileLookup,
@@ -134,8 +139,6 @@ export function SidebarChannelSection({
   title: string;
   unreadChannelIds: ReadonlySet<string>;
 }) {
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
   if (channels.length === 0 && !emptyState) return null;
 
   const contentId = `sidebar-${testId}`;
@@ -178,103 +181,114 @@ export function SidebarChannelSection({
                 const isMuted = rowActions.isMuted(channel.id);
                 const label = rowActions.labelFor(channel);
 
+                const menuProps = {
+                  isMuted,
+                  isStarred: rowActions.isStarred(channel.id),
+                  onCopyLink: () => rowActions.onCopyLink(channel),
+                  onLeave: () => rowActions.onLeave(channel),
+                  onToggleMute: () => rowActions.onToggleMute(channel.id),
+                  onToggleStar: () => rowActions.onToggleStar(channel.id),
+                };
+
                 return (
-                  <SidebarMenuItem key={channel.id}>
-                    <SidebarMenuButton
-                      asChild
-                      className={cn(
-                        !isActive &&
-                          hasUnread &&
-                          "font-semibold text-sidebar-foreground hover:text-sidebar-foreground",
-                        // A muted room stays visible but recedes — until it has
-                        // something unread, which is the one time the reader
-                        // asked to still be told.
-                        !isActive && isMuted && !hasUnread && "opacity-50",
-                      )}
-                      isActive={isActive}
-                      tooltip={label}
-                    >
-                      <Link
-                        data-channel-id={channel.id}
-                        data-testid={`channel-${label}`}
-                        params={{ channelId: channel.id }}
-                        title={channel.about ?? label}
-                        to="/c/$channelId"
-                      >
-                        <ChannelIcon
-                          channel={channel}
-                          label={label}
-                          profiles={rowActions.profiles}
-                        />
-                        <span className="min-w-0 flex-1 truncate">{label}</span>
-                        {rowActions.hasDraft(channel.id) && !isActive && (
-                          // A pencil rather than a dot: an unread badge means
-                          // someone else wrote something, and a draft means the
-                          // reader did — conflating them would send them into
-                          // the wrong room looking for the wrong thing.
-                          <Pencil
-                            aria-label="Unsent draft"
-                            className="size-3.5 shrink-0 text-sidebar-foreground/45"
-                            data-testid={`channel-draft-${label}`}
-                          />
-                        )}
-                        {isMuted && (
-                          <BellOff
-                            aria-label="Muted"
-                            className={cn(
-                              "size-3.5 shrink-0",
-                              isActive
-                                ? "text-sidebar-active-foreground/60"
-                                : "text-sidebar-foreground/40",
+                  // Right-click reaches the same actions as the button. The button
+                  // is a mouse-only path — it appears on hover — so without this
+                  // there was no way to a room's actions from a trackpad
+                  // two-finger tap or the keyboard's menu key.
+                  <ContextMenu key={channel.id}>
+                    <ContextMenuTrigger asChild>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          className={cn(
+                            !isActive &&
+                              hasUnread &&
+                              "font-semibold text-sidebar-foreground hover:text-sidebar-foreground",
+                            // A muted room stays visible but recedes — until it has
+                            // something unread, which is the one time the reader
+                            // asked to still be told.
+                            !isActive && isMuted && !hasUnread && "opacity-50",
+                          )}
+                          isActive={isActive}
+                          tooltip={label}
+                        >
+                          <Link
+                            data-channel-id={channel.id}
+                            data-testid={`channel-${label}`}
+                            params={{ channelId: channel.id }}
+                            title={channel.about ?? label}
+                            to="/c/$channelId"
+                          >
+                            <ChannelIcon
+                              channel={channel}
+                              label={label}
+                              profiles={rowActions.profiles}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              {label}
+                            </span>
+                            {rowActions.hasDraft(channel.id) && !isActive && (
+                              // A pencil rather than a dot: an unread badge means
+                              // someone else wrote something, and a draft means the
+                              // reader did — conflating them would send them into
+                              // the wrong room looking for the wrong thing.
+                              <Pencil
+                                aria-label="Unsent draft"
+                                className="size-3.5 shrink-0 text-sidebar-foreground/45"
+                                data-testid={`channel-draft-${label}`}
+                              />
                             )}
-                          />
+                            {isMuted && (
+                              <BellOff
+                                aria-label="Muted"
+                                className={cn(
+                                  "size-3.5 shrink-0",
+                                  isActive
+                                    ? "text-sidebar-active-foreground/60"
+                                    : "text-sidebar-foreground/40",
+                                )}
+                              />
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+
+                        {hasUnread && (
+                          <span
+                            className={cn(
+                              "pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 transition-opacity",
+                              REPLACED_BADGE_CLASS,
+                            )}
+                          >
+                            <UnreadDot channelName={label} />
+                          </span>
                         )}
-                      </Link>
-                    </SidebarMenuButton>
 
-                    {hasUnread && (
-                      <span
-                        className={cn(
-                          "pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 transition-opacity",
-                          REPLACED_BADGE_CLASS,
-                        )}
-                      >
-                        <UnreadDot channelName={label} />
-                      </span>
-                    )}
-
-                    <button
-                      aria-haspopup="menu"
-                      aria-label={`Actions for ${label}`}
-                      className={cn(
-                        ROW_ACTION_CLASS,
-                        ROW_ACTION_VISIBILITY_CLASS,
-                        openMenuId === channel.id && "md:opacity-100",
-                      )}
-                      data-testid={`channel-menu-${label}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId((current) =>
-                          current === channel.id ? null : channel.id,
-                        );
-                      }}
-                      type="button"
-                    >
-                      <MoreHorizontal />
-                    </button>
-
-                    {openMenuId === channel.id && (
-                      <ChannelRowMenu
-                        isMuted={isMuted}
-                        isStarred={rowActions.isStarred(channel.id)}
-                        onClose={() => setOpenMenuId(null)}
-                        onCopyLink={() => rowActions.onCopyLink(channel)}
-                        onLeave={() => rowActions.onLeave(channel)}
-                        onToggleMute={() => rowActions.onToggleMute(channel.id)}
-                        onToggleStar={() => rowActions.onToggleStar(channel.id)}
-                      />
-                    )}
-                  </SidebarMenuItem>
+                        {/* Uncontrolled. The row used to track which menu was
+                            open purely to keep the button visible while it was,
+                            which Radix already says with `data-state` on the
+                            trigger — and mirroring its open state in React state
+                            raced with it, leaving the menu shut on every second
+                            click. */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            aria-label={`Actions for ${label}`}
+                            className={cn(
+                              ROW_ACTION_CLASS,
+                              ROW_ACTION_VISIBILITY_CLASS,
+                              "data-[state=open]:opacity-100",
+                            )}
+                            data-testid={`channel-menu-${label}`}
+                            onClick={(event) => event.stopPropagation()}
+                            type="button"
+                          >
+                            <MoreHorizontal />
+                          </DropdownMenuTrigger>
+                          <ChannelRowMenuContent {...menuProps} />
+                        </DropdownMenu>
+                      </SidebarMenuItem>
+                    </ContextMenuTrigger>
+                    <ChannelRowContextMenuContent {...menuProps} />
+                  </ContextMenu>
                 );
               })}
             </SidebarMenu>
