@@ -15,6 +15,7 @@ import type {
   PulseEntry,
   Reminder,
   Showcase,
+  ShowcaseCommunity,
 } from "@/mock/showcase";
 
 // --- Forum -----------------------------------------------------------------
@@ -352,4 +353,20 @@ export function addPulseNote(
 ): Showcase {
   const entry: PulseEntry = { ...note, tab: "notes", reactions: [] };
   return { ...current, pulse: [entry, ...current.pulse] };
+}
+
+// --- Communities -----------------------------------------------------------
+
+/**
+ * A community the reader just created.
+ *
+ * Appended rather than prepended: the rail's order is the order communities were
+ * joined, and a new one jumping ahead of the community someone has been in for a
+ * year would move every position they had learned.
+ */
+export function addCommunity(
+  current: Showcase,
+  community: ShowcaseCommunity,
+): Showcase {
+  return { ...current, communities: [...current.communities, community] };
 }

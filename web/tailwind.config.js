@@ -101,6 +101,27 @@ export default {
           DEFAULT: "var(--ui-warning)",
           bg: "var(--ui-warning-bg)",
         },
+        // The hosted-community setup flow, which deliberately keeps one light
+        // palette under both app themes — it is the one surface a person sees
+        // before they have a community, so it does not follow a per-community
+        // theme they have not chosen yet. Declared as `R G B` triplets in
+        // globals.css, hence `rgb()` here rather than the `hsl()` the semantic
+        // tokens use, and `<alpha-value>` so `/70` works on the overlay.
+        hosted: {
+          fg: "rgb(var(--nuxx-hosted-community-surface-fg) / <alpha-value>)",
+          divider:
+            "rgb(var(--nuxx-hosted-community-divider-border) / <alpha-value>)",
+          action: "rgb(var(--nuxx-hosted-community-action-bg) / <alpha-value>)",
+          "action-hover":
+            "rgb(var(--nuxx-hosted-community-action-bg-hover) / <alpha-value>)",
+          input: "rgb(var(--nuxx-hosted-community-input-bg) / <alpha-value>)",
+          "commit-fg":
+            "rgb(var(--nuxx-hosted-community-modal-action-fg) / <alpha-value>)",
+          overlay:
+            "rgb(var(--nuxx-hosted-community-modal-overlay-bg) / <alpha-value>)",
+          identity:
+            "rgb(var(--nuxx-hosted-community-identity-bg) / <alpha-value>)",
+        },
       },
     },
   },

@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  addCommunity,
   addForumComment,
   addForumPost,
   addHuddleParticipant,
   addMember,
+  addPulseNote,
   removeMember,
   setHuddleMuted,
   setMemberRole,
   snoozeReminder,
-  addPulseNote,
   toggleForumReaction,
   togglePulseReaction,
   wouldOrphanCommunity,
@@ -66,6 +67,16 @@ const base = () => ({
       channel: null,
       at: 1,
       reactions: [{ emoji: "👍", count: 2 }],
+    },
+  ],
+  communities: [
+    {
+      id: "c-existing",
+      name: "既存",
+      relayUrl: "wss://relay.example.jp",
+      memberCount: 3,
+      hosted: false,
+      joinPolicy: "invite",
     },
   ],
 });
@@ -217,4 +228,19 @@ test("a note written from Pulse lands at the top of the notes tab", () => {
   // into it would make that tab a lie.
   assert.equal(next.pulse[0].tab, "notes");
   assert.deepEqual(next.pulse[0].reactions, []);
+});
+
+test("a created community goes to the end of the rail", () => {
+  // The rail's order is the order communities were joined; a new one jumping
+  // ahead would move every position the reader had learned.
+  const next = addCommunity(base(), {
+    id: "c-new",
+    name: "my-team",
+    relayUrl: "wss://my-team.nuxx.host",
+    memberCount: 1,
+    hosted: true,
+    joinPolicy: "invite",
+  });
+  assert.equal(next.communities.length, base().communities.length + 1);
+  assert.equal(next.communities[next.communities.length - 1].id, "c-new");
 });

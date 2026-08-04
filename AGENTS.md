@@ -361,6 +361,16 @@ own background and vanishes while still reporting `opacity: 1`.
 `--nuxx-*` tokens were once copied over without the rules that read them and sat
 dead for months, which is why the client rendered in the fallback palette.
 
+One surface deliberately opts out of all of the above: the hosted-community
+setup flow (`features/communities/ui/HostedCommunityFlow.tsx`). It is the only
+screen someone sees *before* they have a community, so it cannot follow a theme
+they have not chosen — the `--nuxx-hosted-community-*` tokens are declared on
+`:root` only and are the same under every theme. They are `R G B` triplets, not
+HSL like the semantic tokens, so their Tailwind mapping uses
+`rgb(var(--…) / <alpha-value>)` (the `hosted-*` colors in
+`web/tailwind.config.js`). A showcase e2e asserts the computed colours, because
+a missing mapping silently degrades to inherited ones rather than erroring.
+
 ### Text sizing & zoom (use rem, never px)
 
 Browser zoom scales the root `<html>` font-size, so **only rem-based text

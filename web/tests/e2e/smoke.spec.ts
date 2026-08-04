@@ -3711,12 +3711,37 @@ test("adding a community offers three doors and normalizes what is typed", async
   );
 
   await page.getByTestId("add-community-back").click();
+  // The third door hands off to the setup flow rather than being a third mode of
+  // this dialog: creating a community is three decisions, not one field.
   await page.getByTestId("choose-create").click();
-  await page.getByTestId("hosted-name-input").fill("My-Team");
+  await expect(page.getByTestId("add-community-dialog")).toHaveCount(0);
+  await page.getByTestId("hosted-name").fill("My-Team");
   // Case is normalized rather than refused: the name becomes a hostname label.
-  await expect(page.getByTestId("add-community-dialog")).toContainText(
+  await expect(page.getByTestId("hosted-flow")).toContainText(
     "wss://my-team.nuxx.host",
   );
+});
+
+test("the hosted setup flow says who is about to own the community", async ({
+  page,
+}) => {
+  // A consequence of the button on this step, so it is disclosed on this step —
+  // a consequence explained after the fact is not a disclosure.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/");
+  await page.getByTestId("add-community").click();
+  await page.getByTestId("choose-create").click();
+  await expect(page.getByTestId("hosted-owner")).toContainText("オーナー");
+
+  // And it refuses to advance on a name a hostname label cannot carry.
+  await page.getByTestId("hosted-name").fill("-nope");
+  await expect(page.getByTestId("hosted-name-error")).toBeVisible();
+  await expect(page.getByTestId("hosted-next")).toBeDisabled();
+  await page.getByTestId("hosted-name").fill("my-team");
+  await expect(page.getByTestId("hosted-next")).toBeEnabled();
 });
 
 // --- Onboarding ------------------------------------------------------------

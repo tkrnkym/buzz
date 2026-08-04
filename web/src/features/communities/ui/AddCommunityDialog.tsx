@@ -4,20 +4,16 @@ import { toast } from "sonner";
 
 import {
   extractInviteCode,
-  hostedNameError,
-  hostedRelayUrl,
   inviteCodeError,
-  JOIN_POLICY_LABELS,
   normalizeRelayUrl,
   relayUrlError,
 } from "@/features/communities/community-model";
-import { useShowcase } from "@/features/showcase/use-showcase";
 import { Dialog } from "@/shared/ui/dialog";
 
 const FIELD_CLASS =
   "h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-type Mode = "choose" | "join" | "connect" | "create";
+type Mode = "choose" | "join" | "connect";
 
 function Choice({
   description,
@@ -68,23 +64,31 @@ function Choice({
  */
 export function AddCommunityDialog({
   onClose,
+  onCreateHosted,
   open,
 }: {
   onClose: () => void;
+  /**
+   * Hand off to the setup flow.
+   *
+   * Not a fourth mode of this dialog. Creating a hosted community is three
+   * decisions on its own light surface, and a `<dialog>` opened with
+   * `showModal()` sits in the browser's top layer — a full-window flow inside it
+   * cannot be scrolled past on a short viewport. The caller closes this and opens
+   * that instead.
+   */
+  onCreateHosted: () => void;
   open: boolean;
 }) {
-  const showcase = useShowcase();
   const [mode, setMode] = useState<Mode>("choose");
   const [invite, setInvite] = useState("");
   const [relayUrl, setRelayUrl] = useState("");
-  const [name, setName] = useState("");
 
   const close = () => {
     onClose();
     setMode("choose");
     setInvite("");
     setRelayUrl("");
-    setName("");
   };
 
   if (!open) return null;
@@ -93,7 +97,6 @@ export function AddCommunityDialog({
     ? inviteCodeError(extractInviteCode(invite))
     : null;
   const urlError = relayUrl ? relayUrlError(relayUrl) : null;
-  const nameError = name ? hostedNameError(name) : null;
 
   const back = (
     <button
@@ -137,8 +140,6 @@ export function AddCommunityDialog({
               submit("参加する", !!invite && !inviteError, "join-community")}
             {mode === "connect" &&
               submit("つなぐ", !!relayUrl && !urlError, "connect-community")}
-            {mode === "create" &&
-              submit("作成する", !!name && !nameError, "create-community")}
           </>
         )
       }
@@ -150,9 +151,7 @@ export function AddCommunityDialog({
           ? "コミュニティを追加"
           : mode === "join"
             ? "招待で参加する"
-            : mode === "connect"
-              ? "リレーにつなぐ"
-              : "ホスト型コミュニティを作る"
+            : "リレーにつなぐ"
       }
     >
       {mode === "choose" && (
@@ -175,7 +174,10 @@ export function AddCommunityDialog({
             Icon={Plus}
             description="サーバを用意せずに、新しいコミュニティを立ち上げます。"
             label="ホスト型を作る"
-            onClick={() => setMode("create")}
+            onClick={() => {
+              close();
+              onCreateHosted();
+            }}
             testId="choose-create"
           />
         </div>
@@ -227,42 +229,6 @@ export function AddCommunityDialog({
             <span className="text-badge text-destructive">{urlError}</span>
           )}
         </label>
-      )}
-
-      {mode === "create" && (
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-2xs font-medium text-muted-foreground">
-              コミュニティ名
-            </span>
-            <input
-              className={FIELD_CLASS}
-              data-testid="hosted-name-input"
-              onChange={(event) => setName(event.target.value)}
-              placeholder="my-team"
-              value={name}
-            />
-            {name && !nameError && (
-              <span className="text-badge text-muted-foreground">
-                URL: <code>{hostedRelayUrl(name)}</code>
-              </span>
-            )}
-            {nameError && (
-              <span className="text-badge text-destructive">{nameError}</span>
-            )}
-          </label>
-          <p className="text-badge text-muted-foreground">
-            作成すると、あなたがオーナーになります。参加方法は
-            {JOIN_POLICY_LABELS.invite}
-            の状態で始まり、あとから変えられます。
-          </p>
-          {showcase && (
-            <p className="text-badge text-muted-foreground">
-              いま {showcase.communities.filter((row) => row.hosted).length}{" "}
-              件のホスト型コミュニティに参加しています。
-            </p>
-          )}
-        </div>
       )}
     </Dialog>
   );

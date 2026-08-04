@@ -7,6 +7,7 @@ import {
   AddCommunityDialog,
   EditCommunityDialog,
 } from "@/features/communities/ui/AddCommunityDialog";
+import { HostedCommunityFlow } from "@/features/communities/ui/HostedCommunityFlow";
 import { useShowcase } from "@/features/showcase/use-showcase";
 import { cn } from "@/shared/lib/cn";
 import { relayWsUrl } from "@/shared/lib/relay-url";
@@ -35,6 +36,7 @@ export function CommunityRail({
 }) {
   const showcase = useShowcase();
   const [adding, setAdding] = useState(false);
+  const [creatingHosted, setCreatingHosted] = useState(false);
   const [editing, setEditing] = useState(false);
   // The connected relay is the first row, so anything the mock also lists under
   // that URL would be a duplicate of it.
@@ -131,7 +133,15 @@ export function CommunityRail({
         <FolderGit2 className="size-4" />
       </RailLink>
 
-      <AddCommunityDialog onClose={() => setAdding(false)} open={adding} />
+      <AddCommunityDialog
+        onClose={() => setAdding(false)}
+        onCreateHosted={() => setCreatingHosted(true)}
+        open={adding}
+      />
+      <HostedCommunityFlow
+        onClose={() => setCreatingHosted(false)}
+        open={creatingHosted}
+      />
       <EditCommunityDialog
         initialName={communityName}
         initialRelayUrl={relayWsUrl()}

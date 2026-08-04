@@ -182,8 +182,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 :root[data-nuxx-sidebar] {
-  --nuxx-gradient-top: var(--nuxx-gradient-light-top);
-  --nuxx-gradient-bottom: var(--nuxx-gradient-light-bottom);
   --nuxx-muted-foreground: rgb(0 0 0 / 40%);
   --nuxx-search-surface: rgb(0 0 0 / 4%);
   --nuxx-hover-surface: rgb(0 0 0 / 4%);
@@ -198,8 +196,6 @@
  * own. The `.dark` class is set on the root whenever a dark theme is active.
  */
 :root[data-nuxx-sidebar].dark {
-  --nuxx-gradient-top: var(--nuxx-gradient-dark-top);
-  --nuxx-gradient-bottom: var(--nuxx-gradient-dark-bottom);
   --nuxx-muted-foreground: rgb(255 255 255 / 40%);
   --nuxx-search-surface: rgb(255 255 255 / 4%);
   --nuxx-hover-surface: rgb(255 255 255 / 4%);

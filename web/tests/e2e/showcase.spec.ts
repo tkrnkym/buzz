@@ -839,3 +839,96 @@ test("a forum reaction can be given and withdrawn", async ({ page }) => {
   await expect(page.getByTestId("forum-reaction-🙏")).toHaveCount(0);
   await expect(page.getByTestId("forum-add-reaction-🙏")).toBeVisible();
 });
+
+// --- Hosted community setup ------------------------------------------------
+
+test("creating a hosted community asks the two questions that matter later", async ({
+  page,
+}) => {
+  // It used to be a name field and a toast, which is enough to name a community
+  // and nothing like enough to have one.
+  await page.goto("/home");
+  await page.getByTestId("add-community").click();
+  await page.getByTestId("choose-create").click();
+
+  await page.getByTestId("hosted-name").fill("my-team");
+  await page.getByTestId("hosted-next").click();
+
+  // Who can get in. The draft starts invite-only — the safe default for a
+  // community that does not exist yet.
+  await expect(page.getByTestId("hosted-policy-invite")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByTestId("hosted-policy-open").click();
+  await page.getByTestId("hosted-next").click();
+
+  // Who else is in it. Two addresses, pasted with mixed separators.
+  await page.getByTestId("hosted-invite-to").fill("a@example.jp, b@example.jp");
+  await expect(page.getByTestId("hosted-create")).toContainText("2 人に送る");
+  await page.getByTestId("hosted-create").click();
+
+  const done = page.getByTestId("hosted-done");
+  await expect(done).toContainText("wss://my-team.nuxx.host");
+  await expect(done).toContainText("誰でも参加できます");
+  await expect(page.getByTestId("hosted-copy-invite")).toContainText(
+    "my-team.nuxx.host/invite/",
+  );
+});
+
+test("the community it created is in the rail afterwards", async ({ page }) => {
+  await page.goto("/home");
+  const before = await page
+    .getByTestId("community-rail")
+    .getByRole("button")
+    .count();
+
+  await page.getByTestId("add-community").click();
+  await page.getByTestId("choose-create").click();
+  await page.getByTestId("hosted-name").fill("my-team");
+  await page.getByTestId("hosted-next").click();
+  await page.getByTestId("hosted-next").click();
+  await page.getByTestId("hosted-create").click();
+  await page.getByTestId("hosted-finish").click();
+
+  // A community that was created and then did not appear would read as the
+  // creation having failed.
+  await expect(page.getByTestId("hosted-flow")).toHaveCount(0);
+  await expect(
+    page.getByTestId("community-rail").getByRole("button"),
+  ).toHaveCount(before + 1);
+});
+
+test("a community can be created with nobody invited", async ({ page }) => {
+  // Blocking on "invite somebody" would be a demand rather than an offer, and a
+  // community of one is a legitimate thing to start.
+  await page.goto("/home");
+  await page.getByTestId("add-community").click();
+  await page.getByTestId("choose-create").click();
+  await page.getByTestId("hosted-name").fill("solo-team");
+  await page.getByTestId("hosted-next").click();
+  await page.getByTestId("hosted-next").click();
+  await expect(page.getByTestId("hosted-create")).toContainText("作成する");
+  await page.getByTestId("hosted-create").click();
+  await expect(page.getByTestId("hosted-done")).toBeVisible();
+});
+
+test("the setup flow keeps its light palette rather than following the theme", async ({
+  page,
+}) => {
+  // The `--nuxx-hosted-community-*` tokens were declared with no rule reading
+  // them, so this surface rendered in whatever the app theme was. They are
+  // declared only on `:root` — deliberately, so they do not vary with the theme —
+  // and this asserts the Tailwind mapping resolves them at all: without it the
+  // classes would not exist and the colours would simply be inherited.
+  await page.goto("/home");
+  await page.getByTestId("add-community").click();
+  await page.getByTestId("choose-create").click();
+
+  const identity = page.getByTestId("hosted-owner");
+  await expect(identity).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByTestId("hosted-name")).toHaveCSS(
+    "color",
+    "rgb(23, 23, 23)",
+  );
+});
