@@ -58,6 +58,11 @@ jobs:
 
   deploy:
     needs: build
+    # Only the default branch can deploy: the github-pages environment rejects
+    # any other ref, so on a feature branch this job failed before it was even
+    # assigned a runner. Skipping it keeps the build validation on branches
+    # without a permanent red check on every web PR.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
