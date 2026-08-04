@@ -16,7 +16,7 @@ const overrides = new Set([
   // Avatar fallback initials — two glyphs inside an avatar disc, not an
   // identity string. The one place allowed to do it; every avatar goes through
   // this component, and it prefers the display name's initials when there is one.
-  "src/shared/ui/PubkeyAvatar.tsx:73",
+  "src/shared/ui/PubkeyAvatar.tsx:87",
   // Array window (first N pubkeys), not string truncation.
   "src/features/repos/ui/OrgSidebar.tsx:22",
   // Also an array window: the first few thread participants for the avatar

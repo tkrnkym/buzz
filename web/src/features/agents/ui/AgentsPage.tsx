@@ -28,9 +28,18 @@ import {
   useShowcase,
   useShowcaseUpdate,
 } from "@/features/showcase/use-showcase";
+import type { ShowcaseAgent } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 
 type Grouping = "status" | "channel";
+
+/**
+ * The card grid. Cards rather than rows means the column count is a function of
+ * the window, and `items-stretch` (the grid default) keeps a card with two
+ * channel chips the same height as one with none.
+ */
+const CARD_GRID_CLASS =
+  "mt-4 grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3";
 
 /**
  * The Agents screen.
@@ -60,6 +69,54 @@ export function AgentsPage() {
   const byChannel = useMemo(() => groupAgentsByChannel(agents), [agents]);
   const selected =
     sorted.find((agent) => agent.id === selectedId) ?? sorted[0] ?? null;
+
+  // The three mutations, written once and handed to both the card menu and the
+  // detail panel. They were inline on the panel; a card that offers the same
+  // actions must run the same code, not a second copy of the selection-pinning
+  // rule below.
+  const startEdit = (agent: ShowcaseAgent) => {
+    setSelectedId(agent.id);
+    setEditing({ agentId: agent.id, draft: draftFromAgent(agent) });
+  };
+
+  const doDelete = (agent: ShowcaseAgent) => {
+    if (!update) return;
+    update((current) => removeAgent(current, agent.id));
+    // Back to no explicit selection, which falls through to the first remaining
+    // agent — the same thing the page shows on arrival. The toast names who was
+    // deleted, so the panel changing to someone else does not read as the wrong
+    // one going.
+    setSelectedId(null);
+    toast.success(`${agent.name} を削除しました`);
+  };
+
+  const doTogglePaused = (agent: ShowcaseAgent) => {
+    if (!update) return;
+    const paused = agent.status !== "paused";
+    // Pin the selection before changing anything. The list is sorted by status,
+    // so pausing reorders it — and with no explicit selection the panel would
+    // fall through to whichever agent is now first, reading as though the wrong
+    // one was paused.
+    setSelectedId(agent.id);
+    update((current) => setAgentPaused(current, agent.id, paused));
+    toast.success(
+      paused
+        ? `${agent.name} を一時停止しました`
+        : `${agent.name} を再開しました`,
+    );
+  };
+
+  const renderCard = (agent: ShowcaseAgent) => (
+    <AgentCard
+      agent={agent}
+      nowSeconds={nowSeconds}
+      onDelete={update ? () => doDelete(agent) : undefined}
+      onEdit={update ? () => startEdit(agent) : undefined}
+      onSelect={() => setSelectedId(agent.id)}
+      onTogglePaused={update ? () => doTogglePaused(agent) : undefined}
+      selected={selected?.id === agent.id}
+    />
+  );
 
   if (!showcase) {
     return (
@@ -111,17 +168,26 @@ export function AgentsPage() {
         </div>
 
         {grouping === "status" ? (
-          <ul className="mt-4 flex flex-col gap-2" data-testid="agent-list">
+          <ul className={CARD_GRID_CLASS} data-testid="agent-list">
             {sorted.map((agent) => (
-              <li key={agent.id}>
-                <AgentCard
-                  agent={agent}
-                  nowSeconds={nowSeconds}
-                  onSelect={() => setSelectedId(agent.id)}
-                  selected={selected?.id === agent.id}
-                />
-              </li>
+              <li key={agent.id}>{renderCard(agent)}</li>
             ))}
+            {/* The add card closes the grid rather than living only in the
+                header: on a screen whose subject is a grid of things, the way to
+                get another one belongs in the grid. */}
+            {update && (
+              <li>
+                <button
+                  className="flex size-full min-h-56 items-center justify-center rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-muted-foreground/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  data-testid="create-agent-card"
+                  onClick={() => setEditing({ agentId: null, draft: null })}
+                  type="button"
+                >
+                  <Plus aria-hidden className="size-5" />
+                  <span className="sr-only">エージェントを作る</span>
+                </button>
+              </li>
+            )}
           </ul>
         ) : (
           <div className="mt-4 flex flex-col gap-5" data-testid="agent-list">
@@ -130,15 +196,10 @@ export function AgentsPage() {
                 <h2 className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
                   #{group.channel}
                 </h2>
-                <ul className="mt-2 flex flex-col gap-2">
+                <ul className={CARD_GRID_CLASS}>
                   {group.agents.map((agent) => (
                     <li key={`${group.channel}:${agent.id}`}>
-                      <AgentCard
-                        agent={agent}
-                        nowSeconds={nowSeconds}
-                        onSelect={() => setSelectedId(agent.id)}
-                        selected={selected?.id === agent.id}
-                      />
+                      {renderCard(agent)}
                     </li>
                   ))}
                 </ul>
@@ -189,51 +250,9 @@ export function AgentsPage() {
         <AgentDetailPanel
           agent={selected}
           nowSeconds={nowSeconds}
-          onDelete={
-            update
-              ? () => {
-                  update((current) => removeAgent(current, selected.id));
-                  // Back to no explicit selection, which falls through to the
-                  // first remaining agent — the same thing the page shows on
-                  // arrival. The toast names who was deleted, so the panel
-                  // changing to someone else does not read as the wrong one going.
-                  setSelectedId(null);
-                  toast.success(`${selected.name} を削除しました`);
-                }
-              : undefined
-          }
-          onEdit={
-            update
-              ? () => {
-                  setSelectedId(selected.id);
-                  setEditing({
-                    agentId: selected.id,
-                    draft: draftFromAgent(selected),
-                  });
-                }
-              : undefined
-          }
-          onTogglePaused={
-            update
-              ? () => {
-                  const paused = selected.status !== "paused";
-                  // Pin the selection before changing anything. The list is
-                  // sorted by status, so pausing reorders it — and with no
-                  // explicit selection the panel would fall through to whichever
-                  // agent is now first, reading as though the wrong one was
-                  // paused.
-                  setSelectedId(selected.id);
-                  update((current) =>
-                    setAgentPaused(current, selected.id, paused),
-                  );
-                  toast.success(
-                    paused
-                      ? `${selected.name} を一時停止しました`
-                      : `${selected.name} を再開しました`,
-                  );
-                }
-              : undefined
-          }
+          onDelete={update ? () => doDelete(selected) : undefined}
+          onEdit={update ? () => startEdit(selected) : undefined}
+          onTogglePaused={update ? () => doTogglePaused(selected) : undefined}
         />
       )}
 

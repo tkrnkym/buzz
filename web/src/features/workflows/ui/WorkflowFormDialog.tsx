@@ -13,16 +13,26 @@ import {
   toWorkflowYaml,
   TRIGGER_LABELS,
   TRIGGER_TYPES,
+  type TriggerType,
   triggerFields,
   validateWorkflowForm,
   type WorkflowForm,
 } from "@/features/workflows/workflow-form";
 import { nextMockId } from "@/features/showcase/use-showcase";
 import { cn } from "@/shared/lib/cn";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { Dialog } from "@/shared/ui/dialog";
+import { FieldShell, ValueRow, type ValueOption } from "@/shared/ui/field-row";
 
 const FIELD_CLASS =
   "h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+/** The trigger choices, as the value row wants them. */
+const TRIGGER_OPTIONS: ReadonlyArray<ValueOption<TriggerType>> =
+  TRIGGER_TYPES.map((trigger) => ({
+    value: trigger,
+    label: TRIGGER_LABELS[trigger],
+  }));
 
 const PLACEHOLDERS: Record<string, string> = {
   filter: "#dev",
@@ -287,27 +297,15 @@ export function WorkflowFormDialog({
             <legend className="mb-1 text-2xs font-medium text-muted-foreground">
               いつ動かすか
             </legend>
-            <select
-              aria-label="トリガー"
-              className={FIELD_CLASS}
-              data-testid="workflow-trigger"
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  trigger: {
-                    ...form.trigger,
-                    on: event.target.value as (typeof TRIGGER_TYPES)[number],
-                  },
-                })
+            <ValueRow
+              label="トリガー"
+              onChange={(on) =>
+                setForm({ ...form, trigger: { ...form.trigger, on } })
               }
+              options={TRIGGER_OPTIONS}
+              testId="workflow-trigger"
               value={form.trigger.on}
-            >
-              {TRIGGER_TYPES.map((trigger) => (
-                <option key={trigger} value={trigger}>
-                  {TRIGGER_LABELS[trigger]}
-                </option>
-              ))}
-            </select>
+            />
             {triggerFields(form.trigger.on).map((field) => (
               <label className="flex flex-col gap-1" key={field}>
                 <span className="text-badge text-muted-foreground">
@@ -385,18 +383,25 @@ export function WorkflowFormDialog({
             </button>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2.5 border-t border-border pt-4">
-            <input
+          {/* A bordered row rather than a bare tick, matching the original: the
+              box is the control, so the whole row is a click target and the
+              setting reads as a field like the ones above it. */}
+          <FieldShell className="flex items-center gap-2.5 px-3 py-3">
+            <Checkbox
               checked={form.enabled}
-              className="size-4 shrink-0 accent-primary"
               data-testid="workflow-enabled"
-              onChange={(event) =>
-                setForm({ ...form, enabled: event.target.checked })
+              id="workflow-enabled"
+              onCheckedChange={(checked) =>
+                setForm({ ...form, enabled: checked === true })
               }
-              type="checkbox"
             />
-            <span className="text-2xs font-medium">作成後すぐに動かす</span>
-          </label>
+            <label
+              className="flex-1 cursor-pointer text-sm font-medium"
+              htmlFor="workflow-enabled"
+            >
+              作成後すぐに動かす
+            </label>
+          </FieldShell>
 
           {formProblems.length > 0 && (
             <ul

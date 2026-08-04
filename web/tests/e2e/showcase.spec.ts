@@ -32,7 +32,8 @@ test("a workflow is built from the form and appears in the list", async ({
 
   await page.getByTestId("workflow-name").fill("金曜の締め");
   await page.getByTestId("workflow-description").fill("週末前の確認");
-  await page.getByTestId("workflow-trigger").selectOption("schedule");
+  await page.getByTestId("workflow-trigger").click();
+  await page.getByTestId("workflow-trigger-schedule").click();
   await page.getByTestId("trigger-cron").fill("0 17 * * 5");
 
   await page.getByTestId("add-step").click();
@@ -58,7 +59,8 @@ test("a workflow just created reopens with the steps that were entered", async (
   await page.goto("/workflows");
   await page.getByTestId("create-workflow").click();
   await page.getByTestId("workflow-name").fill("承認つきリリース");
-  await page.getByTestId("workflow-trigger").selectOption("webhook");
+  await page.getByTestId("workflow-trigger").click();
+  await page.getByTestId("workflow-trigger-webhook").click();
 
   await page.getByTestId("add-step").click();
   const first = page.getByTestId(/^step-step-new-/).first();
@@ -94,7 +96,8 @@ test("a workflow just created reopens with the steps that were entered", async (
 
   // The stored definition keeps each step's id, so the same fields are addressable.
   await expect(page.getByTestId(/^step-step-/)).toHaveCount(2);
-  await expect(page.getByTestId("workflow-trigger")).toHaveValue("webhook");
+  // The row shows the stored trigger rather than carrying a form value.
+  await expect(page.getByTestId("workflow-trigger")).toContainText("Webhook");
   await expect(page.getByTestId(`step-text-${firstId}`)).toHaveValue(
     "リリースを始めます",
   );
@@ -133,7 +136,8 @@ test("the YAML behind the form is what the form says", async ({ page }) => {
   await page.goto("/workflows");
   await page.getByTestId("create-workflow").click();
   await page.getByTestId("workflow-name").fill("毎朝の要約");
-  await page.getByTestId("workflow-trigger").selectOption("schedule");
+  await page.getByTestId("workflow-trigger").click();
+  await page.getByTestId("workflow-trigger-schedule").click();
   await page.getByTestId("trigger-cron").fill("0 9 * * 1-5");
 
   await page.getByTestId("toggle-yaml").click();
@@ -238,6 +242,63 @@ test("an agent is renamed, paused, and deleted", async ({ page }) => {
   await page.getByTestId("delete-agent").click();
   await expect(page.getByTestId("agent-list")).not.toContainText("改名した係");
   await expect(page.getByTestId("agent-list")).not.toContainText(original);
+});
+
+test("the card's own badge and menu run the same actions as the panel", async ({
+  page,
+}) => {
+  // The card gained a run badge and a ⋮ menu, which are two more entry points
+  // into the same three mutations. They call the shared handlers rather than
+  // their own copies, and this is what says so — in particular that pausing from
+  // the card still pins the selection, since the list is sorted by status and
+  // reorders underneath the click.
+  await page.goto("/agents");
+  const panel = page.getByTestId("agent-detail-panel");
+  const name = await panel.getByRole("heading").first().innerText();
+
+  // Pause from the panel first, so the run badge exists regardless of what state
+  // the fixtures put this agent in. The badge appears only where it changes
+  // something — a resume on an already-idle agent would be a no-op button — and
+  // that rule is asserted at the end.
+  const panelToggle = page.getByTestId("toggle-agent-paused");
+  await panelToggle.click();
+  await expect(panelToggle).toHaveText("再開");
+
+  const badge = page.getByTestId(`agent-run-${name}`);
+  await expect(badge).toHaveAttribute("aria-label", `${name} を再開`);
+  await badge.click();
+  await expect(panelToggle).toHaveText("一時停止");
+  // Still the same agent, not whichever one the re-sort put first.
+  await expect(panel.getByRole("heading").first()).toHaveText(name);
+  // Resuming lands on idle, which is neither running nor paused, so there is
+  // nothing for the badge to do and it is not drawn.
+  await expect(badge).toHaveCount(0);
+
+  await page.getByTestId(`agent-menu-${name}`).click();
+  await page.getByTestId(`agent-card-edit-${name}`).click();
+  await page.getByTestId("agent-name").fill("カードから改名");
+  await page.getByTestId("save-agent").click();
+  await expect(page.getByTestId("agent-list")).toContainText("カードから改名");
+
+  await page.getByTestId("agent-menu-カードから改名").click();
+  await page.getByTestId("agent-card-delete-カードから改名").click();
+  await expect(page.getByTestId("agent-list")).not.toContainText(
+    "カードから改名",
+  );
+});
+
+test("the grid's add card creates an agent too", async ({ page }) => {
+  // On a screen whose subject is a grid, the way to get another one belongs in
+  // the grid — not only in the header.
+  await page.goto("/agents");
+  await page.getByTestId("create-agent-card").click();
+  await expect(page.getByTestId("agent-form-dialog")).toBeVisible();
+
+  await page.getByTestId("agent-name").fill("グリッドから");
+  await page.getByTestId("agent-purpose").fill("追加カードの動作確認");
+  await page.getByTestId("agent-channel-general").click();
+  await page.getByTestId("save-agent").click();
+  await expect(page.getByTestId("agent-list")).toContainText("グリッドから");
 });
 
 // --- Projects --------------------------------------------------------------

@@ -1053,8 +1053,16 @@ test("creating a channel publishes kind:9007 and opens the room", async ({
     "Design Review",
   );
 
+  // Type and visibility are value rows: the row shows the current answer and
+  // opens a menu of the alternatives.
+  await page.getByTestId("create-channel-visibility").click();
   await page.getByTestId("create-channel-visibility-private").click();
+  await expect(page.getByTestId("create-channel-visibility")).toContainText(
+    "Private",
+  );
+  await page.getByTestId("create-channel-type").click();
   await page.getByTestId("create-channel-type-forum").click();
+  await expect(page.getByTestId("create-channel-type")).toContainText("Forum");
   await page.getByTestId("create-channel-about").fill("weekly");
   await page.getByTestId("create-channel-submit").click();
 
