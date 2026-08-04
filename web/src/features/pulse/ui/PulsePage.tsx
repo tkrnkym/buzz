@@ -1,21 +1,29 @@
-import { Bot, Hash, StickyNote } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
-import { formatRelativeTime } from "@/features/agents/agent-model";
-import {
-  resolveAvatarUrl,
-  resolveUserLabel,
-} from "@/features/profile/profile-model";
+import { useMyPubkey } from "@/features/chat/use-chat";
 import { useProfiles } from "@/features/profile/profile-store";
-import { togglePulseReaction } from "@/features/showcase/showcase-mutations";
+import {
+  hasFailure,
+  pulseEntriesFor,
+  pulseTabCounts,
+} from "@/features/pulse/pulse-model";
+import { PulseCard } from "@/features/pulse/ui/PulseCard";
+import { useShell } from "@/features/shell/shell-context";
+import {
+  addPulseNote,
+  togglePulseReaction,
+} from "@/features/showcase/showcase-mutations";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
 import {
+  nextMockId,
   useShowcase,
   useShowcaseUpdate,
 } from "@/features/showcase/use-showcase";
 import type { PulseTab } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
-import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
+import { FormDialog } from "@/shared/ui/form-dialog";
 
 const TABS: { value: PulseTab; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -30,22 +38,36 @@ const TABS: { value: PulseTab; label: string }[] = [
  * apart by a tab rather than a badge because the two are read for different
  * reasons — a note is something to remember, an agent report is something that
  * just happened — and mixing them by default buries the shorter list.
+ *
+ * The tabs carry counts, and the agents tab says when something in it has
+ * stopped. With three unlabelled tabs there is no telling an empty one from one
+ * nobody has opened, and a stopped agent waiting behind a tab that does not
+ * mention it is the case this feed exists to catch.
  */
-/** Offered on every entry, so reacting is one click rather than a picker. */
-const QUICK_REACTIONS = ["👍", "🎉", "👀"];
-
 export function PulsePage() {
   const showcase = useShowcase();
   const update = useShowcaseUpdate();
+  const myPubkey = useMyPubkey();
+  const { channels } = useShell();
   const [tab, setTab] = useState<PulseTab>("all");
+  const [composing, setComposing] = useState(false);
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
 
-  const entries = useMemo(() => {
-    const all = showcase?.pulse ?? [];
-    const filtered = tab === "all" ? all : all.filter((e) => e.tab === tab);
-    return [...filtered].sort((left, right) => right.at - left.at);
-  }, [showcase, tab]);
+  const all = showcase?.pulse ?? [];
+  const entries = useMemo(() => pulseEntriesFor(all, tab), [all, tab]);
+  const counts = useMemo(() => pulseTabCounts(all), [all]);
+  const failing = useMemo(
+    () => hasFailure(all.filter((entry) => entry.tab === "agents")),
+    [all],
+  );
   const profiles = useProfiles(entries.map((entry) => entry.authorPubkey));
+  // Entries name a channel; the router needs its id. Resolved here rather than in
+  // the card so the lookup happens once per render instead of once per row.
+  const channelIds = useMemo(() => {
+    const byName = new Map<string, string>();
+    for (const channel of channels) byName.set(channel.name, channel.id);
+    return byName;
+  }, [channels]);
 
   if (!showcase) {
     return (
@@ -60,6 +82,18 @@ export function PulsePage() {
 
   return (
     <ShowcasePage
+      actions={
+        <button
+          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
+          data-testid="create-pulse-note"
+          disabled={update === null}
+          onClick={() => setComposing(true)}
+          type="button"
+        >
+          <Plus aria-hidden className="size-3" />
+          ノートを書く
+        </button>
+      }
       subtitle="覚えておきたいことと、自動で届いたこと"
       title="Pulse"
     >
@@ -67,7 +101,7 @@ export function PulsePage() {
         {TABS.map((option) => (
           <button
             className={cn(
-              "rounded-md px-2.5 py-1 text-2xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-2xs font-medium transition-colors",
               tab === option.value
                 ? "bg-secondary text-secondary-foreground"
                 : "text-muted-foreground hover:bg-accent",
@@ -78,115 +112,43 @@ export function PulsePage() {
             type="button"
           >
             {option.label}
+            <span className="tabular-nums text-muted-foreground">
+              {counts[option.value]}
+            </span>
+            {/* Said on the tab, not only behind it: the reason to open a feed of
+                agent reports is usually that one of them stopped. */}
+            {option.value === "agents" && failing && (
+              <AlertTriangle
+                aria-label="止まっているエージェントがあります"
+                className="size-3 text-destructive"
+                data-testid="pulse-tab-agents-alert"
+              />
+            )}
           </button>
         ))}
       </div>
 
       <ul className="mt-4 flex flex-col gap-3" data-testid="pulse-list">
         {entries.map((entry) => (
-          <li
-            className="rounded-lg border border-border px-4 py-3"
-            data-testid={`pulse-entry-${entry.id}`}
+          <PulseCard
+            channelId={
+              entry.channel === null
+                ? null
+                : (channelIds.get(entry.channel) ?? null)
+            }
+            entry={entry}
             key={entry.id}
-          >
-            <div className="flex items-start gap-3">
-              <PubkeyAvatar
-                avatarUrl={resolveAvatarUrl(entry.authorPubkey, profiles)}
-                className="mt-0.5 rounded-full"
-                label={resolveUserLabel({
-                  pubkey: entry.authorPubkey,
-                  profiles,
-                  preferResolvedSelfLabel: true,
-                })}
-                pubkey={entry.authorPubkey}
-                size="sm"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-sm font-medium">{entry.title}</span>
-                  <span className="inline-flex items-center gap-0.5 text-badge text-muted-foreground">
-                    {entry.tab === "agents" ? (
-                      <Bot aria-hidden className="size-2.5" />
-                    ) : (
-                      <StickyNote aria-hidden className="size-2.5" />
-                    )}
-                    {resolveUserLabel({
-                      pubkey: entry.authorPubkey,
-                      profiles,
-                      preferResolvedSelfLabel: true,
-                    })}
-                  </span>
-                  {entry.channel && (
-                    <span className="inline-flex items-center gap-0.5 text-badge text-muted-foreground">
-                      <Hash aria-hidden className="size-2.5" />
-                      {entry.channel}
-                    </span>
-                  )}
-                  <span className="text-badge text-muted-foreground">
-                    {formatRelativeTime(entry.at, nowSeconds)}
-                  </span>
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-2xs text-muted-foreground">
-                  {entry.body}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {entry.reactions.map((reaction) => (
-                    <button
-                      aria-label={`${reaction.emoji} ${reaction.count}`}
-                      aria-pressed={reaction.mine ?? false}
-                      className={cn(
-                        "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs leading-none disabled:opacity-60",
-                        // Same distinction the real timeline draws on its own
-                        // reactions, so a chip says whether the next click joins
-                        // or withdraws.
-                        reaction.mine
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border bg-secondary hover:bg-accent",
-                      )}
-                      data-testid={`pulse-reaction-${entry.id}-${reaction.emoji}`}
-                      disabled={update === null}
-                      key={reaction.emoji}
-                      onClick={() =>
-                        update?.((current) =>
-                          togglePulseReaction(
-                            current,
-                            entry.id,
-                            reaction.emoji,
-                          ),
-                        )
-                      }
-                      type="button"
-                    >
-                      {reaction.emoji}
-                      <span className="tabular-nums text-muted-foreground">
-                        {reaction.count}
-                      </span>
-                    </button>
-                  ))}
-                  {update &&
-                    QUICK_REACTIONS.filter(
-                      (emoji) =>
-                        !entry.reactions.some((row) => row.emoji === emoji),
-                    ).map((emoji) => (
-                      <button
-                        aria-label={`${emoji} で反応する`}
-                        className="inline-flex h-6 items-center rounded-full border border-dashed border-border px-2 text-2xs leading-none text-muted-foreground hover:bg-accent"
-                        data-testid={`pulse-add-reaction-${entry.id}-${emoji}`}
-                        key={emoji}
-                        onClick={() =>
-                          update((current) =>
-                            togglePulseReaction(current, entry.id, emoji),
-                          )
-                        }
-                        type="button"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </li>
+            nowSeconds={nowSeconds}
+            profiles={profiles}
+            {...(update
+              ? {
+                  onToggleReaction: (emoji: string) =>
+                    update((current) =>
+                      togglePulseReaction(current, entry.id, emoji),
+                    ),
+                }
+              : {})}
+          />
         ))}
       </ul>
 
@@ -194,6 +156,54 @@ export function PulsePage() {
         <p className="mt-4 text-2xs text-muted-foreground">
           このタブには何もありません。
         </p>
+      )}
+
+      {composing && update && (
+        <FormDialog
+          description="あとから探せる場所に残します。チャンネル名は任意です。"
+          fields={[
+            {
+              name: "title",
+              label: "タイトル",
+              placeholder: "リリース手順のメモ",
+              required: true,
+            },
+            {
+              name: "body",
+              label: "本文",
+              multiline: true,
+              placeholder: "何を覚えておきたいのか",
+              required: true,
+            },
+            {
+              name: "channel",
+              label: "チャンネル（任意）",
+              placeholder: "dev",
+            },
+          ]}
+          onClose={() => setComposing(false)}
+          onSubmit={(values) => {
+            const channel = values.channel.trim().replace(/^#/, "");
+            update((current) =>
+              addPulseNote(current, {
+                id: nextMockId("pulse"),
+                authorPubkey: myPubkey ?? "",
+                title: values.title,
+                body: values.body,
+                channel: channel === "" ? null : channel,
+                at: Math.floor(Date.now() / 1000),
+              }),
+            );
+            setComposing(false);
+            // Onto the tab it landed on, so the reader sees what they wrote
+            // rather than wondering where it went.
+            setTab("notes");
+            toast.success("ノートを追加しました");
+          }}
+          submitLabel="残す"
+          testId="create-pulse-dialog"
+          title="ノートを書く"
+        />
       )}
     </ShowcasePage>
   );

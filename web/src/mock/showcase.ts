@@ -192,6 +192,15 @@ export interface PulseEntry {
   channel: string | null;
   at: number;
   /**
+   * How an agent's run ended. Absent on notes — a note is something someone
+   * chose to write down, not a task that can fail.
+   *
+   * Without it a failed run is indistinguishable from a finished one: both
+   * arrive as a title and a paragraph, and "ハーネスの起動に失敗しました" reads
+   * as ordinary prose in the same muted grey as everything else.
+   */
+  outcome?: "ok" | "failed";
+  /**
    * `count` is everyone; `mine` is whether the reader is one of them.
    *
    * Without the second field a chip cannot tell joining from withdrawing, and a
@@ -219,7 +228,8 @@ export interface ForumPost {
   channel: string;
   at: number;
   replyCount: number;
-  reactions: { emoji: string; count: number }[];
+  /** `mine` for the same reason the Pulse chips carry it — see `PulseEntry`. */
+  reactions: { emoji: string; count: number; mine?: boolean }[];
   pinned: boolean;
   comments: {
     id: string;
@@ -795,6 +805,7 @@ export const SHOWCASE: Showcase = {
       tab: "agents",
       authorPubkey: AGENT_REVIEWER,
       title: "#224 のレビューを終えました",
+      outcome: "ok",
       body: "気になったのは 3 点です。仮想化したあとの日付見出しが sticky を失っている件は、追従ピルで代替されているので問題ありません。",
       channel: "dev",
       at: ago(18),
@@ -828,6 +839,7 @@ export const SHOWCASE: Showcase = {
       tab: "agents",
       authorPubkey: AGENT_TRIAGE,
       title: "トリアージが止まっています",
+      outcome: "failed",
       body: "ハーネスの起動に失敗しました。`./bin/triage` が見つかりません。",
       channel: "dev",
       at: ago(52),

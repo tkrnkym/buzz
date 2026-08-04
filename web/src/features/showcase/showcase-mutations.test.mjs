@@ -10,6 +10,8 @@ import {
   setHuddleMuted,
   setMemberRole,
   snoozeReminder,
+  addPulseNote,
+  toggleForumReaction,
   togglePulseReaction,
   wouldOrphanCommunity,
 } from "@/features/showcase/showcase-mutations";
@@ -187,4 +189,32 @@ test("the chip goes at zero rather than showing 0", () => {
   const added = togglePulseReaction(base(), "e1", "🎉");
   const withdrawn = togglePulseReaction(added, "e1", "🎉");
   assert.deepEqual(withdrawn.pulse[0].reactions, [{ emoji: "👍", count: 2 }]);
+});
+
+test("a forum reaction follows the same rule as a pulse one", () => {
+  // One implementation, so the two cannot disagree — the forum's chips were
+  // read-only text until now, which is why there was nothing to diverge from.
+  const joined = toggleForumReaction(base(), "p1", "🎉");
+  assert.deepEqual(joined.forum[0].reactions, [
+    { emoji: "🎉", count: 1, mine: true },
+  ]);
+  // And withdrawing takes the chip away rather than leaving a 0 behind.
+  const withdrawn = toggleForumReaction(joined, "p1", "🎉");
+  assert.deepEqual(withdrawn.forum[0].reactions, []);
+});
+
+test("a note written from Pulse lands at the top of the notes tab", () => {
+  const next = addPulseNote(base(), {
+    id: "n1",
+    authorPubkey: OWNER,
+    title: "決めごと",
+    body: "本文",
+    channel: "dev",
+    at: 999,
+  });
+  assert.equal(next.pulse[0].id, "n1");
+  // Always a note: the agents tab is what agents filed, and a person posting
+  // into it would make that tab a lie.
+  assert.equal(next.pulse[0].tab, "notes");
+  assert.deepEqual(next.pulse[0].reactions, []);
 });

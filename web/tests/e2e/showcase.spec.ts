@@ -767,3 +767,75 @@ test("selecting a room and then a mention moves the pane both ways", async ({
   // The selected row is the one lit, so the list still says what the pane shows.
   await expect(first).toHaveAttribute("aria-current", "true");
 });
+
+// --- Pulse cards and forum reactions ---------------------------------------
+
+test("a stopped agent does not look like a memo", async ({ page }) => {
+  // All three entry kinds used to render as the same bordered box with a 10px
+  // icon, so "ハーネスの起動に失敗しました" sat in the same muted grey as a
+  // style guideline.
+  await page.goto("/pulse");
+  await expect(page.getByTestId("pulse-kind-pulse-4")).toContainText(
+    "止まっています",
+  );
+  await expect(page.getByTestId("pulse-kind-pulse-1")).toContainText(
+    "エージェントの報告",
+  );
+  await expect(page.getByTestId("pulse-kind-pulse-2")).toContainText("ノート");
+  // And the tab says so before it is opened, because that is the reason to open it.
+  await expect(page.getByTestId("pulse-tab-agents-alert")).toBeVisible();
+});
+
+test("the pulse tabs count what is behind them", async ({ page }) => {
+  await page.goto("/pulse");
+  // With three unlabelled tabs there is no telling an empty one from one nobody
+  // has opened.
+  await expect(page.getByTestId("pulse-tab-all")).toContainText("4");
+  await expect(page.getByTestId("pulse-tab-notes")).toContainText("2");
+  await expect(page.getByTestId("pulse-tab-agents")).toContainText("2");
+});
+
+test("an entry that names a room offers the way to it", async ({ page }) => {
+  await page.goto("/pulse");
+  await page.getByTestId("pulse-open-channel-pulse-4").click();
+  await expect(page).toHaveURL(/\/c\/22222222-2222-4222-8222-222222222222/);
+});
+
+test("a note written from Pulse appears in the notes tab", async ({ page }) => {
+  // Pulse is "things worth keeping" and had no way to keep one.
+  await page.goto("/pulse");
+  await page.getByTestId("create-pulse-note").click();
+  await page.getByTestId("create-pulse-dialog-title").fill("金曜の決めごと");
+  await page.getByTestId("create-pulse-dialog-body").fill("タグの前に just ci");
+  await page.getByTestId("create-pulse-dialog-submit").click();
+
+  await expect(page.getByText("ノートを追加しました")).toBeVisible();
+  // Landed on the notes tab, so the writer sees what they wrote.
+  const notes = page.getByTestId("pulse-tab-notes");
+  await expect(notes).toContainText("3");
+  await expect(page.getByTestId("pulse-list")).toContainText("金曜の決めごと");
+});
+
+test("a forum reaction can be given and withdrawn", async ({ page }) => {
+  // The forum's counts used to be plain text — the one thing on the screen that
+  // turned out not to be real.
+  await page.goto("/forum");
+  await page.getByTestId("forum-post-post-1").click();
+
+  // The seeded 🎉 is held by someone else, so this joins them rather than
+  // walking their count down.
+  const seeded = page.getByTestId("forum-reaction-🎉");
+  await expect(seeded).toHaveAttribute("aria-pressed", "false");
+  await seeded.click();
+  await expect(seeded).toContainText("2");
+  await expect(seeded).toHaveAttribute("aria-pressed", "true");
+
+  // A fresh one starts at the reader's own single count, and withdrawing takes
+  // the chip away: a reaction nobody holds is not a reaction.
+  await page.getByTestId("forum-add-reaction-🙏").click();
+  const fresh = page.getByTestId("forum-reaction-🙏");
+  await expect(fresh).toContainText("1");
+  await fresh.click();
+  await expect(page.getByTestId("forum-reaction-🙏")).toHaveCount(0);
+  await expect(page.getByTestId("forum-add-reaction-🙏")).toBeVisible();
+});

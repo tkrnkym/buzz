@@ -12,6 +12,7 @@ import type {
   ForumPost,
   HuddleParticipant,
   MemberRole,
+  PulseEntry,
   Reminder,
   Showcase,
 } from "@/mock/showcase";
@@ -272,39 +273,83 @@ export function togglePulseReaction(
 ): Showcase {
   return {
     ...current,
-    pulse: current.pulse.map((entry) => {
-      if (entry.id !== entryId) return entry;
-      const existing = entry.reactions.find((row) => row.emoji === emoji);
-      if (!existing) {
-        return {
-          ...entry,
-          reactions: [...entry.reactions, { emoji, count: 1, mine: true }],
-        };
-      }
-      if (!existing.mine) {
-        return {
-          ...entry,
-          reactions: entry.reactions.map((row) =>
-            row.emoji === emoji
-              ? { ...row, count: row.count + 1, mine: true }
-              : row,
-          ),
-        };
-      }
-      if (existing.count <= 1) {
-        return {
-          ...entry,
-          reactions: entry.reactions.filter((row) => row.emoji !== emoji),
-        };
-      }
-      return {
-        ...entry,
-        reactions: entry.reactions.map((row) =>
-          row.emoji === emoji
-            ? { ...row, count: row.count - 1, mine: false }
-            : row,
-        ),
-      };
-    }),
+    pulse: current.pulse.map((entry) =>
+      entry.id === entryId
+        ? { ...entry, reactions: toggleReactionList(entry.reactions, emoji) }
+        : entry,
+    ),
   };
+}
+
+/**
+ * The list edit itself, shared by Pulse and the forum.
+ *
+ * One implementation because there is one rule, and two copies of a rule this
+ * fiddly is how they come to disagree — the forum's chips were read-only text
+ * before this, so there was nothing to diverge from yet.
+ */
+function toggleReactionList(
+  reactions: ReactionChip[],
+  emoji: string,
+): ReactionChip[] {
+  const existing = reactions.find((row) => row.emoji === emoji);
+  if (!existing) return [...reactions, { emoji, count: 1, mine: true }];
+  if (!existing.mine) {
+    return reactions.map((row) =>
+      row.emoji === emoji ? { ...row, count: row.count + 1, mine: true } : row,
+    );
+  }
+  if (existing.count <= 1) {
+    return reactions.filter((row) => row.emoji !== emoji);
+  }
+  return reactions.map((row) =>
+    row.emoji === emoji ? { ...row, count: row.count - 1, mine: false } : row,
+  );
+}
+
+/** A reaction on a mock-up entry: everyone's count, plus whether it is mine. */
+type ReactionChip = { emoji: string; count: number; mine?: boolean };
+
+/**
+ * The same rule, on a forum post.
+ *
+ * The forum's reactions used to render as plain text. Every other mock-up surface
+ * lets the reader act on what it shows, and a count that cannot be joined is the
+ * one thing on the screen that turns out not to be real.
+ */
+export function toggleForumReaction(
+  current: Showcase,
+  postId: string,
+  emoji: string,
+): Showcase {
+  return {
+    ...current,
+    forum: current.forum.map((post) =>
+      post.id === postId
+        ? { ...post, reactions: toggleReactionList(post.reactions, emoji) }
+        : post,
+    ),
+  };
+}
+
+/**
+ * A note written from the Pulse screen.
+ *
+ * Pulse is "things worth keeping" and had no way to keep one — the entries could
+ * only arrive from the fixtures. A note is always a note: the `agents` tab is for
+ * what agents filed, and letting a person post into it would make that tab a lie.
+ */
+export function addPulseNote(
+  current: Showcase,
+  note: {
+    id: string;
+    authorPubkey: string;
+    title: string;
+    body: string;
+    channel: string | null;
+    at: number;
+  },
+): Showcase {
+  const entry: PulseEntry = { ...note, tab: "notes", reactions: [] };
+  return { ...current, pulse: [entry, ...current.pulse] };
 }

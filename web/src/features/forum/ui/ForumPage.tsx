@@ -14,6 +14,7 @@ import {
   addForumPost,
   removeForumPost,
   setForumPinned,
+  toggleForumReaction,
 } from "@/features/showcase/showcase-mutations";
 import { NotWiredUp, ShowcasePage } from "@/features/showcase/ui/ShowcasePage";
 import {
@@ -24,6 +25,9 @@ import {
 import { FormDialog } from "@/shared/ui/form-dialog";
 import { cn } from "@/shared/lib/cn";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
+
+/** Offered on every post, so reacting is one click rather than a picker. */
+const QUICK_REACTIONS = ["👍", "🎉", "🙏"];
 
 /**
  * The forum: long posts with comments, alongside the chat channels.
@@ -144,7 +148,15 @@ export function ForumPage() {
                         </span>
                       )}
                       {post.reactions.map((reaction) => (
-                        <span key={reaction.emoji}>
+                        // Text, not a control: the whole row is already a button,
+                        // and a button inside a button is not a thing. The panel
+                        // is where a reaction is given — see below.
+                        <span
+                          className={cn(
+                            reaction.mine && "font-medium text-foreground",
+                          )}
+                          key={reaction.emoji}
+                        >
                           {reaction.emoji} {reaction.count}
                         </span>
                       ))}
@@ -215,6 +227,59 @@ export function ForumPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             <p className="whitespace-pre-wrap text-2xs">{open.body}</p>
+
+            {/* Reactions used to be plain text here too. Every other mock-up
+                surface lets the reader act on what it shows, so a count that
+                could not be joined was the one thing on the screen that turned
+                out not to be real. Same rule as the Pulse chips, from the same
+                function — see `toggleReactionList`. */}
+            <div className="mt-3 flex flex-wrap gap-1">
+              {open.reactions.map((reaction) => (
+                <button
+                  aria-label={`${reaction.emoji} ${reaction.count}`}
+                  aria-pressed={reaction.mine ?? false}
+                  className={cn(
+                    "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs leading-none disabled:opacity-60",
+                    reaction.mine
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-secondary hover:bg-accent",
+                  )}
+                  data-testid={`forum-reaction-${reaction.emoji}`}
+                  disabled={update === null}
+                  key={reaction.emoji}
+                  onClick={() =>
+                    update?.((current) =>
+                      toggleForumReaction(current, open.id, reaction.emoji),
+                    )
+                  }
+                  type="button"
+                >
+                  {reaction.emoji}
+                  <span className="tabular-nums text-muted-foreground">
+                    {reaction.count}
+                  </span>
+                </button>
+              ))}
+              {update &&
+                QUICK_REACTIONS.filter(
+                  (emoji) => !open.reactions.some((row) => row.emoji === emoji),
+                ).map((emoji) => (
+                  <button
+                    aria-label={`${emoji} で反応する`}
+                    className="inline-flex h-6 items-center rounded-full border border-dashed border-border px-2 text-2xs leading-none text-muted-foreground hover:bg-accent"
+                    data-testid={`forum-add-reaction-${emoji}`}
+                    key={emoji}
+                    onClick={() =>
+                      update((current) =>
+                        toggleForumReaction(current, open.id, emoji),
+                      )
+                    }
+                    type="button"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+            </div>
 
             {open.comments.length > 0 && (
               <ul className="mt-5 flex flex-col gap-4">
