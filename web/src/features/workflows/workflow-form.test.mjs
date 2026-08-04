@@ -132,6 +132,71 @@ test("the YAML carries the trigger, the steps, and only the used fields", () => 
   assert.ok(!yaml.includes("url:"));
 });
 
+test("every step carries an id the engine will accept", () => {
+  // `Step.id` is required, must be unique, and may only hold alphanumerics and
+  // underscores. The form's ids come from the mock id source and carry hyphens, so
+  // an unnormalized id is a definition the engine refuses to load.
+  const yaml = toWorkflowYaml(
+    validForm({
+      steps: [
+        { ...emptyStep("step-new-1"), text: "ひとつめ" },
+        { ...emptyStep("step-new-2"), text: "ふたつめ" },
+      ],
+    }),
+  );
+  assert.match(yaml, /^ {2}- id: step_new_1$/m);
+  assert.match(yaml, /^ {2}- id: step_new_2$/m);
+  for (const id of yaml.match(/^ {2}- id: (.+)$/gm) ?? []) {
+    assert.match(id, /^ {2}- id: [A-Za-z0-9_]+$/);
+  }
+});
+
+test("step ids stay unique after normalizing", () => {
+  // Two ids that differ only in characters the engine forbids would collide, and a
+  // duplicate id is rejected outright rather than ignored.
+  const yaml = toWorkflowYaml(
+    validForm({
+      steps: [
+        { ...emptyStep("a-1"), text: "ひとつめ" },
+        { ...emptyStep("a.1"), text: "ふたつめ" },
+      ],
+    }),
+  );
+  const ids = (yaml.match(/^ {2}- id: (.+)$/gm) ?? []).map((line) =>
+    line.replace("  - id: ", ""),
+  );
+  assert.deepEqual(ids, ["a_1", "a_1_2"]);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test("an approval step collects what the engine requires", () => {
+  // `ActionDef::RequestApproval` needs both `from` and `message`; a step carrying
+  // only a body passes a form check and then fails to load.
+  assert.deepEqual(stepFields("request_approval"), ["from", "message"]);
+  const missing = validateWorkflowForm(
+    validForm({
+      steps: [{ ...emptyStep("s1"), action: "request_approval" }],
+    }),
+  );
+  assert.equal(missing.length, 2);
+  const yaml = toWorkflowYaml(
+    validForm({
+      steps: [
+        {
+          ...emptyStep("s1"),
+          action: "request_approval",
+          from: "@release-manager",
+          message: "リリースしてよいですか",
+        },
+      ],
+    }),
+  );
+  assert.match(yaml, /^ {4}from: "@release-manager"$/m);
+  assert.match(yaml, /^ {4}message: "リリースしてよいですか"$/m);
+  // The body field belongs to the message actions, not to this one.
+  assert.ok(!yaml.includes("text:"));
+});
+
 test("a trigger's summary names its detail when it has one", () => {
   assert.equal(
     triggerSummary({

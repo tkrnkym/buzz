@@ -161,18 +161,30 @@ test("muting someone also stops them speaking", () => {
   assert.equal(next.huddle.participants[0].speaking, false);
 });
 
-test("a new pulse reaction starts at one", () => {
+test("a new pulse reaction starts at one, and is the reader's", () => {
   const next = togglePulseReaction(base(), "e1", "🎉");
   assert.deepEqual(next.pulse[0].reactions, [
     { emoji: "👍", count: 2 },
-    { emoji: "🎉", count: 1 },
+    { emoji: "🎉", count: 1, mine: true },
   ]);
 });
 
-test("withdrawing decrements, and the chip goes at zero", () => {
+test("clicking a reaction other people hold joins it rather than removing one", () => {
+  // The seeded 👍 is held by two others and not by the reader. Counting down here
+  // would be deleting someone else's reaction.
   const once = togglePulseReaction(base(), "e1", "👍");
-  assert.deepEqual(once.pulse[0].reactions, [{ emoji: "👍", count: 1 }]);
-  // A reaction nobody holds is not a reaction — the chip goes rather than showing 0.
+  assert.deepEqual(once.pulse[0].reactions, [
+    { emoji: "👍", count: 3, mine: true },
+  ]);
   const twice = togglePulseReaction(once, "e1", "👍");
-  assert.deepEqual(twice.pulse[0].reactions, []);
+  assert.deepEqual(twice.pulse[0].reactions, [
+    { emoji: "👍", count: 2, mine: false },
+  ]);
+});
+
+test("the chip goes at zero rather than showing 0", () => {
+  // A reaction nobody holds is not a reaction.
+  const added = togglePulseReaction(base(), "e1", "🎉");
+  const withdrawn = togglePulseReaction(added, "e1", "🎉");
+  assert.deepEqual(withdrawn.pulse[0].reactions, [{ emoji: "👍", count: 2 }]);
 });

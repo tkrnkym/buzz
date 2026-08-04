@@ -253,15 +253,17 @@ export function setHuddleMuted(
 // --- Pulse -----------------------------------------------------------------
 
 /**
- * Add or withdraw a reaction on a pulse entry.
+ * Add or withdraw the reader's reaction on a pulse entry.
+ *
+ * Which way a click goes is decided by `mine`, not by the count: clicking a chip
+ * two other people hold is joining them, so it counts up to three. Deciding from
+ * the count alone made every click a withdrawal, which walked a seeded reaction
+ * down to nothing and read as deleting other people's reactions.
  *
  * Withdrawing removes the chip entirely at zero rather than leaving a `0` behind:
  * a reaction nobody holds is not a reaction, and a row of zeroed chips is how the
- * count stops meaning anything.
- *
- * There is no per-reader record of who reacted in this fixture shape, so a second
- * click on the same emoji withdraws — which is what a single reader in a demo
- * expects, and what the real timeline does through `myReactionId`.
+ * count stops meaning anything. The real timeline draws the same distinction with
+ * `myReactionId`.
  */
 export function togglePulseReaction(
   current: Showcase,
@@ -276,7 +278,17 @@ export function togglePulseReaction(
       if (!existing) {
         return {
           ...entry,
-          reactions: [...entry.reactions, { emoji, count: 1 }],
+          reactions: [...entry.reactions, { emoji, count: 1, mine: true }],
+        };
+      }
+      if (!existing.mine) {
+        return {
+          ...entry,
+          reactions: entry.reactions.map((row) =>
+            row.emoji === emoji
+              ? { ...row, count: row.count + 1, mine: true }
+              : row,
+          ),
         };
       }
       if (existing.count <= 1) {
@@ -288,7 +300,9 @@ export function togglePulseReaction(
       return {
         ...entry,
         reactions: entry.reactions.map((row) =>
-          row.emoji === emoji ? { ...row, count: row.count - 1 } : row,
+          row.emoji === emoji
+            ? { ...row, count: row.count - 1, mine: false }
+            : row,
         ),
       };
     }),

@@ -77,12 +77,15 @@ export interface StepForm {
   action: ActionType;
   /** An evalexpr guard. Empty means the step always runs. */
   condition: string;
-  /** `send_message` / `send_dm` / `request_approval`: the body. */
+  /** `send_message` / `send_dm`: the body. */
   text: string;
   /** `send_message` / `set_channel_topic`: where. */
   channel: string;
   /** `send_dm`: whose. */
   to: string;
+  /** `request_approval`: who decides, and what they are shown. */
+  from: string;
+  message: string;
   /** `call_webhook`: where and how. */
   url: string;
   method: string;
@@ -122,6 +125,8 @@ export function emptyStep(id: string): StepForm {
     text: "",
     channel: "",
     to: "",
+    from: "",
+    message: "",
     url: "",
     method: "POST",
     emoji: "",
@@ -165,8 +170,11 @@ export function stepFields(action: ActionType): Array<keyof StepForm> {
       return ["to", "text"];
     case "call_webhook":
       return ["url", "method"];
+    // `from` and `message` rather than a single body: the engine's
+    // `ActionDef::RequestApproval` requires both, and a definition carrying only
+    // a body is one the workflow engine refuses to load.
     case "request_approval":
-      return ["text"];
+      return ["from", "message"];
     case "add_reaction":
       return ["emoji"];
     case "set_channel_topic":
@@ -181,7 +189,7 @@ const REQUIRED_BY_ACTION: Record<ActionType, Array<keyof StepForm>> = {
   send_message: ["text"],
   send_dm: ["to", "text"],
   call_webhook: ["url"],
-  request_approval: ["text"],
+  request_approval: ["from", "message"],
   add_reaction: ["emoji"],
   set_channel_topic: ["topic"],
   delay: ["duration"],
@@ -194,6 +202,8 @@ export const FIELD_LABELS: Record<string, string> = {
   channel: "チャンネル",
   text: "本文",
   to: "相手",
+  from: "承認者",
+  message: "承認を求める文面",
   url: "URL",
   method: "メソッド",
   topic: "トピック",
@@ -306,8 +316,10 @@ export function toWorkflowYaml(form: WorkflowForm): string {
     if (value) lines.push(`  ${field}: ${quote(value)}`);
   }
   lines.push("steps:");
-  for (const step of form.steps) {
-    lines.push(`  - action: ${step.action}`);
+  const takenIds = new Set<string>();
+  for (const [index, step] of form.steps.entries()) {
+    lines.push(`  - id: ${engineStepId(step.id, index, takenIds)}`);
+    lines.push(`    action: ${step.action}`);
     if (step.name.trim()) lines.push(`    name: ${quote(step.name)}`);
     if (step.condition.trim()) {
       lines.push(`    if: ${quote(step.condition)}`);
@@ -318,6 +330,27 @@ export function toWorkflowYaml(form: WorkflowForm): string {
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * A step id the engine will accept.
+ *
+ * `Step.id` is required, must be unique within the definition, and may only hold
+ * ASCII alphanumerics and underscores (`nuxx-workflow/src/schema.rs`). The form's
+ * ids come from the mock id source and carry hyphens, so they are normalized here
+ * rather than constrained at the source: the dialog uses them as React keys, and
+ * what React needs and what the engine accepts are not the same requirement.
+ */
+function engineStepId(raw: string, index: number, taken: Set<string>): string {
+  const fallback = `step_${index + 1}`;
+  const base =
+    raw.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
+  let id = base;
+  for (let suffix = 2; taken.has(id); suffix += 1) {
+    id = `${base}_${suffix}`;
+  }
+  taken.add(id);
+  return id;
 }
 
 /**

@@ -39,6 +39,13 @@ export function workflowFromForm(
         .replace(/^#/, "") ??
       existing?.channel ??
       "general",
+    // The submitted definition, so reopening this row shows the steps that were
+    // entered rather than an approximation of them. Copied rather than aliased —
+    // the dialog keeps mutating its own form state after a save.
+    definition: {
+      trigger: { ...form.trigger },
+      steps: form.steps.map((step) => ({ ...step })),
+    },
     // History belongs to the workflow, not the form: editing a definition does not
     // undo what it already did.
     lastRun: existing?.lastRun ?? null,
@@ -50,13 +57,24 @@ export function workflowFromForm(
 /**
  * The form for editing an existing workflow.
  *
- * Its steps come from the last run rather than from a stored definition, because
- * the fixture shape only ever recorded what ran. That is a real limit of editing
- * a demo row and the reason a freshly seeded workflow opens with its steps
- * approximated from its history — stated here rather than hidden behind a form
- * that looks authoritative.
+ * A row built in the builder carries the definition it was built with, and that
+ * round-trips exactly. A seeded row does not — the fixture shape only ever recorded
+ * what *ran*, so its steps are approximated from its history. That approximation is
+ * a real limit of editing a seeded demo row, and it is the fallback rather than the
+ * rule: applying it to a row the reader just created would silently discard the
+ * steps they entered.
  */
 export function formFromWorkflow(workflow: ShowcaseWorkflow): WorkflowForm {
+  if (workflow.definition) {
+    return {
+      name: workflow.name,
+      description: workflow.description,
+      enabled: workflow.enabled,
+      trigger: { ...workflow.definition.trigger },
+      steps: workflow.definition.steps.map((step) => ({ ...step })),
+    };
+  }
+
   const source = workflow.lastRun ?? workflow.runs[0] ?? null;
   const steps: StepForm[] = (source?.steps ?? []).map((step, index) => ({
     ...emptyStep(`${workflow.id}-step-${index}`),

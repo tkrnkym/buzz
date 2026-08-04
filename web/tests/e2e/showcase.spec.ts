@@ -50,6 +50,65 @@ test("a workflow is built from the form and appears in the list", async ({
   ).toBeVisible();
 });
 
+test("a workflow just created reopens with the steps that were entered", async ({
+  page,
+}) => {
+  // The row used to store only summary fields, so reopening a workflow built here
+  // showed zero steps and could not be saved until it was rebuilt from nothing.
+  await page.goto("/workflows");
+  await page.getByTestId("create-workflow").click();
+  await page.getByTestId("workflow-name").fill("承認つきリリース");
+  await page.getByTestId("workflow-trigger").selectOption("webhook");
+
+  await page.getByTestId("add-step").click();
+  const first = page.getByTestId(/^step-step-new-/).first();
+  const firstId = (await first.getAttribute("data-testid"))?.replace(
+    "step-",
+    "",
+  );
+  await page.getByTestId(`step-channel-${firstId}`).fill("#dev");
+  await page.getByTestId(`step-text-${firstId}`).fill("リリースを始めます");
+
+  // A second step on an action whose fields are its own, so the reopened form has
+  // to restore more than one shape.
+  await page.getByTestId("add-step").click();
+  const second = page.getByTestId(/^step-step-new-/).nth(1);
+  const secondId = (await second.getAttribute("data-testid"))?.replace(
+    "step-",
+    "",
+  );
+  await page
+    .getByTestId(`step-action-${secondId}`)
+    .selectOption("request_approval");
+  await page.getByTestId(`step-from-${secondId}`).fill("@release-manager");
+  await page
+    .getByTestId(`step-message-${secondId}`)
+    .fill("リリースしてよいですか");
+
+  await page.getByTestId("save-workflow").click();
+  await expect(page.getByTestId("workflow-form-dialog")).toHaveCount(0);
+
+  await page.getByTestId("workflow-card-承認つきリリース").click();
+  await page.getByTestId("edit-workflow").click();
+  await expect(page.getByTestId("workflow-form-dialog")).toBeVisible();
+
+  // The stored definition keeps each step's id, so the same fields are addressable.
+  await expect(page.getByTestId(/^step-step-/)).toHaveCount(2);
+  await expect(page.getByTestId("workflow-trigger")).toHaveValue("webhook");
+  await expect(page.getByTestId(`step-text-${firstId}`)).toHaveValue(
+    "リリースを始めます",
+  );
+  await expect(page.getByTestId(`step-action-${secondId}`)).toHaveValue(
+    "request_approval",
+  );
+  await expect(page.getByTestId(`step-from-${secondId}`)).toHaveValue(
+    "@release-manager",
+  );
+  await expect(page.getByTestId(`step-message-${secondId}`)).toHaveValue(
+    "リリースしてよいですか",
+  );
+});
+
 test("an incomplete workflow names everything missing at once", async ({
   page,
 }) => {
@@ -420,13 +479,23 @@ test("a reaction is added and withdrawn", async ({ page }) => {
   await expect(page.getByTestId("pulse-add-reaction-pulse-1-🎉")).toBeVisible();
 });
 
-test("an existing reaction can be joined", async ({ page }) => {
+test("an existing reaction can be joined, then withdrawn", async ({ page }) => {
   await page.goto("/pulse");
   const chip = page
     .getByTestId("pulse-entry-pulse-1")
     .getByTestId(/^pulse-reaction-/)
     .first();
   const before = Number((await chip.innerText()).replace(/[^0-9]/g, ""));
+
+  // Seeded by other people and not by the reader, so this click joins them. It
+  // counted *down* before, which read as deleting someone else's reaction.
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
   await chip.click();
-  await expect(chip).toContainText(String(before - 1));
+  await expect(chip).toContainText(String(before + 1));
+  await expect(chip).toHaveAttribute("aria-pressed", "true");
+
+  // And clicking again withdraws only the reader's own.
+  await chip.click();
+  await expect(chip).toContainText(String(before));
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
 });

@@ -132,7 +132,17 @@ export function PulsePage() {
                 <div className="mt-2 flex flex-wrap gap-1">
                   {entry.reactions.map((reaction) => (
                     <button
-                      className="inline-flex h-6 items-center gap-1 rounded-full border border-border bg-secondary px-2 text-2xs leading-none hover:bg-accent disabled:opacity-60"
+                      aria-label={`${reaction.emoji} ${reaction.count}`}
+                      aria-pressed={reaction.mine ?? false}
+                      className={cn(
+                        "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs leading-none disabled:opacity-60",
+                        // Same distinction the real timeline draws on its own
+                        // reactions, so a chip says whether the next click joins
+                        // or withdraws.
+                        reaction.mine
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-secondary hover:bg-accent",
+                      )}
                       data-testid={`pulse-reaction-${entry.id}-${reaction.emoji}`}
                       disabled={update === null}
                       key={reaction.emoji}

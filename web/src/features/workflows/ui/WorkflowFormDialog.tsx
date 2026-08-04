@@ -31,6 +31,8 @@ const PLACEHOLDERS: Record<string, string> = {
   channel: "#general",
   text: "リリース候補ができました",
   to: "@佐藤 美咲",
+  from: "@release-manager",
+  message: "リリースしてよいですか",
   url: "https://example.com/hook",
   method: "POST",
   topic: "リリース作業中",
