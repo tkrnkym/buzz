@@ -330,6 +330,15 @@ export interface ArchiveSubscription {
 /** An archived identity — a member who left, whose history is kept. */
 export interface ArchivedIdentity {
   pubkey: string;
+  /**
+   * When they joined, kept so restoring them is lossless.
+   *
+   * An archive that drops the join date cannot put a member back — the only
+   * values left to pick from are the archive time, which says they joined the
+   * moment they left, and today, which says they were never here before. Both
+   * are wrong, so the date travels with the archive.
+   */
+  joinedAt: number;
   archivedAt: number;
   archivedBy: string;
   reason: string | null;
@@ -1070,6 +1079,7 @@ export const SHOWCASE: Showcase = {
   archivedIdentities: [
     {
       pubkey: "9".repeat(64),
+      joinedAt: ago(60 * 24 * 400),
       archivedAt: ago(60 * 24 * 45),
       archivedBy: MISAKI,
       reason: "退職",

@@ -1,11 +1,20 @@
-import { Archive, ArchiveRestore, HardDrive, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, HardDrive, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { formatRelativeTime } from "@/features/agents/agent-model";
+import {
+  addArchiveSubscription,
+  removeArchiveSubscription,
+  restoreArchivedIdentity,
+} from "@/features/archive/archive-mutations";
 import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { Checkbox } from "@/shared/ui/checkbox";
 
@@ -59,6 +68,7 @@ const KIND_GROUPS: ReadonlyArray<{
  */
 export function LocalArchiveSettings() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set([9, 40002, 40003, 40099, 9005]),
   );
@@ -134,7 +144,13 @@ export function LocalArchiveSettings() {
               aria-label={`${row.scope} の購読を削除`}
               className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-destructive hover:bg-destructive/10"
               data-testid={`remove-archive-${row.id}`}
-              onClick={() => toast.success("購読を削除しました（モックです）")}
+              disabled={update === null}
+              onClick={() => {
+                update?.((current) =>
+                  removeArchiveSubscription(current, row.id),
+                );
+                toast.success(`${row.scope} の購読をやめました`);
+              }}
               type="button"
             >
               <Trash2 aria-hidden className="size-3" />
@@ -177,6 +193,34 @@ export function LocalArchiveSettings() {
             </div>
           );
         })}
+
+        {/* The checkboxes had no action behind them, so choosing kinds did
+            nothing at all. A picker that cannot be applied is a decision the
+            reader makes and the screen throws away. */}
+        <button
+          className="mt-2 flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-2xs font-medium hover:bg-accent disabled:opacity-60"
+          data-testid="start-archiving"
+          disabled={update === null || selected.size === 0}
+          onClick={() => {
+            const kinds = [...selected].sort((left, right) => left - right);
+            update?.((current) =>
+              addArchiveSubscription(current, {
+                id: nextMockId("arc"),
+                // Named by what was chosen rather than "新しい購読": the list is
+                // read to decide what to keep, and two rows called the same thing
+                // cannot be told apart.
+                scope: `選んだ ${kinds.length} 種類`,
+                kinds,
+                at: Math.floor(Date.now() / 1000),
+              }),
+            );
+            toast.success("保存を始めました");
+          }}
+          type="button"
+        >
+          <Plus aria-hidden className="size-3" />
+          これらを保存する
+        </button>
       </fieldset>
     </div>
   );
@@ -195,6 +239,7 @@ export function LocalArchiveSettings() {
  */
 export function IdentityArchiveSettings() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
   const nowSeconds = useMemo(() => Math.floor(Date.now() / 1000), []);
   const pubkeys = useMemo(
     () =>
@@ -262,7 +307,13 @@ export function IdentityArchiveSettings() {
               <button
                 className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-badge hover:bg-accent"
                 data-testid={`unarchive-${row.pubkey}`}
-                onClick={() => toast.success("復帰させました（モックです）")}
+                disabled={update === null}
+                onClick={() => {
+                  update?.((current) =>
+                    restoreArchivedIdentity(current, row.pubkey),
+                  );
+                  toast.success("メンバーに戻しました");
+                }}
                 type="button"
               >
                 <ArchiveRestore aria-hidden className="size-3" />

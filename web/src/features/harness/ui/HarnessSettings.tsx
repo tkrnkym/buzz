@@ -1,8 +1,16 @@
-import { Check, ExternalLink, Plus, TriangleAlert } from "lucide-react";
+import { Check, ExternalLink, Plus, TriangleAlert, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useShowcase } from "@/features/showcase/use-showcase";
+import {
+  addHarness,
+  removeCustomHarness,
+} from "@/features/harness/harness-mutations";
+import {
+  nextMockId,
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import type { Harness } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 import { Dialog } from "@/shared/ui/dialog";
@@ -10,7 +18,14 @@ import { Dialog } from "@/shared/ui/dialog";
 const FIELD_CLASS =
   "h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-function HarnessRow({ harness }: { harness: Harness }) {
+function HarnessRow({
+  harness,
+  onRemove,
+}: {
+  harness: Harness;
+  /** Only for one the reader added — the shipped catalog is not theirs to edit. */
+  onRemove?: () => void;
+}) {
   return (
     <li
       className={cn(
@@ -52,6 +67,18 @@ function HarnessRow({ harness }: { harness: Harness }) {
         </span>
       </span>
 
+      {onRemove && (
+        <button
+          aria-label={`${harness.name} を削除`}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-destructive hover:bg-destructive/10"
+          data-testid={`remove-harness-${harness.id}`}
+          onClick={onRemove}
+          type="button"
+        >
+          <Trash2 aria-hidden className="size-3" />
+        </button>
+      )}
+
       {!harness.available && (
         <a
           className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-badge hover:bg-accent"
@@ -80,6 +107,7 @@ function HarnessRow({ harness }: { harness: Harness }) {
  */
 export function HarnessSettings() {
   const showcase = useShowcase();
+  const update = useShowcaseUpdate();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
@@ -95,12 +123,25 @@ export function HarnessSettings() {
   return (
     <div className="flex flex-col gap-3" data-testid="harness-settings">
       <p className="text-2xs text-muted-foreground">
-        ブラウザからはローカルのコマンドを調べられないので、この一覧は見た目の再現です。実際の判定はデスクトップ側の仕事になります。
+        ブラウザからはローカルのコマンドを調べられないので、入っているかどうかの判定は再現です。自分で追加したものは、あなたが指定したコマンドとして扱います。
       </p>
 
       <ul className="flex flex-col gap-2">
         {showcase.harnesses.map((harness) => (
-          <HarnessRow harness={harness} key={harness.id} />
+          <HarnessRow
+            harness={harness}
+            key={harness.id}
+            {...(update && harness.custom
+              ? {
+                  onRemove: () => {
+                    update((current) =>
+                      removeCustomHarness(current, harness.id),
+                    );
+                    toast.success(`${harness.name} を削除しました`);
+                  },
+                }
+              : {})}
+          />
         ))}
       </ul>
 
@@ -133,13 +174,19 @@ export function HarnessSettings() {
               <button
                 className="rounded-md bg-primary px-3 py-1.5 text-2xs font-medium text-primary-foreground disabled:opacity-60"
                 data-testid="save-harness"
-                disabled={!name.trim() || !command.trim()}
+                disabled={!name.trim() || !command.trim() || update === null}
                 onClick={() => {
-                  // Mock: nothing to persist to, and saying so beats a row that
-                  // vanishes on reload without explanation.
-                  toast.success(
-                    `${name.trim()} を追加しました（この画面はモックなので保存されません）`,
+                  // Into the list, which is where the reader is looking. It used
+                  // to toast and leave the catalog untouched, so the dialog closed
+                  // on an unchanged screen — a failure claiming to have worked.
+                  update?.((current) =>
+                    addHarness(current, {
+                      id: nextMockId("harness"),
+                      name: name.trim(),
+                      command: command.trim(),
+                    }),
                   );
+                  toast.success(`${name.trim()} を追加しました`);
                   setAdding(false);
                 }}
                 type="button"
