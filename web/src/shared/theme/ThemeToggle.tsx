@@ -1,5 +1,6 @@
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "@/shared/theme/ThemeProvider";
+import type { ThemeMode } from "@/shared/theme/theme-mode";
 import { Button } from "@/shared/ui/button";
 
 const icons = {
@@ -8,23 +9,23 @@ const icons = {
   system: Monitor,
 } as const;
 
-const next: Record<string, "dark" | "system" | "light"> = {
+const next: Record<ThemeMode, ThemeMode> = {
   light: "dark",
   dark: "system",
   system: "light",
 };
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const Icon = icons[theme];
+  const { mode, setMode } = useTheme();
+  const Icon = icons[mode];
 
   return (
     <Button
       variant="ghost"
       size="icon"
       className="h-8 w-8"
-      onClick={() => setTheme(next[theme])}
-      aria-label={`Theme: ${theme}. Click to switch.`}
+      onClick={() => setMode(next[mode])}
+      aria-label={`Theme: ${mode}. Click to switch.`}
     >
       <Icon className="h-4 w-4" />
     </Button>

@@ -1,4 +1,3 @@
-import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -10,11 +9,10 @@ import {
   useMyProfile,
   usePublishProfile,
 } from "@/features/profile/use-profile";
+import { AppearanceSettings } from "@/features/settings/ui/AppearanceSettings";
 import { Section } from "@/features/settings/ui/Section";
-import { cn } from "@/shared/lib/cn";
 import { relayWsUrl } from "@/shared/lib/relay-url";
 import { resolveSigner } from "@/shared/lib/signer";
-import { useTheme } from "@/shared/theme/ThemeProvider";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
 const FIELD_CLASS =
@@ -33,7 +31,6 @@ export function AccountPanel() {
   const profile = useMyProfile();
   const profiles = useProfiles(pubkey ? [pubkey] : []);
   const publishProfile = usePublishProfile();
-  const { theme, setTheme } = useTheme();
   const signer = resolveSigner();
 
   const [displayName, setDisplayName] = useState("");
@@ -217,37 +214,7 @@ export function AccountPanel() {
         </form>
       </Section>
 
-      <Section
-        description="Follows the system by default. Both themes are Catppuccin — Latte and Macchiato."
-        title="Appearance"
-      >
-        <div className="flex gap-2" data-testid="theme-picker">
-          {(
-            [
-              { value: "light", label: "Light", Icon: Sun },
-              { value: "dark", label: "Dark", Icon: Moon },
-              { value: "system", label: "System", Icon: Monitor },
-            ] as const
-          ).map(({ value, label: optionLabel, Icon }) => (
-            <button
-              aria-pressed={theme === value}
-              className={cn(
-                "flex flex-1 flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-2xs font-medium transition-colors",
-                theme === value
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-              data-testid={`theme-${value}`}
-              key={value}
-              onClick={() => setTheme(value)}
-              type="button"
-            >
-              <Icon aria-hidden className="size-4" />
-              {optionLabel}
-            </button>
-          ))}
-        </div>
-      </Section>
+      <AppearanceSettings />
 
       <Section
         description="Your key signs everything you publish. This client never sends it anywhere."

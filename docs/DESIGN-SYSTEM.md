@@ -1,7 +1,12 @@
 # デザインシステム
 
-web（React + Tailwind）と mobile（Flutter）で同じ見た目を目指す。配色の共通基盤は
-**Catppuccin**（ライト = Latte、ダーク = Macchiato）。
+web（React + Tailwind）と mobile（Flutter）で同じ見た目を目指す。
+
+**配色の共通基盤は分岐している。** mobile は **Catppuccin**（ライト = Latte、
+ダーク = Macchiato）を CSS/Dart に直書きしている。web は配色を CSS に持たず、
+選択中の **Shiki テーマ JSON** から実行時に導出する（既定はブランドテーマ
+`nuxx` / `nuxx-dark` = GitHub Light / GitHub Dark 借用）。globals.css に残る
+Catppuccin の値は、導出が載る前のフォールバックであり、実際に見える色ではない。
 
 関連: [FEATURES.md](FEATURES.md) · web の規約詳細は [AGENTS.md](../AGENTS.md)
 
@@ -13,7 +18,8 @@ web（React + Tailwind）と mobile（Flutter）で同じ見た目を目指す�
 
 | サーフェス | 実体 |
 |---|---|
-| web | `web/src/shared/styles/globals.css` の CSS カスタムプロパティ **105 個**。`:root` = ライト、`.dark` = ダーク |
+| web（実体） | `web/src/shared/theme/` — `theme-loader.ts` が Shiki テーマ JSON を読み、`adaptive-theme.ts` が bg/fg/comment/git の 4 色から全トークンを導出し、`ThemeProvider.tsx` が `:root` にインラインで書き込む |
+| web（フォールバック） | `web/src/shared/styles/globals.css` の CSS カスタムプロパティ **105 個**。`:root` = ライト、`.dark` = ダーク。**インライン値に必ず負けるので、ここを読んでも実際の色は分からない** |
 | mobile | `mobile/lib/shared/theme/`（`nuxx_theme.dart` ほか）。テーマ名 `nuxx` / `nuxx-dark` |
 
 ### 構造（web）
@@ -30,6 +36,11 @@ shadcn/ui 系の意味論トークン（HSL 三成分で保持、`hsl(var(--…)
 
 **新しい色はまずトークンとして追加する。** コンポーネントへの生 HSL/HEX 直書きは
 しない（Tailwind が未定義ユーティリティを黙って捨てるため、欠けが目視できない）。
+テーマが 62 種あるので、直書きした色は残り 61 種で必ず外れる。
+
+**トークンを追加するときは、それを読む規則を同じ変更に含める。** `--nuxx-gradient-*`
+`--nuxx-content-dark` は値だけが移植され、参照する規則が無いまま長く放置されていた。
+アプリがフォールバック配色で描画されていた原因はこれ。
 
 ## 2. タイポグラフィ（web） — 最重要規約
 

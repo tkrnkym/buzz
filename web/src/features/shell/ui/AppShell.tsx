@@ -8,6 +8,7 @@ import { AppSidebar } from "@/features/shell/ui/AppSidebar";
 import { resolveShellView } from "@/features/shell/lib/shell-view";
 import { CommunityRail } from "@/features/shell/ui/CommunityRail";
 import { relayWsUrl } from "@/shared/lib/relay-url";
+import { ContentSurface, GradientLayer } from "@/shared/theme/ThemeSurfaces";
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar";
 
 /** The community's display name: the relay's host, which is what it is. */
@@ -55,7 +56,15 @@ function AppShellFrame({ children }: { children: ReactNode }) {
   const hasUnread = channels.some((channel) => unread.isUnread(channel.id));
 
   return (
-    <div className="flex h-dvh min-h-0">
+    // `relative` so the gradient can be painted once behind the whole shell, and
+    // `isolate` because the gradient layer sits at `-z-10`: without a stacking
+    // context here, a negative z-index child paints behind this element's own
+    // `bg-background` and the gradient is invisible.
+    <div
+      className="relative isolate flex h-dvh min-h-0 bg-background"
+      data-testid="app-surface"
+    >
+      <GradientLayer />
       <CommunityRail communityName={communityName} hasUnread={hasUnread} />
       <SidebarProvider className="min-w-0 flex-1">
         <AppSidebar
@@ -64,7 +73,11 @@ function AppShellFrame({ children }: { children: ReactNode }) {
           query={q ?? ""}
           view={view}
         />
-        <SidebarInset className="min-h-0">{children}</SidebarInset>
+        {/* The inset is the chrome canvas, not the content one — it carries the
+            sidebar fill so the card inside it reads as a separate surface. */}
+        <SidebarInset className="isolate min-h-0 min-w-0 overflow-hidden bg-sidebar">
+          <ContentSurface>{children}</ContentSurface>
+        </SidebarInset>
       </SidebarProvider>
     </div>
   );

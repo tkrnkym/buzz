@@ -324,6 +324,40 @@ just web         # dev server (port derived from the worktree)
 just relay-web   # relay serving the built web bundle
 ```
 
+### The palette is computed at runtime, not written in CSS
+
+**Do not read `web/src/shared/styles/globals.css` to learn the app's colors.**
+The palette there is the pre-hydration fallback. What actually paints is derived
+in JS from the selected syntax theme:
+
+- `shared/theme/theme-loader.ts` — loads a **Shiki theme JSON** (the `shiki`
+  dependency) and pulls out bg / fg / comment / git colors. 62 themes, each its
+  own lazy chunk. `nuxx` / `nuxx-dark` are aliases that borrow the GitHub Light /
+  GitHub Dark palettes.
+- `shared/theme/adaptive-theme.ts` — derives the whole variable set from those
+  four colors, including `--background`, `--foreground`, `--card`, `--border`,
+  `--muted`, `--popover` and the sidebar tokens.
+- `shared/theme/ThemeProvider.tsx` — writes them onto `:root` as inline custom
+  properties, which beat everything in the stylesheet. Caches the last palette in
+  `localStorage` so a reload does not flash.
+- `shared/theme/accent.ts` — the one color that is *chosen* rather than derived
+  (primary buttons, active nav row). `nuxx` / `nuxx-dark` pin it to the theme
+  foreground; every other theme uses the reader's pick.
+
+So a component must consume semantic tokens (`bg-background`, `text-foreground`,
+`border-border`). **A hardcoded hex or a raw Tailwind color (`bg-zinc-900`) does
+not follow the theme and will be wrong under 61 of the 62.**
+
+The Nuxx themes add a gradient canvas with a rounded content card floating on
+it, via `data-nuxx-sidebar` on `<html>` plus `GradientLayer` / `ContentSurface`
+in `shared/theme/ThemeSurfaces.tsx`. The gradient layer sits at `-z-10`, so the
+shell root must stay `isolate` — without a stacking context it paints behind its
+own background and vanishes while still reporting `opacity: 1`.
+
+**Adding a token means adding its consumer in the same change.** Several
+`--nuxx-*` tokens were once copied over without the rules that read them and sat
+dead for months, which is why the client rendered in the fallback palette.
+
 ### Text sizing & zoom (use rem, never px)
 
 Browser zoom scales the root `<html>` font-size, so **only rem-based text
@@ -361,7 +395,9 @@ The mobile app lives in `mobile/` — a Flutter app using Riverpod + Hooks.
 ### Architecture
 
 - **State management:** Riverpod + `flutter_hooks` (`HookConsumerWidget`)
-- **Theme:** Catppuccin Latte (light) / Macchiato (dark) — matches web
+- **Theme:** Catppuccin Latte (light) / Macchiato (dark). This no longer matches
+  web, which derives its palette from a selectable Shiki theme and defaults to
+  the branded `nuxx` pair — see the web client's theme section above.
 - **Features:** Isolated under `lib/features/`, shared code in `lib/shared/`
 - **Nostr models:** `lib/shared/relay/nostr_models.dart` — event kinds must
   stay in sync with `web/src/shared/constants/kinds.ts`
