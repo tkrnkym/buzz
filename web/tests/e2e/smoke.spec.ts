@@ -1474,12 +1474,31 @@ test("adding a custom emoji publishes the whole kind:30030 set", async ({
   });
   await relay.install();
 
-  await page.goto("/settings");
-  // Custom emoji moved under the Channels panel when Settings became a left nav.
-  await page.getByTestId("settings-nav-channels").click();
-  await page.getByTestId("emoji-shortcode").fill("shipit");
-  await page.getByTestId("emoji-url").fill(SHIPIT_URL);
-  await page.getByTestId("add-emoji").click();
+  await page.route("**/upload", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        url: SHIPIT_URL,
+        sha256: "b".repeat(64),
+        size: 5,
+        type: "image/png",
+        uploaded: 1_700_000_000,
+      }),
+    });
+  });
+
+  await page.goto("/settings/emoji");
+  // Image first, name second: asking for a shortcode before the picture means
+  // naming something the reader has not looked at yet.
+  await page.getByRole("button", { name: "画像を選ぶ" }).setInputFiles({
+    name: "shipit.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("hello"),
+  });
+  // And the name is suggested from the filename, so there is nothing to type.
+  await expect(page.getByTestId("emoji-shortcode")).toHaveValue("shipit");
+  await page.getByTestId("save-emoji").click();
 
   const set = relay.published.find(
     (event) => (event as { kind: number }).kind === 30030,
@@ -1832,7 +1851,9 @@ test("saving a profile publishes kind:0 and renames the reader", async ({
   const relay = mockRelay(page, { extraMessages: [myMessage("1", "mine")] });
   await relay.install();
 
-  await page.goto("/settings");
+  await page.goto("/settings/profile");
+  // Read-first: the fields are values until Edit is pressed.
+  await page.getByTestId("edit-profile").click();
   await page.getByTestId("settings-display-name").fill("Dana Dev");
   await page.getByTestId("settings-name").fill("dana");
   await page.getByTestId("save-profile").click();
@@ -1847,6 +1868,9 @@ test("saving a profile publishes kind:0 and renames the reader", async ({
   // kind:0 carries no tags — it is replaceable by author, not addressable.
   expect(saved.tags).toEqual([]);
 
+  // Back to the app to see it: Settings is its own window now, so the sidebar the
+  // name appears in is not on screen while the profile is being edited.
+  await page.getByTestId("settings-back").click();
   // The reader's own edit shows without waiting for the relay to echo it back.
   await expect(page.getByTestId("sidebar-profile-name")).toHaveText("Dana Dev");
   await page.goto(`/c/${CHANNEL_UUID}`);
@@ -1858,7 +1882,7 @@ test("the theme choice survives a reload", async ({ page }) => {
   const relay = mockRelay(page);
   await relay.install();
 
-  await page.goto("/settings");
+  await page.goto("/settings/appearance");
   await page.getByTestId("theme-dark").click();
   await expect(page.locator("html")).toHaveClass(/dark/);
 
@@ -1949,9 +1973,11 @@ test("a chosen theme brings its own palette, and the accent is separate", async 
 }) => {
   const relay = mockRelay(page);
   await relay.install();
-  await page.goto("/settings");
-
-  await page.getByTestId("theme-name").selectOption("vitesse-dark");
+  await page.goto("/settings/appearance");
+  // A card per theme family now, not a select of 62 file names. The mode control
+  // above the grid picks the half, so this is Vitesse in whichever the reader is in.
+  await page.getByTestId("theme-dark").click();
+  await page.getByTestId("theme-card-vitesse-light").click();
   await expect(page.locator("html")).toHaveClass(/dark/);
 
   // Vitesse Dark is cream on near-black: a warm hue on the foreground is the
@@ -1986,9 +2012,12 @@ test("settings names the key custody honestly", async ({ page }) => {
   const relay = mockRelay(page);
   await relay.install();
 
-  await page.goto("/settings");
+  await page.goto("/settings/profile");
+  // The key is behind a disclosure: nobody opens this screen to read it, and then
+  // they need it in full.
+  await page.getByTestId("toggle-identity").click();
   await expect(page.getByTestId("settings-custody")).toContainText(
-    /minted for this page load only/,
+    "このページ読み込みのためだけに作られました",
   );
 });
 
@@ -2808,18 +2837,18 @@ test("an uploaded picture fills the profile field and is saved with it", async (
     });
   });
 
-  await page.goto("/settings");
-  await page.getByRole("button", { name: "Upload a picture" }).setInputFiles({
+  await page.goto("/settings/profile");
+  await page.getByTestId("edit-profile").click();
+  await page.getByRole("button", { name: "画像を選ぶ" }).setInputFiles({
     name: "face.png",
     mimeType: "image/png",
     buffer: Buffer.from("hello"),
   });
 
-  // The upload only fills the field. kind:0 carries every field in one event,
-  // so publishing here would save a half-finished profile.
-  await expect(page.getByTestId("settings-avatar-url")).toHaveValue(
-    "https://relay.test/media/face.png",
-  );
+  // The upload only fills the pending picture — the portrait shows it, and there is
+  // no URL box to read any more. kind:0 carries every field in one event, so
+  // publishing here would save a half-finished profile.
+  await expect(page.locator("img[src*='face.png']")).toBeVisible();
   expect(
     relay.published.filter((event) => (event as { kind: number }).kind === 0),
   ).toEqual([]);
@@ -2853,8 +2882,9 @@ test("a picture the relay will not store is refused before the upload", async ({
     await route.fulfill({ status: 500, body: "should not be reached" });
   });
 
-  await page.goto("/settings");
-  await page.getByRole("button", { name: "Upload a picture" }).setInputFiles({
+  await page.goto("/settings/profile");
+  await page.getByTestId("edit-profile").click();
+  await page.getByRole("button", { name: "画像を選ぶ" }).setInputFiles({
     name: "notes.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("not an image"),
@@ -3553,55 +3583,65 @@ test("notification settings are per-browser and survive navigation", async ({
   const relay = mockRelay(page);
   await relay.install();
 
-  await page.goto("/settings");
-  await page.getByTestId("settings-nav-notifications").click();
-  const settings = page.getByTestId("notification-settings");
+  await page.goto("/settings/notifications");
   // Quiet by default: a client that announced without being asked would start
   // making noise on a machine nobody chose.
-  await expect(page.getByTestId("notify-sound")).not.toBeChecked();
-  await expect(settings.getByTestId("notify-only-hidden")).toBeChecked();
+  await expect(page.getByTestId("pref-sound")).not.toBeChecked();
+  // The row asks the opposite question — "also notify while I am looking at it" —
+  // so quiet-by-default reads as this one being off.
+  await expect(page.getByTestId("pref-while-viewing")).not.toBeChecked();
   // Desktop notifications need a permission the headless browser has not given,
   // so the request button stands in for the toggle.
-  await expect(page.getByTestId("notify-request-permission")).toBeVisible();
+  await expect(page.getByTestId("ask-permission")).toBeVisible();
 
-  await page.getByTestId("notify-sound").check();
-  await expect(page.getByTestId("notify-test-sound")).toBeVisible();
+  await page.getByTestId("pref-sound").check();
+  await expect(page.getByTestId("preview-dm")).toBeVisible();
 
   await page.goto("/home");
-  await page.goto("/settings");
-  await page.getByTestId("settings-nav-notifications").click();
-  await expect(page.getByTestId("notify-sound")).toBeChecked();
+  await page.goto("/settings/notifications");
+  await expect(page.getByTestId("pref-sound")).toBeChecked();
   // Nothing about this was published — it describes the machine, not the account.
   expect(
     relay.published.some((event) => (event as { kind: number }).kind === 30078),
   ).toBe(false);
 });
 
-// --- Settings panels, harness, templates, feedback -------------------------
+// --- Settings screens, harness, templates, feedback ------------------------
 //
-// Settings became a left nav when it grew past a dozen sections; see
-// `settings-nav.ts`. These assert the nav reaches each panel and that the two
+// Settings is its own full-window destination with one screen per nav item; see
+// `settings-nav.ts`. These assert the nav reaches each screen and that the two
 // surfaces with real behaviour behind them work.
 
-test("settings reaches every panel, and only one at a time", async ({
-  page,
-}) => {
+test("settings reaches every screen, one URL each", async ({ page }) => {
   await installNip07WithNip44(page, MY_PUBKEY);
   const relay = mockRelay(page);
   await relay.install();
 
   await page.goto("/settings");
-  // Account is the landing panel: everyone touches it.
-  await expect(page.getByTestId("settings-display-name")).toBeVisible();
+  // `/settings` redirects rather than rendering the first screen at a second URL.
+  await expect(page).toHaveURL(/\/settings\/profile$/);
+  await expect(page.getByTestId("profile-info")).toBeVisible();
 
+  // Every one of the fifteen, because a nav row without a screen behind it is the
+  // failure this list exists to catch — and each has to light up as the current one.
   for (const panel of [
+    "appearance",
     "notifications",
-    "community",
+    "voice",
+    "shortcuts",
+    "emoji",
+    "archive",
+    "hosted",
+    "templates",
+    "invites",
     "agents",
-    "channels",
-    "advanced",
+    "compute",
+    "experiments",
+    "mobile",
+    "updates",
   ]) {
     await page.getByTestId(`settings-nav-${panel}`).click();
+    await expect(page).toHaveURL(new RegExp(`/settings/${panel}$`));
     await expect(
       page
         .getByTestId(`settings-nav-${panel}`)
@@ -3609,8 +3649,26 @@ test("settings reaches every panel, and only one at a time", async ({
     ).toBeVisible();
   }
   // Switching away really unmounts: a nav that only scrolled would leave the
-  // profile form on screen.
-  await expect(page.getByTestId("settings-display-name")).toHaveCount(0);
+  // profile card on screen.
+  await expect(page.getByTestId("profile-info")).toHaveCount(0);
+  // And the version is on every one of them, since it is what a bug report needs.
+  await expect(page.getByTestId("settings-version")).toBeVisible();
+});
+
+test("settings is its own window, with one way back", async ({ page }) => {
+  // It was a page inside the shell, so the community rail and the channel sidebar
+  // stayed on screen while the reader changed how the app behaves.
+  await installNip07WithNip44(page, MY_PUBKEY);
+  const relay = mockRelay(page);
+  await relay.install();
+
+  await page.goto("/settings/appearance");
+  await expect(page.getByTestId("community-rail")).toHaveCount(0);
+  await expect(page.getByTestId("app-surface")).toHaveCount(0);
+
+  await page.getByTestId("settings-back").click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId("community-rail")).toBeVisible();
 });
 
 test("the mock-backed settings panels say they are not connected", async ({
@@ -3627,20 +3685,25 @@ test("the mock-backed settings panels say they are not connected", async ({
   const relay = mockRelay(page);
   await relay.install();
 
-  await page.goto("/settings");
+  await page.goto("/settings/profile");
 
   await page.getByTestId("settings-nav-agents").click();
   await expect(page.getByText("ハーネスの一覧はまだ")).toBeVisible();
   await expect(page.getByTestId("harness-claude-code")).toHaveCount(0);
   await expect(page.getByText("エージェントの既定値はまだ")).toBeVisible();
 
-  await page.getByTestId("settings-nav-channels").click();
+  await page.getByTestId("settings-nav-templates").click();
   await expect(page.getByText("テンプレートはまだリレーから")).toBeVisible();
   await expect(page.getByTestId("add-template")).toHaveCount(0);
 
-  await page.getByTestId("settings-nav-advanced").click();
+  await page.getByTestId("settings-nav-compute").click();
   await expect(page.getByText("共有計算の状態はまだ")).toBeVisible();
+
+  await page.getByTestId("settings-nav-archive").click();
   await expect(page.getByText("アーカイブの状態はまだ")).toBeVisible();
+
+  await page.getByTestId("settings-nav-hosted").click();
+  await expect(page.getByText("ホスト型コミュニティ")).toBeVisible();
 });
 
 test("feedback publishes kind:42000 with its category on a tag", async ({
@@ -3650,8 +3713,7 @@ test("feedback publishes kind:42000 with its category on a tag", async ({
   const relay = mockRelay(page);
   await relay.install();
 
-  await page.goto("/settings");
-  await page.getByTestId("settings-nav-advanced").click();
+  await page.goto("/settings/updates");
   await page.getByTestId("open-feedback").click();
 
   // An empty body is refused at ingest, so the button stays disabled rather than

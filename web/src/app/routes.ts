@@ -19,8 +19,13 @@ export const routes = rootRoute("root.tsx", [
     route("/c", "c.tsx"),
     route("/c/$channelId", "chat.$channelId.tsx"),
     route("/home", "home.tsx"),
-    route("/settings", "settings.tsx"),
   ]),
+  // Settings is its own full-window destination, outside the shell. With the rail
+  // and the channel sidebar still on screen it read as a panel of the room the
+  // reader was in, and their unread badges stayed in peripheral vision while they
+  // were trying to change how the app behaves. `settings-nav.ts` has the rest.
+  route("/settings", "settings.tsx"),
+  route("/settings/$panel", "settings.$panel.tsx"),
   route("/invite/$code", "invite.$code.tsx"),
   // Onboarding sits outside the shell too: it needs no relay socket, and a
   // sidebar full of empty channels is the wrong first thing to show someone who

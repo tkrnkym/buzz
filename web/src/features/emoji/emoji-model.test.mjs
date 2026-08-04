@@ -10,6 +10,7 @@ import {
   emojiFromEvent,
   emojiTagsForContent,
   isShortcode,
+  shortcodeFromFilename,
   MY_EMOJI_SET_D_TAG,
   searchEmoji,
   shortcodesIn,
@@ -187,4 +188,25 @@ test("the reader's own set is one addressable event", () => {
 
 test("a completed emoji is closed and followed by a space", () => {
   assert.equal(emojiInsertText("wave"), ":wave: ");
+});
+
+test("a shortcode is suggested from the filename", () => {
+  // Retyping the name after picking the file is a step that exists only because
+  // the client would not do it.
+  assert.equal(shortcodeFromFilename("Party Parrot.PNG"), "party_parrot");
+  assert.equal(shortcodeFromFilename("shipit_squirrel.gif"), "shipit_squirrel");
+});
+
+test("separators become underscores, because that is NIP-30's alphabet", () => {
+  // A hyphenated shortcode is one this client could show and no other client
+  // could, so the emoji we publish would be unusable elsewhere.
+  assert.equal(shortcodeFromFilename("party-parrot.gif"), "party_parrot");
+  assert.equal(shortcodeFromFilename("a.b.c.png"), "a_b_c");
+});
+
+test("a filename with nothing usable in it suggests nothing", () => {
+  // An empty field, not a suggestion made of punctuation.
+  assert.equal(shortcodeFromFilename("うんこ.png"), "");
+  assert.equal(shortcodeFromFilename("---.png"), "");
+  assert.equal(shortcodeFromFilename(".gitkeep"), "");
 });

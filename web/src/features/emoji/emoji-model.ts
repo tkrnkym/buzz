@@ -243,3 +243,28 @@ export function buildEmojiSetTemplate(emoji: CustomEmoji[]): {
     content: "",
   };
 }
+
+/**
+ * A shortcode suggested from a filename.
+ *
+ * The name is almost always what the reader wanted — `party-parrot.gif` becomes
+ * `:party_parrot:` — and retyping it after choosing the file is a step that exists
+ * only because the client would not do it.
+ *
+ * Separators become underscores rather than being kept: NIP-30's own alphabet is
+ * `a-zA-Z0-9_`, so a hyphenated shortcode is one this client could display and no
+ * other client could. Widening the alphabet to match a filename would make the
+ * emoji we publish unusable elsewhere, which is the opposite of the point.
+ *
+ * Returns "" when nothing usable is left, so the caller shows an empty field rather
+ * than a suggestion made of punctuation.
+ */
+export function shortcodeFromFilename(filename: string): string {
+  const stem = filename.replace(/\.[^.]+$/, "");
+  const cleaned = stem
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32);
+  return isShortcode(cleaned) ? cleaned : "";
+}

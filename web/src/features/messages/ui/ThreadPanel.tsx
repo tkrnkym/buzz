@@ -3,6 +3,7 @@ import { useMemo } from "react";
 
 import type { TimelineRow } from "@/features/chat/timeline";
 import { threadRows } from "@/features/messages/lib/thread-summary";
+import { cn } from "@/shared/lib/cn";
 import {
   hasSameMessageAuthor,
   isWithinGroupingWindow,
@@ -30,11 +31,19 @@ export function ThreadPanel({
   onClose,
   rootId,
   rows,
+  wide = false,
 }: {
   actions: MessageRowActions;
   onClose: () => void;
   rootId: string;
   rows: TimelineRow[];
+  /**
+   * Fill the pane instead of sitting in a column beside it.
+   *
+   * Set by the `full` thread layout — see `thread-layout.ts`. A fixed 384px column
+   * next to a hidden timeline would leave most of the window empty.
+   */
+  wide?: boolean;
 }) {
   const thread = useMemo(() => threadRows(rows, rootId), [rows, rootId]);
 
@@ -43,7 +52,10 @@ export function ThreadPanel({
     return (
       <aside
         aria-label="Thread"
-        className="flex w-96 shrink-0 flex-col bg-background shadow-panel-left"
+        className={cn(
+          "flex flex-col bg-background shadow-panel-left",
+          wide ? "min-w-0 flex-1" : "w-96 shrink-0",
+        )}
         data-testid="thread-panel"
       >
         <ThreadHeader onClose={onClose} replyCount={0} />
@@ -60,7 +72,10 @@ export function ThreadPanel({
   return (
     <aside
       aria-label="Thread"
-      className="flex w-96 shrink-0 flex-col bg-background shadow-panel-left"
+      className={cn(
+        "flex flex-col bg-background shadow-panel-left",
+        wide ? "min-w-0 flex-1" : "w-96 shrink-0",
+      )}
       data-testid="thread-panel"
     >
       <ThreadHeader onClose={onClose} replyCount={replies.length} />

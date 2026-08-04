@@ -34,6 +34,10 @@ import { MessageTimeline } from "@/features/messages/ui/MessageTimeline";
 import { ThreadPanel } from "@/features/messages/ui/ThreadPanel";
 import { useUnreadFrontier } from "@/features/messages/use-unread-frontier";
 import { SearchResults } from "@/features/search/ui/SearchResults";
+import {
+  showsTimelineBesideThread,
+  useThreadLayout,
+} from "@/features/settings/use-thread-layout";
 import { useShell } from "@/features/shell/shell-context";
 import { ChannelWelcome } from "@/features/shell/ui/ChannelWelcome";
 import { cn } from "@/shared/lib/cn";
@@ -56,6 +60,10 @@ export function ChatPage({
   // Channels, read cursors, and unread state come from the shell so the sidebar
   // and this pane cannot disagree — see `shell-context.tsx`.
   const { channels, dms, readState } = useShell();
+  // Where a thread opens, from Settings > Appearance. `full` hands the pane over to
+  // the thread instead of splitting it — on a narrow window the split leaves the
+  // timeline and the thread both too thin to read.
+  const { layout: threadLayout } = useThreadLayout();
   const timeline = useChannelMessages(channelId);
   // A mute hides the person, which is the whole of what a mute means — there is
   // no "message hidden" placeholder, because a row announcing that someone spoke
@@ -122,6 +130,9 @@ export function ChatPage({
   } | null>(null);
   const openPane = pane?.channelId === channelId ? pane.pane : null;
   const openThreadRootId = openPane?.kind === "thread" ? openPane.rootId : null;
+  // In `full`, the thread replaces the timeline rather than sitting beside it.
+  const timelineVisible =
+    openThreadRootId === null || showsTimelineBesideThread(threadLayout);
 
   // Searched across both lists: a DM is not in `channels` (the relay marks it
   // hidden), and a header that could not find it would title the room "Channels".
@@ -389,17 +400,22 @@ export function ChatPage({
           />
         ) : channelId ? (
           <>
-            <MessageTimeline
-              actions={rowActions}
-              error={timeline.error}
-              firstUnreadMessageId={unreadMarker.firstUnreadMessageId}
-              hasMore={timeline.hasMore}
-              isLoadingMore={timeline.isLoadingMore}
-              loaded={timeline.loaded}
-              onLoadOlder={timeline.loadOlder}
-              rows={rows}
-              unreadCount={unreadMarker.unreadCount}
-            />
+            {/* Hidden in `full`, where the thread has the pane. The header above
+                still says which room this is and the composer below still sends
+                into the thread, so only the timeline goes. */}
+            {timelineVisible && (
+              <MessageTimeline
+                actions={rowActions}
+                error={timeline.error}
+                firstUnreadMessageId={unreadMarker.firstUnreadMessageId}
+                hasMore={timeline.hasMore}
+                isLoadingMore={timeline.isLoadingMore}
+                loaded={timeline.loaded}
+                onLoadOlder={timeline.loadOlder}
+                rows={rows}
+                unreadCount={unreadMarker.unreadCount}
+              />
+            )}
             <HuddleBar />
             <TypingIndicator typists={typing.typists} />
             <MessageComposer
@@ -424,6 +440,9 @@ export function ChatPage({
           onClose={onClosePane}
           rootId={openThreadRootId}
           rows={rows}
+          // In `full` the thread takes the space the timeline was using rather than
+          // sitting in a 384px column beside an empty one.
+          wide={!timelineVisible}
         />
       )}
 

@@ -88,6 +88,94 @@ export type ValueOption<T extends string> = {
  * `--radix-dropdown-menu-trigger-width`, so it reads as the row expanding rather
  * than as a popup arriving from somewhere else.
  */
+/**
+ * The choice control on its own: current value, chevron, and an anchored menu.
+ *
+ * Split out of {@link ValueRow} because the settings screens need the same picker
+ * without the row — there the label and its explanation are already the left half of
+ * a `SettingRow`, and nesting a labelled row inside a labelled row prints the
+ * question twice.
+ *
+ * The menu is width-matched to the trigger via
+ * `--radix-dropdown-menu-trigger-width`, so it reads as the control expanding rather
+ * than as a popup arriving from somewhere else.
+ */
+export function ValuePicker<T extends string>({
+  ariaLabel,
+  disabled,
+  onChange,
+  options,
+  testId,
+  value,
+}: {
+  ariaLabel: string;
+  disabled?: boolean;
+  onChange: (value: T) => void;
+  options: ReadonlyArray<ValueOption<T>>;
+  testId?: string;
+  value: T;
+}) {
+  const selected = options.find((option) => option.value === value);
+  const Icon = selected?.icon;
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger
+        aria-label={`${ariaLabel}: ${selected?.label ?? value}`}
+        className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+        data-testid={testId}
+        disabled={disabled}
+        type="button"
+      >
+        {Icon && <Icon aria-hidden className="size-4" />}
+        {selected?.label ?? value}
+        <ChevronDown aria-hidden className="size-4 text-muted-foreground/70" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        // Returning focus to the trigger reopens nothing, but it does scroll the
+        // dialog back to this row on a narrow window. The row is already where the
+        // reader is looking.
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        style={{ minWidth: "var(--radix-dropdown-menu-trigger-width)" }}
+      >
+        <DropdownMenuRadioGroup
+          onValueChange={(next) => onChange(next as T)}
+          value={value}
+        >
+          {options.map((option) => {
+            const OptionIcon = option.icon;
+            return (
+              <DropdownMenuRadioItem
+                className={option.hint ? "items-start py-2" : undefined}
+                data-testid={testId ? `${testId}-${option.value}` : undefined}
+                key={option.value}
+                value={option.value}
+              >
+                {OptionIcon && (
+                  <OptionIcon
+                    aria-hidden
+                    className={cn("size-4", option.hint && "mt-0.5")}
+                  />
+                )}
+                <span className="flex flex-col gap-0.5">
+                  <span>{option.label}</span>
+                  {option.hint && (
+                    <span className="text-2xs text-muted-foreground">
+                      {option.hint}
+                    </span>
+                  )}
+                </span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** A bordered row carrying a choice: label left, current value and chevron right. */
 export function ValueRow<T extends string>({
   disabled,
   label,
@@ -103,68 +191,17 @@ export function ValueRow<T extends string>({
   testId?: string;
   value: T;
 }) {
-  const selected = options.find((option) => option.value === value);
-  const Icon = selected?.icon;
-
   return (
     <FieldShell className="flex min-h-12 items-center justify-between gap-3 pl-3 pr-1.5">
       <span className="text-sm font-medium text-foreground">{label}</span>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger
-          aria-label={`${label}: ${selected?.label ?? value}`}
-          className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-          data-testid={testId}
-          disabled={disabled}
-          type="button"
-        >
-          {Icon && <Icon aria-hidden className="size-4" />}
-          {selected?.label ?? value}
-          <ChevronDown
-            aria-hidden
-            className="size-4 text-muted-foreground/70"
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          // Returning focus to the trigger reopens nothing, but it does scroll
-          // the dialog back to this row on a narrow window. The row is already
-          // where the reader is looking.
-          onCloseAutoFocus={(event) => event.preventDefault()}
-          style={{ minWidth: "var(--radix-dropdown-menu-trigger-width)" }}
-        >
-          <DropdownMenuRadioGroup
-            onValueChange={(next) => onChange(next as T)}
-            value={value}
-          >
-            {options.map((option) => {
-              const OptionIcon = option.icon;
-              return (
-                <DropdownMenuRadioItem
-                  className={option.hint ? "items-start py-2" : undefined}
-                  data-testid={testId ? `${testId}-${option.value}` : undefined}
-                  key={option.value}
-                  value={option.value}
-                >
-                  {OptionIcon && (
-                    <OptionIcon
-                      aria-hidden
-                      className={cn("size-4", option.hint && "mt-0.5")}
-                    />
-                  )}
-                  <span className="flex flex-col gap-0.5">
-                    <span>{option.label}</span>
-                    {option.hint && (
-                      <span className="text-2xs text-muted-foreground">
-                        {option.hint}
-                      </span>
-                    )}
-                  </span>
-                </DropdownMenuRadioItem>
-              );
-            })}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <ValuePicker<T>
+        ariaLabel={label}
+        {...(disabled === undefined ? {} : { disabled })}
+        onChange={onChange}
+        options={options}
+        {...(testId === undefined ? {} : { testId })}
+        value={value}
+      />
     </FieldShell>
   );
 }

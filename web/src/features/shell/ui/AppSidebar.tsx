@@ -33,6 +33,7 @@ import {
   type ChannelGroup,
 } from "@/features/shell/lib/channel-groups";
 import type { ShellView } from "@/features/shell/lib/shell-view";
+import { useFeatureFlags } from "@/features/settings/use-feature-flags";
 import { useShell } from "@/features/shell/shell-context";
 import {
   SidebarChannelSection,
@@ -81,6 +82,9 @@ export function AppSidebar({
     stars,
     unread,
   } = useShell();
+  // Which sections exist, from Settings > Experiments. The flag is what makes that
+  // screen real rather than a list of switches that change nothing.
+  const { flags } = useFeatureFlags();
   const navigate = useNavigate();
   const myPubkey = useMyPubkey();
   const createChannel = useCreateChannel();
@@ -265,30 +269,34 @@ export function AppSidebar({
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={view === "pulse"}
-              tooltip="Pulse"
-            >
-              <Link to="/pulse">
-                <Activity className="size-4" />
-                <span>Pulse</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={view === "projects"}
-              tooltip="Projects"
-            >
-              <Link to="/projects">
-                <FolderKanban className="size-4" />
-                <span>Projects</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {flags.pulse && (
+            <SidebarMenuItem data-testid="nav-pulse">
+              <SidebarMenuButton
+                asChild
+                isActive={view === "pulse"}
+                tooltip="Pulse"
+              >
+                <Link to="/pulse">
+                  <Activity className="size-4" />
+                  <span>Pulse</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {flags.projects && (
+            <SidebarMenuItem data-testid="nav-projects">
+              <SidebarMenuButton
+                asChild
+                isActive={view === "projects"}
+                tooltip="Projects"
+              >
+                <Link to="/projects">
+                  <FolderKanban className="size-4" />
+                  <span>Projects</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
@@ -301,30 +309,34 @@ export function AppSidebar({
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={view === "workflows"}
-              tooltip="Workflows"
-            >
-              <Link to="/workflows">
-                <Zap className="size-4" />
-                <span>Workflows</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={view === "forum"}
-              tooltip="Forum"
-            >
-              <Link to="/forum">
-                <FileText className="size-4" />
-                <span>Forum</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {flags.workflows && (
+            <SidebarMenuItem data-testid="nav-workflows">
+              <SidebarMenuButton
+                asChild
+                isActive={view === "workflows"}
+                tooltip="Workflows"
+              >
+                <Link to="/workflows">
+                  <Zap className="size-4" />
+                  <span>Workflows</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {flags.forum && (
+            <SidebarMenuItem data-testid="nav-forum">
+              <SidebarMenuButton
+                asChild
+                isActive={view === "forum"}
+                tooltip="Forum"
+              >
+                <Link to="/forum">
+                  <FileText className="size-4" />
+                  <span>Forum</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

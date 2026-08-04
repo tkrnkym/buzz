@@ -1,3 +1,9 @@
+import {
+  DEFAULT_SOUND,
+  soundRecipe,
+  type SoundName,
+} from "@/features/notifications/notification-sounds";
+
 /**
  * Raising a notification: the browser popup and the sound.
  *
@@ -69,7 +75,12 @@ let audioContext: AudioContext | null = null;
  * ramp, which costs nothing in the bundle and cannot 404. The envelope matters —
  * a bare oscillator start/stop clicks audibly at both ends.
  */
-export function playNotificationSound(): boolean {
+export function playNotificationSound(
+  sound: SoundName = DEFAULT_SOUND,
+): boolean {
+  const { tones, gap } = soundRecipe(sound);
+  // Silence is a choice, so it succeeds: the caller asked for no sound and got it.
+  if (tones.length === 0) return true;
   try {
     audioContext ??= new AudioContext();
     const context = audioContext;
@@ -77,8 +88,8 @@ export function playNotificationSound(): boolean {
     // no-op when it is already running.
     void context.resume();
     const now = context.currentTime;
-    for (const [index, frequency] of [880, 1174.7].entries()) {
-      const start = now + index * 0.09;
+    for (const [index, frequency] of tones.entries()) {
+      const start = now + index * gap;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.frequency.value = frequency;

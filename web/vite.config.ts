@@ -1,9 +1,23 @@
+import { readFileSync } from "node:fs";
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
+/**
+ * The client's own version, for the Settings > Updates screen and the settings nav.
+ *
+ * Read from `package.json` rather than `process.env.npm_package_version`, which is
+ * only populated when Vite is started through a package script — a direct
+ * `vite build` would silently ship "dev" as the version people report bugs against.
+ */
+const APP_VERSION = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+).version;
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(APP_VERSION) },
   // "/" locally and behind the relay; "/<repo>/" for GitHub Pages builds.
   base: process.env.VITE_BASE || "/",
   plugins: [

@@ -496,8 +496,7 @@ test("a reminder is snoozed, finished, and removed", async ({ page }) => {
 const MISAKI = "a11ce".padEnd(64, "a");
 
 test("a member is added, promoted, and removed", async ({ page }) => {
-  await page.goto("/settings");
-  await page.getByTestId("settings-nav-community").click();
+  await page.goto("/settings/invites");
   const members = page.getByTestId("members-settings");
   await expect(members).toBeVisible();
 
@@ -519,8 +518,7 @@ test("a member is added, promoted, and removed", async ({ page }) => {
 });
 
 test("the last owner cannot be demoted or removed", async ({ page }) => {
-  await page.goto("/settings");
-  await page.getByTestId("settings-nav-community").click();
+  await page.goto("/settings/invites");
 
   const owner = page.getByTestId(`member-role-${MISAKI}`);
   await expect(owner).toHaveValue("owner");
@@ -944,13 +942,13 @@ test("the setup flow keeps its light palette rather than following the theme", a
  * that the click had a visible effect.
  */
 async function openSettings(page, panel: string) {
-  await page.goto("/settings");
-  await page.getByTestId(`settings-nav-${panel}`).click();
+  // A URL per screen now, so this is a navigation rather than a click.
+  await page.goto(`/settings/${panel}`);
 }
 
-/** Leave the panel and return, which is what used to throw the change away. */
+/** Leave the screen and return, which is what used to throw the change away. */
 async function leaveAndReturn(page, panel: string) {
-  await page.getByTestId("settings-nav-notifications").click();
+  await page.getByTestId("settings-nav-shortcuts").click();
   await page.getByTestId(`settings-nav-${panel}`).click();
 }
 
@@ -1022,25 +1020,25 @@ test("an unsaved edit to the defaults is not kept", async ({ page }) => {
 test("a channel template is created, copied, and deleted for good", async ({
   page,
 }) => {
-  await openSettings(page, "channels");
+  await openSettings(page, "templates");
   await page.getByTestId("add-template").click();
   await page.getByTestId("template-name").fill("週次の振り返り");
   await page.getByTestId("save-template").click();
 
   const templates = page.getByTestId("channel-templates");
   await expect(templates).toContainText("週次の振り返り");
-  await leaveAndReturn(page, "channels");
+  await leaveAndReturn(page, "templates");
   await expect(templates).toContainText("週次の振り返り");
 
   // A copy sits beside the original and starts with no usage history.
   await page.getByTestId("duplicate-template-tpl-incident").click();
   await expect(templates).toContainText("障害対応 のコピー");
-  await leaveAndReturn(page, "channels");
+  await leaveAndReturn(page, "templates");
   await expect(templates).toContainText("障害対応 のコピー");
 
   await page.getByTestId("delete-template-tpl-incident").click();
   await page.getByTestId("confirm-delete-template").click();
-  await leaveAndReturn(page, "channels");
+  await leaveAndReturn(page, "templates");
   // By row id, not by text: the copy inherited the original's topic, so the
   // words are still on screen while the original itself is gone.
   await expect(page.getByTestId("template-tpl-incident")).toHaveCount(0);
@@ -1051,17 +1049,17 @@ test("shared compute remembers the switch and the VRAM cap", async ({
 }) => {
   // The cap is the one control on this screen with a consequence attached, and it
   // was the one that reverted.
-  await openSettings(page, "advanced");
+  await openSettings(page, "compute");
   await page.getByTestId("mesh-vram").fill("24");
   await page.getByTestId("mesh-vram").blur();
-  await leaveAndReturn(page, "advanced");
+  await leaveAndReturn(page, "compute");
   await expect(page.getByTestId("mesh-vram")).toHaveValue("24");
 
   await page.getByTestId("mesh-share").click();
   await expect(page.getByTestId("mesh-status")).toContainText(
     "共有していません",
   );
-  await leaveAndReturn(page, "advanced");
+  await leaveAndReturn(page, "compute");
   await expect(page.getByTestId("mesh-status")).toContainText(
     "共有していません",
   );
@@ -1071,7 +1069,7 @@ test("turning sharing on says it is starting, not that it is serving", async ({
   page,
 }) => {
   // A node has to come up before it can answer anything.
-  await openSettings(page, "advanced");
+  await openSettings(page, "compute");
   await page.getByTestId("mesh-share").click();
   await page.getByTestId("mesh-share").click();
   await expect(page.getByTestId("mesh-status")).toContainText("起動中");
@@ -1080,18 +1078,18 @@ test("turning sharing on says it is starting, not that it is serving", async ({
 test("an archive subscription can be dropped and a new one started", async ({
   page,
 }) => {
-  await openSettings(page, "advanced");
+  await openSettings(page, "archive");
   await page.getByTestId("remove-archive-arc-general").click();
   const subscriptions = page.getByTestId("archive-subscriptions");
   await expect(subscriptions).not.toContainText("#general");
-  await leaveAndReturn(page, "advanced");
+  await leaveAndReturn(page, "archive");
   await expect(subscriptions).not.toContainText("#general");
 
   // The kind checkboxes had no action behind them at all, so choosing kinds was a
   // decision the screen threw away.
   await page.getByTestId("start-archiving").click();
   await expect(subscriptions).toContainText("種類");
-  await leaveAndReturn(page, "advanced");
+  await leaveAndReturn(page, "archive");
   await expect(subscriptions).toContainText("種類");
 });
 
@@ -1100,7 +1098,7 @@ test("restoring an archived member puts them back in the member list", async ({
 }) => {
   // An archive is a move, not a flag: doing only half of it would leave the person
   // neither archived nor a member, and so visible nowhere.
-  await openSettings(page, "advanced");
+  await openSettings(page, "archive");
   const archived = page.getByTestId(/^archived-/);
   await expect(archived).toHaveCount(1);
   await page.getByTestId(/^unarchive-/).click();
@@ -1108,7 +1106,7 @@ test("restoring an archived member puts them back in the member list", async ({
     page.getByText("アーカイブされたメンバーはいません"),
   ).toBeVisible();
 
-  await page.getByTestId("settings-nav-community").click();
+  await page.getByTestId("settings-nav-invites").click();
   await expect(
     page.getByTestId("members-settings").getByTestId(/^member-role-9{64}$/),
   ).toHaveCount(1);
@@ -1132,4 +1130,144 @@ test("a right-hand panel casts the sideways edge its token describes", async ({
   // Both layers run -x, so they wrap the rounded left corners.
   expect(shadow).toContain("-1px");
   expect(shadow).toContain("-16px");
+});
+
+// --- The rebuilt settings screens ------------------------------------------
+
+test("a theme is picked from a grid of what it looks like", async ({
+  page,
+}) => {
+  // The picker was a `<select>` of 62 file names, which asks the reader to choose a
+  // file when what they are choosing is a look — and made them apply each one to
+  // find out what it was.
+  await page.goto("/settings/appearance");
+  const grid = page.getByTestId("theme-grid");
+  await expect(grid).toBeVisible();
+  // Families, not halves: light and dark used to be separate entries, so the mode
+  // control and the theme control fought each other.
+  await expect(grid.getByTestId(/^theme-card-/)).toHaveCount(44);
+  await expect(page.getByTestId("theme-card-nuxx")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await page.getByTestId("theme-card-gruvbox-light-hard").click();
+  await expect(
+    page.getByTestId("theme-card-gruvbox-light-hard"),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("theme-card-nuxx")).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("switching to Dark stays inside the chosen family", async ({ page }) => {
+  await page.goto("/settings/appearance");
+  await page.getByTestId("theme-card-github-light").click();
+  await page.getByTestId("theme-dark").click();
+  // Still Github — the mode picks the half, not a different row of a flat list.
+  await expect(page.getByTestId("theme-card-github-light")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("html")).toHaveClass(/dark/);
+});
+
+test("the thread layout setting actually moves the thread", async ({
+  page,
+}) => {
+  // A stored string nothing reads is the mistake this codebase already made with
+  // the theme tokens, so the setting has a consumer.
+  await page.goto("/settings/appearance");
+  await page.getByTestId("thread-layout").click();
+  await page.getByTestId("thread-layout-full").click();
+
+  await page.goto(`/c/${CH_DEV}`);
+  const row = page
+    .getByRole("listitem")
+    .filter({ has: page.getByTestId("reply-in-thread") })
+    .first();
+  await row.hover();
+  await row.getByTestId("reply-in-thread").click();
+
+  // `full` hands the pane over to the thread rather than splitting it. The header
+  // and the composer stay — the composer is what sends into the thread.
+  await expect(page.getByTestId("thread-panel")).toBeVisible();
+  await expect(page.getByTestId("message-timeline")).toHaveCount(0);
+  await expect(page.getByTestId("open-emoji-picker")).toBeVisible();
+});
+
+test("each notification category picks its own sound, and previews it", async ({
+  page,
+}) => {
+  // A DM and a thread reply that sound identical carry no more information than one
+  // beep.
+  await page.goto("/settings/notifications");
+  await page.getByTestId("sound-dm").click();
+  await page.getByTestId("sound-dm-knock").click();
+  await expect(page.getByTestId("sound-dm")).toContainText("knock");
+  await expect(page.getByTestId("sound-mention")).toContainText("flutter");
+  await expect(page.getByTestId("preview-dm")).toBeVisible();
+
+  // Per browser, so it survives leaving the screen.
+  await page.getByTestId("settings-nav-voice").click();
+  await page.getByTestId("settings-nav-notifications").click();
+  await expect(page.getByTestId("sound-dm")).toContainText("knock");
+});
+
+test("turning off an experiment takes its section out of the app", async ({
+  page,
+}) => {
+  // Real flags with real consumers: a list of switches that changed nothing would
+  // be the same mistake as a token nothing reads.
+  await page.goto("/settings/experiments");
+  await expect(page.getByTestId("experiment-projects")).toBeVisible();
+  await page.getByTestId("experiment-projects").click();
+
+  await page.getByTestId("settings-back").click();
+  await expect(page.getByTestId("nav-projects")).toHaveCount(0);
+  // And the others are untouched.
+  await expect(page.getByTestId("nav-pulse")).toBeVisible();
+});
+
+test("the profile screen reads before it edits, and says what is unset", async ({
+  page,
+}) => {
+  // A profile is read far more often than it is changed, and a screen of input
+  // boxes makes the reader parse a form to answer "what does everyone see".
+  await page.goto("/settings/profile");
+  const info = page.getByTestId("profile-info");
+  await expect(info).toContainText("Not set");
+  await expect(page.getByTestId("settings-display-name")).toHaveCount(0);
+
+  await page.getByTestId("edit-profile").click();
+  await expect(page.getByTestId("settings-display-name")).toBeVisible();
+});
+
+test("shortcuts are listed with the scope that makes them work", async ({
+  page,
+}) => {
+  // A shortcut that "does not work" is almost always one pressed somewhere it does
+  // not apply, which is what the second line is for.
+  await page.goto("/settings/shortcuts");
+  const writing = page.getByTestId("shortcuts-書く");
+  await expect(writing).toContainText("送信する");
+  await expect(writing).toContainText("メッセージ入力欄");
+  // No rebinding controls, because the handlers are local to their screens — and the
+  // panel says so rather than offering something that cannot work.
+  await expect(
+    page.getByText("割り当ての変更に対応していません"),
+  ).toBeVisible();
+});
+
+test("the hosted screen lists only the communities it can manage", async ({
+  page,
+}) => {
+  await page.goto("/settings/hosted");
+  const list = page.getByTestId("hosted-list");
+  await expect(list).toBeVisible();
+  // A community reached by typing a relay URL has nothing here to manage — its
+  // settings live on that relay — so listing it would imply otherwise.
+  await expect(list.getByTestId(/^hosted-/)).toHaveCount(1);
+  await expect(list).toContainText("design.nuxx.host");
 });

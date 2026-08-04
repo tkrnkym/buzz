@@ -254,7 +254,7 @@ function useAnnounceNewNotifications({
       }
       // Once per batch. Ten mentions arriving together should not be ten chimes.
       if (prefsRef.current.sound && !played) {
-        played = playNotificationSound();
+        played = playNotificationSound(prefsRef.current.sounds[item.category]);
       }
     }
   }, [items, loaded]);

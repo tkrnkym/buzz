@@ -169,7 +169,12 @@ export function ProfilePopover({
 
       <div aria-hidden className="my-1 h-px bg-border" />
 
-      <Link className={ROW_CLASS} onClick={onClose} to="/settings">
+      <Link
+        className={ROW_CLASS}
+        onClick={onClose}
+        params={{ panel: "profile" }}
+        to="/settings/$panel"
+      >
         <Settings aria-hidden className="size-4 shrink-0" />
         Settings
       </Link>

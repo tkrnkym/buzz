@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useMyPubkey } from "@/features/chat/use-chat";
+import { useChannels, useDms, useMyPubkey } from "@/features/chat/use-chat";
 import {
   buildDirectory,
   buildMemberListFilter,
@@ -10,7 +10,6 @@ import {
 } from "@/features/directory/directory-model";
 import { normalizePubkey } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
-import { useShell } from "@/features/shell/shell-context";
 import { postRelayQuery } from "@/shared/api/relay-http";
 
 const EMPTY_ROLES: Map<string, string> = new Map();
@@ -22,9 +21,16 @@ const EMPTY_ROLES: Map<string, string> = new Map();
  * how often something asks about it, and the two consumers here — the mention
  * autocomplete and the moderator gate on a message — would otherwise issue the
  * same query twice on every channel switch.
+ *
+ * The channel list comes from `useChannels`/`useDms` rather than the shell. Roles are
+ * asked about on the Settings window too, which is not inside `ShellProvider` — and
+ * the shell exists for the read cursors and the presence heartbeat, neither of which
+ * this needs. React Query dedupes the channel query, so reading it directly costs a
+ * cache lookup rather than a second request.
  */
 export function useMemberRoles(): Map<string, string> {
-  const { channels, dms } = useShell();
+  const channels = useChannels().data ?? [];
+  const dms = useDms().data ?? [];
   // Joined into a string so the query key changes on a change of membership, not
   // on every new array carrying the same channel ids.
   const channelKey = [...channels, ...dms]

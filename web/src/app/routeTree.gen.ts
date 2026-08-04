@@ -6,12 +6,13 @@
 
 import { Route as rootRouteImport } from "./routes/root";
 import { Route as welcomeRouteImport } from "./routes/welcome";
+import { Route as settingsRouteImport } from "./routes/settings";
 import { Route as reposRouteImport } from "./routes/repos";
 import { Route as shellRouteImport } from "./routes/shell";
+import { Route as settingsDotpanelRouteImport } from "./routes/settings.$panel";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
 import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
 import { Route as workflowsRouteImport } from "./routes/workflows";
-import { Route as settingsRouteImport } from "./routes/settings";
 import { Route as remindersRouteImport } from "./routes/reminders";
 import { Route as pulseRouteImport } from "./routes/pulse";
 import { Route as projectsRouteImport } from "./routes/projects";
@@ -31,6 +32,11 @@ const welcomeRoute = welcomeRouteImport.update({
   path: "/welcome",
   getParentRoute: () => rootRouteImport,
 } as any);
+const settingsRoute = settingsRouteImport.update({
+  id: "/settings",
+  path: "/settings",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const reposRoute = reposRouteImport.update({
   id: "/repos",
   path: "/repos",
@@ -38,6 +44,11 @@ const reposRoute = reposRouteImport.update({
 } as any);
 const shellRoute = shellRouteImport.update({
   id: "/_shell",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const settingsDotpanelRoute = settingsDotpanelRouteImport.update({
+  id: "/settings/$panel",
+  path: "/settings/$panel",
   getParentRoute: () => rootRouteImport,
 } as any);
 const reposDotrepoIdRoute = reposDotrepoIdRouteImport.update({
@@ -53,11 +64,6 @@ const inviteDotcodeRoute = inviteDotcodeRouteImport.update({
 const workflowsRoute = workflowsRouteImport.update({
   id: "/workflows",
   path: "/workflows",
-  getParentRoute: () => shellRoute,
-} as any);
-const settingsRoute = settingsRouteImport.update({
-  id: "/settings",
-  path: "/settings",
   getParentRoute: () => shellRoute,
 } as any);
 const remindersRoute = remindersRouteImport.update({
@@ -130,6 +136,7 @@ const reposDotrepoIdDotblobDotsplatRoute =
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
   "/repos": typeof reposRoute;
+  "/settings": typeof settingsRoute;
   "/welcome": typeof welcomeRoute;
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
@@ -139,10 +146,10 @@ export interface FileRoutesByFullPath {
   "/projects": typeof projectsRoute;
   "/pulse": typeof pulseRoute;
   "/reminders": typeof remindersRoute;
-  "/settings": typeof settingsRoute;
   "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
+  "/settings/$panel": typeof settingsDotpanelRoute;
   "/c/$channelId": typeof chatDotchannelIdRoute;
   "/projects/$projectId": typeof projectsDotprojectIdRoute;
   "/workflows/$workflowId": typeof workflowsDotworkflowIdRoute;
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/repos": typeof reposRoute;
+  "/settings": typeof settingsRoute;
   "/welcome": typeof welcomeRoute;
   "/": typeof indexRoute;
   "/agents": typeof agentsRoute;
@@ -160,10 +168,10 @@ export interface FileRoutesByTo {
   "/projects": typeof projectsRoute;
   "/pulse": typeof pulseRoute;
   "/reminders": typeof remindersRoute;
-  "/settings": typeof settingsRoute;
   "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
+  "/settings/$panel": typeof settingsDotpanelRoute;
   "/c/$channelId": typeof chatDotchannelIdRoute;
   "/projects/$projectId": typeof projectsDotprojectIdRoute;
   "/workflows/$workflowId": typeof workflowsDotworkflowIdRoute;
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/_shell": typeof shellRouteWithChildren;
   "/repos": typeof reposRoute;
+  "/settings": typeof settingsRoute;
   "/welcome": typeof welcomeRoute;
   "/_shell/": typeof indexRoute;
   "/_shell/agents": typeof agentsRoute;
@@ -183,10 +192,10 @@ export interface FileRoutesById {
   "/_shell/projects": typeof projectsRoute;
   "/_shell/pulse": typeof pulseRoute;
   "/_shell/reminders": typeof remindersRoute;
-  "/_shell/settings": typeof settingsRoute;
   "/_shell/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
+  "/settings/$panel": typeof settingsDotpanelRoute;
   "/_shell/c/$channelId": typeof chatDotchannelIdRoute;
   "/_shell/projects/$projectId": typeof projectsDotprojectIdRoute;
   "/_shell/workflows/$workflowId": typeof workflowsDotworkflowIdRoute;
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/repos"
+    | "/settings"
     | "/welcome"
     | "/agents"
     | "/browse"
@@ -206,10 +216,10 @@ export interface FileRouteTypes {
     | "/projects"
     | "/pulse"
     | "/reminders"
-    | "/settings"
     | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
+    | "/settings/$panel"
     | "/c/$channelId"
     | "/projects/$projectId"
     | "/workflows/$workflowId"
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/repos"
+    | "/settings"
     | "/welcome"
     | "/"
     | "/agents"
@@ -227,10 +238,10 @@ export interface FileRouteTypes {
     | "/projects"
     | "/pulse"
     | "/reminders"
-    | "/settings"
     | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
+    | "/settings/$panel"
     | "/c/$channelId"
     | "/projects/$projectId"
     | "/workflows/$workflowId"
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | "__root__"
     | "/_shell"
     | "/repos"
+    | "/settings"
     | "/welcome"
     | "/_shell/"
     | "/_shell/agents"
@@ -249,10 +261,10 @@ export interface FileRouteTypes {
     | "/_shell/projects"
     | "/_shell/pulse"
     | "/_shell/reminders"
-    | "/_shell/settings"
     | "/_shell/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
+    | "/settings/$panel"
     | "/_shell/c/$channelId"
     | "/_shell/projects/$projectId"
     | "/_shell/workflows/$workflowId"
@@ -262,9 +274,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   shellRoute: typeof shellRouteWithChildren;
   reposRoute: typeof reposRoute;
+  settingsRoute: typeof settingsRoute;
   welcomeRoute: typeof welcomeRoute;
   inviteDotcodeRoute: typeof inviteDotcodeRoute;
   reposDotrepoIdRoute: typeof reposDotrepoIdRoute;
+  settingsDotpanelRoute: typeof settingsDotpanelRoute;
   reposDotrepoIdDotblobDotsplatRoute: typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 
@@ -275,6 +289,13 @@ declare module "@tanstack/react-router" {
       path: "/welcome";
       fullPath: "/welcome";
       preLoaderRoute: typeof welcomeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/settings": {
+      id: "/settings";
+      path: "/settings";
+      fullPath: "/settings";
+      preLoaderRoute: typeof settingsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/repos": {
@@ -289,6 +310,13 @@ declare module "@tanstack/react-router" {
       path: "";
       fullPath: "/";
       preLoaderRoute: typeof shellRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/settings/$panel": {
+      id: "/settings/$panel";
+      path: "/settings/$panel";
+      fullPath: "/settings/$panel";
+      preLoaderRoute: typeof settingsDotpanelRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/repos/$repoId": {
@@ -310,13 +338,6 @@ declare module "@tanstack/react-router" {
       path: "/workflows";
       fullPath: "/workflows";
       preLoaderRoute: typeof workflowsRouteImport;
-      parentRoute: typeof shellRoute;
-    };
-    "/_shell/settings": {
-      id: "/_shell/settings";
-      path: "/settings";
-      fullPath: "/settings";
-      preLoaderRoute: typeof settingsRouteImport;
       parentRoute: typeof shellRoute;
     };
     "/_shell/reminders": {
@@ -423,7 +444,6 @@ interface shellRouteChildren {
   projectsRoute: typeof projectsRoute;
   pulseRoute: typeof pulseRoute;
   remindersRoute: typeof remindersRoute;
-  settingsRoute: typeof settingsRoute;
   workflowsRoute: typeof workflowsRoute;
   chatDotchannelIdRoute: typeof chatDotchannelIdRoute;
   projectsDotprojectIdRoute: typeof projectsDotprojectIdRoute;
@@ -440,7 +460,6 @@ const shellRouteChildren: shellRouteChildren = {
   projectsRoute: projectsRoute,
   pulseRoute: pulseRoute,
   remindersRoute: remindersRoute,
-  settingsRoute: settingsRoute,
   workflowsRoute: workflowsRoute,
   chatDotchannelIdRoute: chatDotchannelIdRoute,
   projectsDotprojectIdRoute: projectsDotprojectIdRoute,
@@ -452,9 +471,11 @@ const shellRouteWithChildren = shellRoute._addFileChildren(shellRouteChildren);
 const rootRouteChildren: RootRouteChildren = {
   shellRoute: shellRouteWithChildren,
   reposRoute: reposRoute,
+  settingsRoute: settingsRoute,
   welcomeRoute: welcomeRoute,
   inviteDotcodeRoute: inviteDotcodeRoute,
   reposDotrepoIdRoute: reposDotrepoIdRoute,
+  settingsDotpanelRoute: settingsDotpanelRoute,
   reposDotrepoIdDotblobDotsplatRoute: reposDotrepoIdDotblobDotsplatRoute,
 };
 export const routeTree = rootRouteImport

@@ -39,7 +39,7 @@ const ROLE_RANK: Record<MemberRole, number> = { owner: 0, admin: 1, member: 2 };
  * admin changes occasionally and everyone else only reads, which is exactly
  * what a settings section is for. The desktop client put it in the same place.
  */
-export function MembersSettings() {
+export function MembersSettings({ query = "" }: { query?: string }) {
   const showcase = useShowcase();
   const update = useShowcaseUpdate();
   const [adding, setAdding] = useState(false);
@@ -51,7 +51,26 @@ export function MembersSettings() {
       ),
     [showcase],
   );
+  // Profiles for everyone, not just the matches: the filter runs on the resolved
+  // name, so narrowing the lookup to the current matches would mean a name that has
+  // not loaded yet can never be searched for.
   const profiles = useProfiles(members.map((member) => member.pubkey));
+  const needle = query.trim().toLowerCase();
+  const shown = needle
+    ? members.filter((member) => {
+        const label = resolveUserLabel({
+          pubkey: member.pubkey,
+          profiles,
+          preferResolvedSelfLabel: true,
+        });
+        // The pubkey is searchable too: it is what a moderator has to hand when
+        // someone is reported, and it is not always resolvable to a name.
+        return (
+          label.toLowerCase().includes(needle) ||
+          member.pubkey.toLowerCase().includes(needle)
+        );
+      })
+    : members;
 
   if (!showcase) {
     return (
@@ -66,7 +85,12 @@ export function MembersSettings() {
   return (
     <div className="flex flex-col gap-4" data-testid="members-settings">
       <ul className="flex flex-col gap-1">
-        {members.map((member) => {
+        {shown.length === 0 && (
+          <li className="px-2 py-1.5 text-2xs text-muted-foreground">
+            該当するメンバーはいません。
+          </li>
+        )}
+        {shown.map((member) => {
           const label = resolveUserLabel({
             pubkey: member.pubkey,
             profiles,
