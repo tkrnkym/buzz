@@ -1167,6 +1167,29 @@ test("a theme is picked from a grid of what it looks like", async ({
   );
 });
 
+test("each thumbnail is painted in its own theme, not in a placeholder", async ({
+  page,
+}) => {
+  // Each card loads its own palette behind an IntersectionObserver. When the ref
+  // that observer watches never reaches an element, every card keeps its
+  // placeholder — a grid of identical grey windows, with nothing on the page
+  // looking broken and no error anywhere. Three cards, three colours.
+  await page.goto("/settings/appearance");
+  const surfaces = ["nuxx", "gruvbox-light-hard", "solarized-light"].map(
+    (family) => page.getByTestId(`theme-card-${family}`).locator("div").first(),
+  );
+  await expect
+    .poll(async () => {
+      const colors = await Promise.all(
+        surfaces.map((surface) =>
+          surface.evaluate((node) => getComputedStyle(node).backgroundColor),
+        ),
+      );
+      return new Set(colors).size;
+    })
+    .toBe(3);
+});
+
 test("switching to Dark stays inside the chosen family", async ({ page }) => {
   await page.goto("/settings/appearance");
   await page.getByTestId("theme-card-github-light").click();

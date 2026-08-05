@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Sun } from "lucide-react";
 import { useMemo } from "react";
 
 import {
@@ -125,7 +125,19 @@ export function AppearancePanel() {
                 type="button"
               >
                 {accentColor === value && (
-                  <span className="size-2.5 rounded-full bg-white/90" />
+                  // A tick, not a dot: the swatch is already a filled circle, so a
+                  // smaller circle inside it reads as a bullet rather than as a
+                  // choice. Neutral is the theme's foreground, so its tick has to
+                  // be the background or it disappears in dark mode.
+                  <Check
+                    aria-hidden
+                    className={cn(
+                      "size-4 stroke-[3]",
+                      value === NEUTRAL_ACCENT
+                        ? "text-background"
+                        : "text-white",
+                    )}
+                  />
                 )}
               </button>
             ))}
