@@ -6,6 +6,7 @@
  */
 
 import type { AgentDraft } from "@/features/agents/ui/AgentFormDialog";
+import { agentAvatarUrl } from "@/mock/agent-avatar";
 import type { AgentDefaults, Showcase, ShowcaseAgent } from "@/mock/showcase";
 
 /**
@@ -32,6 +33,7 @@ export function agentFromDraft(
   return {
     id,
     pubkey: existing?.pubkey ?? mockPubkey(id),
+    avatarUrl: existing?.avatarUrl ?? agentAvatarUrl(id),
     name: draft.name.trim(),
     purpose: draft.purpose.trim(),
     harness: draft.harness,

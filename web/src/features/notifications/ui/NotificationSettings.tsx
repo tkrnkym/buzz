@@ -16,7 +16,7 @@ import { useNotificationPrefs } from "@/features/notifications/use-notifications
 import { cn } from "@/shared/lib/cn";
 import { Switch } from "@/shared/ui/switch";
 
-const CATEGORIES: NotificationCategory[] = ["mention", "dm", "reply"];
+const CATEGORIES: NotificationCategory[] = ["mention", "dm", "reply", "action"];
 
 function Toggle({
   checked,

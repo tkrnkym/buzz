@@ -11,8 +11,8 @@ import {
 const template = (overrides) => ({
   id: "t1",
   name: "設計レビュー",
-  topic: "",
-  visibility: "open",
+  description: "",
+  canvasTemplate: "",
   agentIds: [],
   usedCount: 4,
   ...overrides,

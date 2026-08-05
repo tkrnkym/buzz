@@ -1,4 +1,4 @@
-import { Bot, Copy, Hash, Lock, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, LayoutTemplate, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -16,17 +16,18 @@ import {
 import type { ChannelTemplate } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
 import { Dialog } from "@/shared/ui/dialog";
+import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
 const FIELD_CLASS =
-  "h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+  "w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /** A blank template, for the create path. */
 function emptyTemplate(): ChannelTemplate {
   return {
     id: "",
     name: "",
-    topic: "",
-    visibility: "open",
+    description: "",
+    canvasTemplate: "",
     agentIds: [],
     usedCount: 0,
   };
@@ -38,7 +39,12 @@ function TemplateDialog({
   onSave,
   template,
 }: {
-  agents: { id: string; name: string }[];
+  agents: {
+    id: string;
+    name: string;
+    pubkey: string;
+    avatarUrl: string | null;
+  }[];
   onClose: () => void;
   onSave: (template: ChannelTemplate) => void;
   template: ChannelTemplate;
@@ -92,84 +98,82 @@ function TemplateDialog({
 
         <label className="flex flex-col gap-1">
           <span className="text-2xs font-medium text-muted-foreground">
-            トピック
+            説明（省略可）
           </span>
-          <input
-            className={FIELD_CLASS}
-            data-testid="template-topic"
+          <textarea
+            className={cn(FIELD_CLASS, "min-h-16 resize-y")}
+            data-testid="template-description"
             onChange={(event) =>
-              setDraft({ ...draft, topic: event.target.value })
+              setDraft({ ...draft, description: event.target.value })
             }
-            placeholder="この部屋で何を話すか"
-            value={draft.topic}
+            placeholder="このテンプレートが何のためのものか"
+            value={draft.description}
           />
         </label>
 
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-2xs font-medium text-muted-foreground">
-            公開範囲
-          </legend>
-          <div className="flex gap-1.5">
-            {(
-              [
-                { value: "open", label: "誰でも参加できる", Icon: Hash },
-                { value: "private", label: "招待した人だけ", Icon: Lock },
-              ] as const
-            ).map((option) => (
-              <button
-                aria-pressed={draft.visibility === option.value}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2.5 py-2 text-2xs font-medium transition-colors",
-                  draft.visibility === option.value
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:bg-accent",
-                )}
-                data-testid={`template-visibility-${option.value}`}
-                key={option.value}
-                onClick={() => setDraft({ ...draft, visibility: option.value })}
-                type="button"
-              >
-                <option.Icon aria-hidden className="size-3" />
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <label className="flex flex-col gap-1">
+          <span className="text-2xs font-medium text-muted-foreground">
+            Canvas テンプレート（省略可）
+          </span>
+          <textarea
+            className={cn(FIELD_CLASS, "min-h-24 resize-y font-mono text-2xs")}
+            data-testid="template-canvas"
+            onChange={(event) =>
+              setDraft({ ...draft, canvasTemplate: event.target.value })
+            }
+            placeholder="Canvas の内容..."
+            value={draft.canvasTemplate}
+          />
+          <span className="text-badge text-muted-foreground">
+            {
+              "{channel.name} と {template.name} をプレースホルダーとして使えます。"
+            }
+          </span>
+        </label>
 
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-2xs font-medium text-muted-foreground">
-            招くエージェント
+          <legend className="mb-0.5 text-2xs font-medium text-muted-foreground">
+            あなたのエージェント
           </legend>
-          <div className="flex flex-wrap gap-1.5">
+          <ul className="flex flex-col gap-1">
             {agents.map((agent) => {
               const picked = draft.agentIds.includes(agent.id);
               return (
-                <button
-                  aria-pressed={picked}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md border px-2 py-1 text-badge transition-colors",
-                    picked
-                      ? "border-primary bg-primary/10 font-medium"
-                      : "border-border hover:bg-accent",
-                  )}
-                  data-testid={`template-agent-${agent.id}`}
-                  key={agent.id}
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      agentIds: picked
-                        ? draft.agentIds.filter((id) => id !== agent.id)
-                        : [...draft.agentIds, agent.id],
-                    })
-                  }
-                  type="button"
-                >
-                  <Bot aria-hidden className="size-3" />
-                  {agent.name}
-                </button>
+                <li key={agent.id}>
+                  <label
+                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-accent"
+                    htmlFor={`template-agent-${agent.id}`}
+                  >
+                    <PubkeyAvatar
+                      avatarUrl={agent.avatarUrl}
+                      label={agent.name}
+                      pubkey={agent.pubkey}
+                      shape="circle"
+                      size="sm"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {agent.name}
+                    </span>
+                    <input
+                      checked={picked}
+                      className="size-4 shrink-0 rounded border-border"
+                      data-testid={`template-agent-${agent.id}`}
+                      id={`template-agent-${agent.id}`}
+                      onChange={() =>
+                        setDraft({
+                          ...draft,
+                          agentIds: picked
+                            ? draft.agentIds.filter((id) => id !== agent.id)
+                            : [...draft.agentIds, agent.id],
+                        })
+                      }
+                      type="checkbox"
+                    />
+                  </label>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </fieldset>
       </div>
     </Dialog>
@@ -207,6 +211,8 @@ export function ChannelTemplatesSettings() {
   const agents = showcase.agents.map((agent) => ({
     id: agent.id,
     name: agent.name,
+    pubkey: agent.pubkey,
+    avatarUrl: agent.avatarUrl,
   }));
   const nameOf = (id: string) =>
     agents.find((agent) => agent.id === id)?.name ?? id;
@@ -240,18 +246,14 @@ export function ChannelTemplatesSettings() {
               key={template.id}
             >
               <span className="shrink-0 text-muted-foreground">
-                {template.visibility === "private" ? (
-                  <Lock aria-label="招待した人だけ" className="size-3.5" />
-                ) : (
-                  <Hash aria-label="誰でも参加できる" className="size-3.5" />
-                )}
+                <LayoutTemplate aria-hidden className="size-3.5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
                   {template.name}
                 </span>
                 <span className="block truncate text-badge text-muted-foreground">
-                  {template.topic || "トピックなし"}
+                  {template.description || "説明なし"}
                   {template.agentIds.length > 0 &&
                     ` · ${template.agentIds.map(nameOf).join("、")}`}
                   {` · ${template.usedCount} 回使用`}

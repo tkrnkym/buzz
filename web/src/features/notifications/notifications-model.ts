@@ -37,7 +37,7 @@ const MESSAGE_KINDS = [KIND_STREAM_MESSAGE, KIND_STREAM_MESSAGE_V2];
 /** How many of the reader's own messages are watched for replies. */
 export const OWN_MESSAGE_WINDOW = 100;
 
-export type NotificationCategory = "mention" | "dm" | "reply";
+export type NotificationCategory = "mention" | "dm" | "reply" | "action";
 
 export interface NotificationItem {
   id: string;
@@ -46,6 +46,15 @@ export interface NotificationItem {
   channelId: string | null;
   createdAt: number;
   content: string;
+  /**
+   * Overrides the label a real author's pubkey would resolve to.
+   *
+   * An "action" item has no author — a workflow waiting on approval is not a
+   * person — so `authorPubkey` there is a synthetic id used only for the
+   * dedup key and the avatar's colour, and this is what carries the subject's
+   * actual name.
+   */
+  authorLabel?: string;
 }
 
 /**
@@ -231,6 +240,7 @@ export function notificationTitle(
   item: NotificationItem,
   { authorLabel, channelName }: { authorLabel: string; channelName?: string },
 ): string {
+  if (item.category === "action") return authorLabel;
   if (item.category === "dm") return `${authorLabel} からのDM`;
   const room = channelName ? `#${channelName}` : null;
   if (item.category === "mention") {
@@ -247,4 +257,5 @@ export const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   mention: "メンション",
   dm: "DM",
   reply: "返信",
+  action: "対応が必要",
 };

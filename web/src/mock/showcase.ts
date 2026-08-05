@@ -17,6 +17,7 @@
  */
 
 import type { StepForm, TriggerForm } from "@/features/workflows/workflow-form";
+import { agentAvatarUrl } from "@/mock/agent-avatar";
 import {
   AGENT_RELEASE,
   AGENT_REVIEWER,
@@ -39,6 +40,9 @@ export interface ShowcaseAgent {
   id: string;
   pubkey: string;
   name: string;
+  /** From {@link agentAvatarUrl}; `null` where the desktop client would have
+   * shown one uploaded, which this repo has no asset for. */
+  avatarUrl: string | null;
   /** One line about what this agent is for. */
   purpose: string;
   /** The harness it runs under — `sprig`, `acp`, or a custom command. */
@@ -301,8 +305,14 @@ export interface AgentDefaults {
 export interface ChannelTemplate {
   id: string;
   name: string;
-  topic: string;
-  visibility: "open" | "private";
+  description: string;
+  /**
+   * Seed content for the new channel's canvas, or "" for none.
+   *
+   * `{channel.name}` and `{template.name}` are placeholders the reader can use
+   * in it, filled in when a channel is actually created from the template.
+   */
+  canvasTemplate: string;
   agentIds: string[];
   usedCount: number;
 }
@@ -463,6 +473,7 @@ export const SHOWCASE: Showcase = {
       id: "agent-reviewer",
       pubkey: AGENT_REVIEWER,
       name: "レビュー係",
+      avatarUrl: agentAvatarUrl("agent-reviewer"),
       purpose: "PR を読んで、危ないところだけ指摘する",
       harness: "sprig",
       model: "claude-opus-5",
@@ -477,6 +488,7 @@ export const SHOWCASE: Showcase = {
       id: "agent-release",
       pubkey: AGENT_RELEASE,
       name: "リリース番",
+      avatarUrl: agentAvatarUrl("agent-release"),
       purpose: "タグを切って、リリースノートの下書きを置く",
       harness: "acp",
       model: "claude-sonnet-5",
@@ -491,6 +503,7 @@ export const SHOWCASE: Showcase = {
       id: "agent-triage",
       pubkey: AGENT_TRIAGE,
       name: "トリアージ",
+      avatarUrl: agentAvatarUrl("agent-triage"),
       purpose: "新しい Issue にラベルを付けて担当を提案する",
       harness: "custom: ./bin/triage",
       model: "claude-haiku-4-5",
@@ -1030,24 +1043,25 @@ export const SHOWCASE: Showcase = {
     {
       id: "tpl-incident",
       name: "障害対応",
-      topic: "一次対応と時系列の記録",
-      visibility: "private",
+      description: "一次対応と時系列の記録のためのチャンネル",
+      canvasTemplate:
+        "# {channel.name} 対応記録\n\n## 状況\n\n## タイムライン\n\n## 復旧後の確認",
       agentIds: ["agent-triage", "agent-release"],
       usedCount: 7,
     },
     {
       id: "tpl-review",
       name: "リリースレビュー",
-      topic: "リリース前の確認",
-      visibility: "open",
+      description: "リリース前の確認をするためのチャンネル",
+      canvasTemplate: "",
       agentIds: ["agent-reviewer"],
       usedCount: 12,
     },
     {
       id: "tpl-onboarding",
       name: "新メンバー受け入れ",
-      topic: "最初の一週間",
-      visibility: "private",
+      description: "最初の一週間をここで案内する",
+      canvasTemplate: "",
       agentIds: [],
       usedCount: 3,
     },

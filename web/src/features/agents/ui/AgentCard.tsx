@@ -119,6 +119,7 @@ export function AgentCard({
 
       <div className="flex flex-1 items-center justify-center px-4 pb-3 pt-10">
         <PubkeyAvatar
+          avatarUrl={agent.avatarUrl}
           badge={
             runControl ? (
               <button

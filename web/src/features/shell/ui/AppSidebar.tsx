@@ -26,6 +26,7 @@ import {
   useOpenDm,
 } from "@/features/channels/use-channel-ops";
 import { useDraftChannels } from "@/features/messages/use-draft";
+import { useNotificationPrefs } from "@/features/notifications/use-notifications";
 import { useProfiles } from "@/features/profile/profile-store";
 import { SearchBox } from "@/features/search/ui/SearchBox";
 import {
@@ -85,6 +86,7 @@ export function AppSidebar({
   // Which sections exist, from Settings > Experiments. The flag is what makes that
   // screen real rather than a list of switches that change nothing.
   const { flags } = useFeatureFlags();
+  const { prefs } = useNotificationPrefs();
   const navigate = useNavigate();
   const myPubkey = useMyPubkey();
   const createChannel = useCreateChannel();
@@ -248,7 +250,7 @@ export function AppSidebar({
                 <span>Inbox</span>
               </Link>
             </SidebarMenuButton>
-            {unreadChannelIds.size > 0 && (
+            {prefs.showHomeBadge && unreadChannelIds.size > 0 && (
               <SidebarMenuBadge
                 className="right-2 rounded-full bg-primary/15 px-1.5 text-2xs text-primary peer-data-[active=true]/menu-button:bg-sidebar-active-foreground/20 peer-data-[active=true]/menu-button:text-sidebar-active-foreground"
                 data-testid="sidebar-inbox-count"

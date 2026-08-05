@@ -1,4 +1,4 @@
-import { AtSign, MessageSquareReply, Send } from "lucide-react";
+import { AtSign, ClipboardCheck, MessageSquareReply, Send } from "lucide-react";
 import { useMemo } from "react";
 
 import {
@@ -23,6 +23,7 @@ const CATEGORY_ICONS: Record<NotificationCategory, React.ReactNode> = {
   mention: <AtSign aria-hidden className="size-3" />,
   dm: <Send aria-hidden className="size-3" />,
   reply: <MessageSquareReply aria-hidden className="size-3" />,
+  action: <ClipboardCheck aria-hidden className="size-3" />,
 };
 
 /** How many rows are shown. The tail is history, and history is the timeline. */
@@ -110,11 +111,16 @@ export function NotificationList({
       {heading}
       <ul className="flex flex-col" data-testid="notification-rows">
         {rows.map((item) => {
-          const label = resolveUserLabel({
-            pubkey: item.authorPubkey,
-            profiles,
-            preferResolvedSelfLabel: true,
-          });
+          // An action item has no author — a workflow waiting on approval is
+          // not a person — so its own label stands in rather than resolving a
+          // profile for a pubkey nobody signed with.
+          const label =
+            item.authorLabel ??
+            resolveUserLabel({
+              pubkey: item.authorPubkey,
+              profiles,
+              preferResolvedSelfLabel: true,
+            });
           const unread = isNotificationUnread(item, readState.contexts);
           const channelName = item.channelId
             ? channelNames.get(item.channelId)
@@ -137,7 +143,9 @@ export function NotificationList({
                       "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-badge",
                       item.category === "dm"
                         ? "bg-primary/15 text-primary"
-                        : "bg-secondary text-secondary-foreground",
+                        : item.category === "action"
+                          ? "bg-warning-bg text-warning"
+                          : "bg-secondary text-secondary-foreground",
                     )}
                   >
                     {CATEGORY_ICONS[item.category]}

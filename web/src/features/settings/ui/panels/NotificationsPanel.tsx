@@ -32,6 +32,10 @@ const CATEGORIES: ReadonlyArray<{
     id: "reply",
     description: "あなたが参加しているスレッドに返信があったとき。",
   },
+  {
+    id: "action",
+    description: "承認待ちや、思い出してほしいことがあるとき。",
+  },
 ];
 
 const SOUND_OPTIONS = SOUNDS.map((sound) => ({
@@ -199,6 +203,20 @@ export function NotificationsPanel() {
           View all
         </button>
       )}
+
+      <SettingCard>
+        <SettingRow
+          description="メンションと対応が必要な項目について、サイドバーの Inbox にバッジを表示します。"
+          testId="home-badge-row"
+          title="Home badge"
+        >
+          <Switch
+            checked={prefs.showHomeBadge}
+            data-testid="pref-home-badge"
+            onCheckedChange={(next) => update({ showHomeBadge: next })}
+          />
+        </SettingRow>
+      </SettingCard>
     </div>
   );
 }

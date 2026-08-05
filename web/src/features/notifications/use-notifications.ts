@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useMyPubkey } from "@/features/chat/use-chat";
 import { useMuteList } from "@/features/moderation/use-moderation";
+import { buildActionNotifications } from "@/features/notifications/action-notifications";
 import {
   playNotificationSound,
   showDesktopNotification,
@@ -26,8 +27,18 @@ import {
 } from "@/features/notifications/notifications-model";
 import { useUserLabels } from "@/features/profile/use-user-label";
 import { useShell } from "@/features/shell/shell-context";
+import { useShowcase } from "@/features/showcase/use-showcase";
 import { useRelaySession } from "@/shared/api/relay-provider";
 import type { NostrEvent } from "@/shared/lib/nostr-client";
+
+/** Newest first, same tie-break as `buildNotifications` — so a merge of the
+ * two sources reads as one timeline rather than two lists stitched together. */
+function sortByRecency(items: NotificationItem[]): NotificationItem[] {
+  return [...items].sort(
+    (left, right) =>
+      right.createdAt - left.createdAt || left.id.localeCompare(right.id),
+  );
+}
 
 export interface NotificationsApi {
   items: NotificationItem[];
@@ -49,6 +60,7 @@ export function useNotifications(): NotificationsApi {
   const myPubkey = useMyPubkey();
   const { channels, dms, readState } = useShell();
   const muted = useMuteList();
+  const showcase = useShowcase();
 
   const [events, setEvents] = useState<Map<string, NostrEvent>>(
     () => new Map(),
@@ -125,17 +137,24 @@ export function useNotifications(): NotificationsApi {
     [dms],
   );
 
-  const items = useMemo(
-    () =>
-      buildNotifications({
-        events: [...events.values()],
-        dmChannelIds,
-        mutedPubkeys: muted,
-        myPubkey,
-        ownMessageIds: ownIds,
-      }),
-    [dmChannelIds, events, muted, myPubkey, ownIds],
-  );
+  const items = useMemo(() => {
+    const fromMessages = buildNotifications({
+      events: [...events.values()],
+      dmChannelIds,
+      mutedPubkeys: muted,
+      myPubkey,
+      ownMessageIds: ownIds,
+    });
+    // Showcase-only: there is no relay event yet for a held workflow run, so
+    // this is the one source of "action" items and only exists in the demo
+    // build — a client pointed at a real relay never shows an invented one.
+    const fromActions = showcase
+      ? buildActionNotifications(showcase.workflows)
+      : [];
+    return fromActions.length === 0
+      ? fromMessages
+      : sortByRecency([...fromMessages, ...fromActions]);
+  }, [dmChannelIds, events, muted, myPubkey, ownIds, showcase]);
 
   const unreadCount = useMemo(
     () => unreadNotificationCount(items, readState.contexts),
@@ -247,7 +266,8 @@ function useAnnounceNewNotifications({
           body: truncateBody(item.content, "新しいメッセージ"),
           tag: item.id,
           title: notificationTitle(item, {
-            authorLabel: labelsRef.current.nameOf(item.authorPubkey),
+            authorLabel:
+              item.authorLabel ?? labelsRef.current.nameOf(item.authorPubkey),
             ...(channelName ? { channelName } : {}),
           }),
         });

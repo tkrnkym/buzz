@@ -38,14 +38,28 @@ export interface NotificationPrefs {
    * noise, and the reader is looking straight at it.
    */
   onlyWhenHidden: boolean;
+  /**
+   * Show the Inbox nav badge for mentions and needs-action items.
+   *
+   * On by default, unlike `desktop`/`sound`: a badge in the sidebar the reader
+   * is already looking at is not the same kind of interruption a popup or a
+   * chime is.
+   */
+  showHomeBadge: boolean;
 }
 
 export const DEFAULT_PREFS: NotificationPrefs = {
-  categories: { mention: true, dm: true, reply: true },
-  sounds: { mention: DEFAULT_SOUND, dm: DEFAULT_SOUND, reply: DEFAULT_SOUND },
+  categories: { mention: true, dm: true, reply: true, action: true },
+  sounds: {
+    mention: DEFAULT_SOUND,
+    dm: DEFAULT_SOUND,
+    reply: DEFAULT_SOUND,
+    action: DEFAULT_SOUND,
+  },
   desktop: false,
   sound: false,
   onlyWhenHidden: true,
+  showHomeBadge: true,
 };
 
 const VERSION = "v1";
@@ -79,10 +93,14 @@ export function readPrefs(pubkey: string | null): NotificationPrefs {
         reply: isSoundName(parsed.sounds?.reply)
           ? parsed.sounds.reply
           : DEFAULT_SOUND,
+        action: isSoundName(parsed.sounds?.action)
+          ? parsed.sounds.action
+          : DEFAULT_SOUND,
       },
       desktop: parsed.desktop ?? DEFAULT_PREFS.desktop,
       sound: parsed.sound ?? DEFAULT_PREFS.sound,
       onlyWhenHidden: parsed.onlyWhenHidden ?? DEFAULT_PREFS.onlyWhenHidden,
+      showHomeBadge: parsed.showHomeBadge ?? DEFAULT_PREFS.showHomeBadge,
     };
   } catch {
     // A corrupt or unavailable store (private mode, quota) is not worth failing
