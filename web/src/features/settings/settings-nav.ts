@@ -56,7 +56,16 @@ export type SettingsPanelId =
 
 export interface SettingsPanel {
   id: SettingsPanelId;
+  /** The nav row, which has a 64px column to fit in. */
   label: string;
+  /**
+   * The screen's heading, when it differs from the nav row.
+   *
+   * "Compute" is enough in a list of fifteen; on the screen itself the heading has
+   * a whole line to be specific with, and "Share compute" says what the screen does
+   * rather than what subject it belongs to.
+   */
+  title?: string;
   Icon: LucideIcon;
   /** The one line under the screen's title, saying what the screen is for. */
   description: string;
@@ -127,7 +136,8 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         id: "hosted",
         label: "Hosted communities",
         Icon: MessagesSquare,
-        description: "サーバを用意せずに立ち上げたコミュニティ。",
+        description:
+          "Buzz はどのリレーでも動きます。この画面は、ホスティングを使う場合のためのものです。",
       },
       {
         id: "templates",
@@ -151,14 +161,16 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         id: "agents",
         label: "Agents",
         Icon: Bot,
-        description: "ハーネスと、ローカルのエージェントが引き継ぐ既定値。",
+        description:
+          "会話でのエージェントのふるまいと、このマシンでの動かし方を決めます。",
       },
       {
         id: "compute",
         label: "Compute",
+        title: "Share compute",
         Icon: Cpu,
         description:
-          "このマシンの計算資源を、コミュニティのエージェントに貸します。",
+          "このマシンをリレーと共有します。オンのあいだ、ほかのメンバーが自分のエージェントをここで動かせます。",
       },
       {
         id: "experiments",
@@ -176,8 +188,9 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
       {
         id: "updates",
         label: "Updates",
+        title: "Software Updates",
         Icon: Download,
-        description: "いま動いているバージョンと、変わったこと。",
+        description: "Buzz を最新の機能と修正に追いつかせます。",
       },
     ],
   },

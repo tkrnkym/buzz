@@ -85,7 +85,11 @@ export function SettingsShell({
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-6 px-8 py-8">
           <header>
-            <h1 className="text-2xl font-semibold">{panel.label}</h1>
+            {/* The heading, which is allowed to be longer than the nav row it
+                came from — "Compute" in a list of fifteen, "Share compute" here. */}
+            <h1 className="text-2xl font-semibold">
+              {panel.title ?? panel.label}
+            </h1>
             {/* One line, under the title. Every screen has one: a heading alone
                 does not say what changing the thing below it will do. */}
             <p className="mt-1 text-sm text-muted-foreground">

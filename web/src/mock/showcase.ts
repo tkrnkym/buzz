@@ -316,6 +316,14 @@ export interface MeshNode {
   /** Null when nothing is downloading. */
   download: { model: string; receivedBytes: number; totalBytes: number } | null;
   installedModels: string[];
+  /**
+   * Models worth suggesting, with the size they need loaded.
+   *
+   * The size is the point: the screen ranks these against a memory budget so the
+   * reader can see which ones their machine can actually serve, rather than picking
+   * a name and finding out when sharing starts.
+   */
+  catalog: { ref: string; sizeGb: number }[];
 }
 
 /** A standing request to keep copies of some events locally. */
@@ -1057,6 +1065,15 @@ export const SHOWCASE: Showcase = {
       totalBytes: 9_000_000_000,
     },
     installedModels: ["qwen3-coder:30b", "llama3.3:70b"],
+    // Sized so the list spans all three fits against the 24 GB cap above: two that
+    // are comfortable, one that is tight, one that will not load. A catalog where
+    // everything fits never shows the state the screen is for.
+    catalog: [
+      { ref: "llama3.2:3b", sizeGb: 2.2 },
+      { ref: "qwen3-coder:30b", sizeGb: 16 },
+      { ref: "deepseek-r1:14b", sizeGb: 9 },
+      { ref: "llama3.3:70b", sizeGb: 40 },
+    ],
   },
 
   archiveSubscriptions: [

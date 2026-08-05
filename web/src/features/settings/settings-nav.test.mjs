@@ -47,3 +47,12 @@ test("an unknown panel falls back rather than failing the page", () => {
   assert.equal(findSettingsPanel("nope"), null);
   assert.equal(findSettingsPanel("voice").label, "Voice");
 });
+
+test("a screen may have a longer heading than its nav row", () => {
+  // "Compute" is enough in a column of fifteen; the heading has a whole line to be
+  // specific with, and falls back to the nav label when there is nothing to add.
+  const compute = findSettingsPanel("compute");
+  assert.equal(compute.label, "Compute");
+  assert.equal(compute.title, "Share compute");
+  assert.equal(findSettingsPanel("profile").title, undefined);
+});

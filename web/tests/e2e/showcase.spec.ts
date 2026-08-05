@@ -1050,18 +1050,22 @@ test("shared compute remembers the switch and the VRAM cap", async ({
   // The cap is the one control on this screen with a consequence attached, and it
   // was the one that reverted.
   await openSettings(page, "compute");
-  await page.getByTestId("mesh-vram").fill("24");
+  // The cap sits under Advanced now: it is the number the suggestions above are
+  // judged against, not something most readers touch.
+  await page.getByTestId("toggle-compute-advanced").click();
+  await page.getByTestId("mesh-vram").fill("32");
   await page.getByTestId("mesh-vram").blur();
   await leaveAndReturn(page, "compute");
-  await expect(page.getByTestId("mesh-vram")).toHaveValue("24");
+  await page.getByTestId("toggle-compute-advanced").click();
+  await expect(page.getByTestId("mesh-vram")).toHaveValue("32");
 
   await page.getByTestId("mesh-share").click();
-  await expect(page.getByTestId("mesh-status")).toContainText(
-    "共有していません",
+  await expect(page.getByTestId("mesh-share-row")).toContainText(
+    "いまは共有していません",
   );
   await leaveAndReturn(page, "compute");
-  await expect(page.getByTestId("mesh-status")).toContainText(
-    "共有していません",
+  await expect(page.getByTestId("mesh-share-row")).toContainText(
+    "いまは共有していません",
   );
 });
 
@@ -1072,7 +1076,9 @@ test("turning sharing on says it is starting, not that it is serving", async ({
   await openSettings(page, "compute");
   await page.getByTestId("mesh-share").click();
   await page.getByTestId("mesh-share").click();
-  await expect(page.getByTestId("mesh-status")).toContainText("起動中");
+  await expect(page.getByTestId("mesh-share-row")).toContainText(
+    "起動しています",
+  );
 });
 
 test("an archive subscription can be dropped and a new one started", async ({
@@ -1270,4 +1276,87 @@ test("the hosted screen lists only the communities it can manage", async ({
   // settings live on that relay — so listing it would imply otherwise.
   await expect(list.getByTestId(/^hosted-/)).toHaveCount(1);
   await expect(list).toContainText("design.nuxx.host");
+});
+
+test("the compute screen ranks models against a budget it can explain", async ({
+  page,
+}) => {
+  // A browser cannot read the machine's AI memory — there is no GPU-memory API and
+  // `deviceMemory` is rounded, capped and Chromium-only — so the budget is the
+  // reader's own cap and the screen says so rather than guessing.
+  await page.goto("/settings/compute");
+  const suggestions = page.getByTestId("model-suggestions");
+  await expect(suggestions).toBeVisible();
+  // Best fit first: the largest model that still fits leads.
+  await expect(suggestions.getByRole("listitem").first()).toContainText(
+    "qwen3-coder:30b",
+  );
+
+  await page.getByTestId("show-all-models").click();
+  // A model that does not fit stays on the list — the reader's next question is
+  // whether a smaller quantization exists, and dropping it says it does not exist.
+  await expect(suggestions).toContainText("llama3.3:70b");
+  await expect(suggestions).toContainText("入りません");
+});
+
+test("picking a suggested model sets the served one", async ({ page }) => {
+  await page.goto("/settings/compute");
+  // Third in the ranking, so it is behind the "show the rest" link.
+  await page.getByTestId("show-all-models").click();
+  await page.getByTestId("model-llama3.2:3b").click();
+  await expect(page.getByTestId("mesh-model")).toHaveValue("llama3.2:3b");
+  // Per the fixtures, so it survives leaving the screen.
+  await page.getByTestId("settings-nav-agents").click();
+  await page.getByTestId("settings-nav-compute").click();
+  await expect(page.getByTestId("mesh-model")).toHaveValue("llama3.2:3b");
+});
+
+test("a runtime that needs a CLI says so, and links to its guide", async ({
+  page,
+}) => {
+  // Not-installed entries stay on the list: the reader's next question is how to
+  // get one, and hiding it turns "not installed" into "does not exist".
+  await page.goto("/settings/agents");
+  const missing = page.getByTestId("harness-gemini-cli");
+  await expect(missing).toContainText("CLI needed");
+  await expect(missing.getByText("CLI setup guide")).toBeVisible();
+  await expect(page.getByTestId("harness-claude-code")).toContainText("Ready");
+});
+
+test("the hosted screen does not offer a sign-in it cannot do", async ({
+  page,
+}) => {
+  // A button that reports success and does nothing is the failure this client has
+  // already been through once.
+  await page.goto("/settings/hosted");
+  await expect(page.getByTestId("hosted-signin-button")).toBeDisabled();
+  await expect(
+    page.getByText("まだホスティングのサインインがありません"),
+  ).toBeVisible();
+  // The demo creation flow is still reachable, and says that is what it is.
+  await expect(page.getByTestId("create-hosted")).toBeEnabled();
+});
+
+test("the update check reports the build it is actually running", async ({
+  page,
+}) => {
+  // A web client has no download to apply, but "this tab is running last week's
+  // bundle" is a real thing to be told — and it is answerable from the entry
+  // script's content hash.
+  await page.goto("/settings/updates");
+  await expect(page.getByTestId("update-status-row")).toContainText(
+    "最新版です",
+  );
+  await expect(page.getByTestId("app-version")).toBeVisible();
+
+  // A different build deployed under the same URL is reported as an update.
+  await page.route("**/index.html", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: `<!doctype html><script type="module" src="/assets/index-DIFFERENT.js"></script>`,
+    });
+  });
+  await page.getByTestId("check-for-updates").click();
+  await expect(page.getByTestId("update-now")).toBeVisible();
 });
