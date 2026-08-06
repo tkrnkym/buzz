@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AgentDefaultsSettings } from "@/features/agents/ui/AgentDefaultsSettings";
+import { harnessIcon } from "@/features/harness/harness-model";
 import {
   addHarness,
   removeCustomHarness,
@@ -114,79 +115,88 @@ export function AgentsPanel() {
       ) : (
         <>
           <div className="flex flex-col gap-2" data-testid="harness-settings">
-            {showcase.harnesses.map((harness) => (
-              <div
-                className="rounded-xl border border-border bg-card px-4 py-3.5"
-                data-testid={`harness-${harness.id}`}
-                key={harness.id}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">{harness.name}</span>
-                    {harness.custom && (
-                      <span className="rounded bg-secondary px-1.5 py-0.5 text-badge text-secondary-foreground">
-                        自分で追加
+            {showcase.harnesses.map((harness) => {
+              const Icon = harnessIcon(harness);
+              return (
+                <div
+                  className="rounded-xl border border-border bg-card px-4 py-3.5"
+                  data-testid={`harness-${harness.id}`}
+                  key={harness.id}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <Icon
+                        aria-hidden
+                        className="size-4 shrink-0 text-muted-foreground"
+                      />
+                      <span className="text-sm font-medium">
+                        {harness.name}
                       </span>
-                    )}
+                      {harness.custom && (
+                        <span className="rounded bg-secondary px-1.5 py-0.5 text-badge text-secondary-foreground">
+                          自分で追加
+                        </span>
+                      )}
+                      {!harness.available && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-badge text-muted-foreground">
+                          CLI needed
+                        </span>
+                      )}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {harness.available ? (
+                        <span className="rounded bg-status-added/15 px-2 py-0.5 text-badge font-medium text-status-added">
+                          Ready
+                        </span>
+                      ) : (
+                        <a
+                          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-badge font-medium hover:bg-accent"
+                          href={harness.installUrl}
+                          rel="noreferrer noopener"
+                          target="_blank"
+                        >
+                          Install
+                        </a>
+                      )}
+                      {update && harness.custom && (
+                        <button
+                          aria-label={`${harness.name} を削除`}
+                          className="flex size-7 items-center justify-center rounded-md border border-border text-destructive hover:bg-destructive/10"
+                          data-testid={`remove-harness-${harness.id}`}
+                          onClick={() => {
+                            update((current) =>
+                              removeCustomHarness(current, harness.id),
+                            );
+                            toast.success(`${harness.name} を削除しました`);
+                          }}
+                          type="button"
+                        >
+                          <Trash2 aria-hidden className="size-3" />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-2xs text-muted-foreground">
+                      {harness.available
+                        ? `${harness.command}${harness.version ? ` · ${harness.version}` : ""}`
+                        : `Buzz は ${harness.command} を通して ${harness.name} と話します。`}
+                    </span>
                     {!harness.available && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-badge text-muted-foreground">
-                        CLI needed
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {harness.available ? (
-                      <span className="rounded bg-status-added/15 px-2 py-0.5 text-badge font-medium text-status-added">
-                        Ready
-                      </span>
-                    ) : (
                       <a
-                        className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-badge font-medium hover:bg-accent"
+                        className="flex items-center gap-1 text-badge text-muted-foreground hover:text-foreground"
                         href={harness.installUrl}
                         rel="noreferrer noopener"
                         target="_blank"
                       >
-                        Install
+                        <ExternalLink aria-hidden className="size-2.5" />
+                        CLI setup guide
                       </a>
                     )}
-                    {update && harness.custom && (
-                      <button
-                        aria-label={`${harness.name} を削除`}
-                        className="flex size-7 items-center justify-center rounded-md border border-border text-destructive hover:bg-destructive/10"
-                        data-testid={`remove-harness-${harness.id}`}
-                        onClick={() => {
-                          update((current) =>
-                            removeCustomHarness(current, harness.id),
-                          );
-                          toast.success(`${harness.name} を削除しました`);
-                        }}
-                        type="button"
-                      >
-                        <Trash2 aria-hidden className="size-3" />
-                      </button>
-                    )}
-                  </span>
+                  </div>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-2xs text-muted-foreground">
-                    {harness.available
-                      ? `${harness.command}${harness.version ? ` · ${harness.version}` : ""}`
-                      : `Buzz は ${harness.command} を通して ${harness.name} と話します。`}
-                  </span>
-                  {!harness.available && (
-                    <a
-                      className="flex items-center gap-1 text-badge text-muted-foreground hover:text-foreground"
-                      href={harness.installUrl}
-                      rel="noreferrer noopener"
-                      target="_blank"
-                    >
-                      <ExternalLink aria-hidden className="size-2.5" />
-                      CLI setup guide
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button
