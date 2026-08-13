@@ -1806,13 +1806,16 @@ test("a message is attributed to its author's display name", async ({
 });
 
 test("an author with no profile still has a name to show", async ({ page }) => {
-  // The truncated pubkey is the last resort, not an error state: a community
-  // where nobody has published kind:0 must still be readable.
+  // A membership id is the last resort, not an error state: a community where
+  // nobody has published kind:0 must still be readable. This is the path §7
+  // cares about most — it is the one that used to put a key on screen, and it
+  // is reachable here precisely because this bundle resolves no profiles.
   const relay = mockRelay(page);
   await relay.install();
 
   await page.goto(`/c/${CHANNEL_UUID}`);
-  await expect(page.getByText("eeeeeeee…eeee").first()).toBeVisible();
+  await expect(page.getByText(/^mem_/).first()).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("eeeeeeee");
 });
 
 test("profiles are fetched once per identity, not once per row", async ({
@@ -2098,8 +2101,13 @@ test("a burst from one author renders as one block", async ({ page }) => {
   await expect(page.getByText("third")).toBeVisible();
 
   // Four messages from one author (the mock's baseline plus these three), and
-  // the author line appears once — the continuations show only a time.
-  const authorLines = page.getByText("eeeeeeee…eeee", { exact: true });
+  // the author line appears once — the continuations show only a time. Named by
+  // membership id rather than by key; see §7.
+  // Scoped to the timeline: the reader's own membership id is in the sidebar
+  // too, and an unscoped match counts that as a second author line.
+  const authorLines = page
+    .getByTestId("message-timeline")
+    .getByText(/^mem_[a-z0-9]+$/);
   await expect(authorLines).toHaveCount(1);
 });
 
@@ -3703,7 +3711,9 @@ test("the mock-backed settings panels say they are not connected", async ({
   await expect(page.getByText("アーカイブの状態はまだ")).toBeVisible();
 
   await page.getByTestId("settings-nav-hosted").click();
-  await expect(page.getByText("ホスト型コミュニティ")).toBeVisible();
+  await expect(
+    page.getByText("ホスト型コミュニティの一覧はまだリレーから"),
+  ).toBeVisible();
 });
 
 test("feedback publishes kind:42000 with its category on a tag", async ({
