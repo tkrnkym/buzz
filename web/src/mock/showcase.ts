@@ -17,6 +17,7 @@
  */
 
 import type { StepForm, TriggerForm } from "@/features/workflows/workflow-form";
+import type { Canvas } from "@/features/canvas/canvas-model";
 import { agentAvatarUrl } from "@/mock/agent-avatar";
 import {
   AGENT_RELEASE,
@@ -545,6 +546,8 @@ export interface Showcase {
   dataRegion: "apac" | "eu" | "us";
   /** The subdomain this workspace answers at. Renaming keeps the internal id. */
   workspaceSlug: string;
+  /** One shared document per channel, keyed by channel id. */
+  canvases: Record<string, Canvas>;
   /** Only the configurable rows appear; the rest are fixed by policy. */
   retentionOverrides: Record<string, number>;
   communities: ShowcaseCommunity[];
@@ -1576,6 +1579,32 @@ export const SHOWCASE: Showcase = {
   approvalPolicyVersion: 4,
   dataRegion: "apac",
   workspaceSlug: "acme",
+
+  // Seeded on the private incident room, which is also the one the make-public
+  // flow acts on — so the canvas is visible in the same place that demonstrates
+  // how much goes public with it.
+  canvases: {
+    "77777777-7777-4777-8777-777777777777": {
+      channelId: "77777777-7777-4777-8777-777777777777",
+      body: [
+        "# incident-0731 対応記録",
+        "",
+        "## 状況",
+        "07:31 にリレーが応答しなくなり、08:05 に復旧。",
+        "",
+        "## タイムライン",
+        "- 07:31 監視が接続数の急増を検知",
+        "- 07:48 接続上限に達していたことを確認",
+        "- 08:05 上限を引き上げて復旧",
+        "",
+        "## 恒久対応",
+        "接続上限の自動調整を #dev で検討中。",
+      ].join("\n"),
+      updatedAt: ago(60 * 25),
+      updatedByPubkey: MISAKI,
+      revision: 3,
+    },
+  },
   // One row moved off its default, so the screen has a case where "既定" is
   // worth showing beside the current value.
   retentionOverrides: { "execution-logs": 30 * 24 * 3_600 },

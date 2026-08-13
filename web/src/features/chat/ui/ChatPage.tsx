@@ -1,4 +1,4 @@
-import { Globe, Users } from "lucide-react";
+import { FileText, Globe, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,6 +25,7 @@ import {
   type ChannelPane,
 } from "@/features/channels/channel-roster-model";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
+import { CanvasPanel } from "@/features/canvas/ui/CanvasPanel";
 import { ChannelRosterPanel } from "@/features/channels/ui/ChannelRosterPanel";
 import { PublishChannelDialog } from "@/features/channels/ui/PublishChannelDialog";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
@@ -40,6 +41,10 @@ import {
   useThreadLayout,
 } from "@/features/settings/use-thread-layout";
 import { useShell } from "@/features/shell/shell-context";
+import {
+  useShowcase,
+  useShowcaseUpdate,
+} from "@/features/showcase/use-showcase";
 import { ChannelWelcome } from "@/features/shell/ui/ChannelWelcome";
 import { cn } from "@/shared/lib/cn";
 import { SidebarTrigger } from "@/shared/ui/sidebar";
@@ -89,6 +94,8 @@ export function ChatPage({
   const typing = useTyping(channelId);
   const emojiCatalog = useEmojiCatalog();
   const myPubkey = useMyPubkey();
+  const showcase = useShowcase();
+  const showcaseUpdate = useShowcaseUpdate();
   // Only the authors on screen: presence is read per-author, so asking about
   // everyone would grow the query with the community rather than the viewport.
   const visibleAuthors = useMemo(
@@ -275,6 +282,17 @@ export function ChatPage({
     if (next === null || next.kind === "roster") setReply(null);
   }, [channelId, pane]);
 
+  const onToggleCanvas = useCallback(() => {
+    if (!channelId) return;
+    const next = togglePane(pane?.channelId === channelId ? pane.pane : null, {
+      kind: "canvas",
+    });
+    setPane(next === null ? null : { channelId, pane: next });
+    // Same reason as the roster: a thread that lost the pane cannot keep the
+    // composer aimed at it.
+    if (next === null || next.kind === "canvas") setReply(null);
+  }, [channelId, pane]);
+
   const onCopyLink = useCallback(
     (row: TimelineRow) => {
       if (!channelId) return;
@@ -387,6 +405,23 @@ export function ChatPage({
             )}
             {channelId && !query && (
               <button
+                aria-label="キャンバス"
+                aria-pressed={openPane?.kind === "canvas"}
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  openPane?.kind === "canvas"
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground",
+                )}
+                data-testid="toggle-canvas"
+                onClick={onToggleCanvas}
+                type="button"
+              >
+                <FileText aria-hidden className="size-4" />
+              </button>
+            )}
+            {channelId && !query && (
+              <button
                 aria-label="メンバー"
                 aria-pressed={openPane?.kind === "roster"}
                 className={cn(
@@ -465,6 +500,25 @@ export function ChatPage({
           channelName={isDm ? null : activeLabel}
           onClose={onClosePane}
           statusOf={presence.statusOf}
+        />
+      )}
+
+      {!query && openPane?.kind === "canvas" && activeChannel && (
+        <CanvasPanel
+          canvas={showcase?.canvases[activeChannel.id] ?? null}
+          channelName={activeLabel ?? activeChannel.name}
+          nowSeconds={Math.floor(Date.now() / 1000)}
+          onClose={onClosePane}
+          {...(showcaseUpdate
+            ? {
+                onSave: (next) =>
+                  showcaseUpdate((current) => ({
+                    ...current,
+                    canvases: { ...current.canvases, [next.channelId]: next },
+                  })),
+              }
+            : {})}
+          selfPubkey={myPubkey}
         />
       )}
 

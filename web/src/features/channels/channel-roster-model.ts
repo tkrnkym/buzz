@@ -107,7 +107,8 @@ export function rosterCounts(roster: ChannelRoster): string {
  */
 export type ChannelPane =
   | { kind: "thread"; rootId: string }
-  | { kind: "roster" };
+  | { kind: "roster" }
+  | { kind: "canvas" };
 
 export function togglePane(
   current: ChannelPane | null,

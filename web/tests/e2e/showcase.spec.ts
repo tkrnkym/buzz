@@ -661,6 +661,76 @@ test("an existing reaction can be joined, then withdrawn", async ({ page }) => {
   await expect(chip).toHaveAttribute("aria-pressed", "false");
 });
 
+// --- Channel canvas --------------------------------------------------------
+
+test("the canvas holds what is true, beside the stream of what happened", async ({
+  page,
+}) => {
+  await page.goto("/c/77777777-7777-4777-8777-777777777777");
+  await page.getByTestId("toggle-canvas").click();
+
+  const panel = page.getByTestId("canvas-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("canvas-body")).toContainText("恒久対応");
+  // Last editor and revision, since a canvas belongs to the room rather than
+  // to whoever started it.
+  await expect(panel.getByTestId("canvas-meta")).toContainText("第3版");
+});
+
+test("an edit bumps the revision and survives leaving the room", async ({
+  page,
+}) => {
+  const room = "/c/77777777-7777-4777-8777-777777777777";
+  await page.goto(room);
+  await page.getByTestId("toggle-canvas").click();
+  await page.getByTestId("edit-canvas").click();
+  await page.getByTestId("canvas-editor").fill("# 差し替え\n\n新しい内容");
+  await page.getByTestId("save-canvas").click();
+
+  const panel = page.getByTestId("canvas-panel");
+  await expect(panel.getByTestId("canvas-body")).toContainText("新しい内容");
+  await expect(panel.getByTestId("canvas-meta")).toContainText("第4版");
+
+  // Navigated in-app, not by reloading: the showcase store is session-scoped
+  // and a reload re-seeds the fixtures by design, so `goto` would test the
+  // seeding rather than whether the edit survived leaving the room.
+  await page.getByTestId("channel-dev").click();
+  await expect(page.getByTestId("canvas-panel")).toHaveCount(0);
+  await page.getByTestId("channel-incident-0731").click();
+  // The pane is keyed by channel, so returning to the room reopens it where it
+  // was left — no second toggle, which would close it again.
+  await expect(page.getByTestId("canvas-body")).toContainText("新しい内容");
+});
+
+test("a room with no canvas says so rather than showing an empty document", async ({
+  page,
+}) => {
+  await page.goto("/c/22222222-2222-4222-8222-222222222222");
+  await page.getByTestId("toggle-canvas").click();
+  await expect(page.getByTestId("canvas-empty")).toContainText("まだ空です");
+  await expect(page.getByTestId("canvas-body")).toHaveCount(0);
+});
+
+test("the canvas and the roster take turns rather than crowding the timeline", async ({
+  page,
+}) => {
+  // Two 384px panels beside the timeline on a 1280px window leave it narrower
+  // than either, so opening one closes the other.
+  await page.goto("/c/77777777-7777-4777-8777-777777777777");
+  await page.getByTestId("toggle-canvas").click();
+  await expect(page.getByTestId("canvas-panel")).toBeVisible();
+
+  await page.getByTestId("toggle-roster").click();
+  await expect(page.getByTestId("roster-panel")).toBeVisible();
+  await expect(page.getByTestId("canvas-panel")).toHaveCount(0);
+
+  // And the toggle closes it rather than only ever opening.
+  await page.getByTestId("toggle-canvas").click();
+  await expect(page.getByTestId("canvas-panel")).toBeVisible();
+  await page.getByTestId("toggle-canvas").click();
+  await expect(page.getByTestId("canvas-panel")).toHaveCount(0);
+});
+
 // --- Making a private channel public ---------------------------------------
 
 const CH_INCIDENT = "77777777-7777-4777-8777-777777777777";
