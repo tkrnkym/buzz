@@ -354,6 +354,52 @@ test("the grid's add card creates an agent too", async ({ page }) => {
   await expect(page.getByTestId("agent-list")).toContainText("グリッドから");
 });
 
+test("an evaluation is shown with its sample size, not as a bare rate", async ({
+  page,
+}) => {
+  // The two ways this display lies are a percentage with no denominator, and
+  // one merged figure made of numbers that different parties measured. Both are
+  // asserted against here.
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-レビュー係").click();
+
+  const card = page.getByTestId("evaluation-card");
+  await expect(card).toBeVisible();
+
+  // The publisher's 231/300 and this workspace's 9/11 both appear, separately.
+  await expect(card).toContainText("231/300");
+  await expect(card).toContainText("9/11");
+  await expect(card).toContainText("提供元による評価");
+  await expect(card).toContainText("このWorkspaceでの評価");
+
+  // Only the under-thirty result is qualified, and it says so in words.
+  await expect(
+    card.getByTestId("evaluation-eval-reviewer-workspace-qualifier"),
+  ).toHaveText("暫定");
+  await expect(
+    card.getByTestId("evaluation-eval-reviewer-publisher-qualifier"),
+  ).toHaveCount(0);
+
+  // Same dataset and agent version, different model — two rows, not one sum.
+  await expect(card).toContainText("claude-opus-5");
+  await expect(card).toContainText("claude-sonnet-5");
+  await expect(card).toContainText("34/50");
+  await expect(card).toContainText("27/50");
+  // 34+27=61 is the figure a merge would produce, and nobody measured it.
+  await expect(card).not.toContainText("61/100");
+});
+
+test("an agent nobody has evaluated says so rather than showing nothing", async ({
+  page,
+}) => {
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-トリアージ").click();
+  await expect(page.getByTestId("evaluation-unevaluated")).toContainText(
+    "未評価",
+  );
+  await expect(page.getByTestId("evaluation-card")).toHaveCount(0);
+});
+
 // --- Projects --------------------------------------------------------------
 
 test("a project is created and opens on its own page", async ({ page }) => {

@@ -19,6 +19,7 @@ import {
   eventsUpTo,
 } from "@/features/agents/agent-session-model";
 import { AgentSessionTranscript } from "@/features/agents/ui/AgentSessionTranscript";
+import { EvaluationCard } from "@/features/agents/ui/EvaluationCard";
 import { MemorySection } from "@/features/agents/ui/MemorySection";
 import { useShowcase } from "@/features/showcase/use-showcase";
 import { resolveUserLabel } from "@/features/profile/profile-model";
@@ -67,6 +68,7 @@ export function AgentDetailPanel({
 }) {
   const showcase = useShowcase();
   const events = showcase?.agentSessions[agent.id] ?? [];
+  const evaluations = showcase?.agentEvaluations[agent.id] ?? [];
   const [tab, setTab] = useState<PanelTab>("overview");
   // How much of the run is revealed, stored with the agent it belongs to and
   // read back only for a match — the same discipline the chat pane uses for its
@@ -156,6 +158,13 @@ export function AgentDetailPanel({
               />
               <Field label="今日のターン数" value={`${agent.turnsToday}`} />
             </dl>
+
+            <section className="mt-4">
+              <h3 className="mb-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+                評価
+              </h3>
+              <EvaluationCard results={evaluations} />
+            </section>
           </TabsContent>
 
           <TabsContent value="session">

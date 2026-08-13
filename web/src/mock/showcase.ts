@@ -59,6 +59,28 @@ export interface ShowcaseAgent {
   turnsToday: number;
 }
 
+/**
+ * Who ran an evaluation. Never merged — see `evaluation-model.ts`.
+ *
+ * `publisher` is the agent's vendor reporting on their own work, `nuxx` is this
+ * product's own harness, `workspace` is what this community measured itself.
+ * The three answer the same question with different incentives, which is
+ * exactly why one number made of all three would be worthless.
+ */
+export type EvaluationSource = "publisher" | "nuxx" | "workspace";
+
+export interface EvaluationResult {
+  id: string;
+  source: EvaluationSource;
+  /** The three axes a result is pinned to; a change in any is a new experiment. */
+  dataset: string;
+  model: string;
+  agentVersion: string;
+  succeeded: number;
+  total: number;
+  ranAt: number;
+}
+
 export interface ShowcaseAgentTeam {
   id: string;
   name: string;
@@ -464,6 +486,8 @@ export interface Showcase {
   agentMemories: Record<string, MemoryEntry[]>;
   /** Keyed by agent id — what each one has been doing, oldest first. */
   agentSessions: Record<string, AgentSessionEvent[]>;
+  /** Keyed by agent id. Absent or empty means nobody has evaluated it. */
+  agentEvaluations: Record<string, EvaluationResult[]>;
   communities: ShowcaseCommunity[];
 }
 
@@ -1314,6 +1338,70 @@ export const SHOWCASE: Showcase = {
           output: "sh: ./bin/triage: No such file or directory",
           exitCode: 127,
         },
+      },
+    ],
+  },
+
+  // Deliberately uneven: the reviewer has a well-attested publisher number and
+  // a thin one of its own, which is the case the "暫定" label exists for; the
+  // release agent has only ever been measured here; and the triage agent has
+  // never been evaluated at all, which is a state the card has to show rather
+  // than an empty space.
+  agentEvaluations: {
+    "agent-reviewer": [
+      {
+        id: "eval-reviewer-publisher",
+        source: "publisher",
+        dataset: "swe-bench-verified",
+        model: "claude-opus-5",
+        agentVersion: "1.4.0",
+        succeeded: 231,
+        total: 300,
+        ranAt: ago(60 * 24 * 12),
+      },
+      {
+        id: "eval-reviewer-nuxx",
+        source: "nuxx",
+        dataset: "swe-bench-verified",
+        model: "claude-opus-5",
+        agentVersion: "1.4.0",
+        succeeded: 34,
+        total: 50,
+        ranAt: ago(60 * 24 * 3),
+      },
+      {
+        // Same dataset and agent, different model — a separate row, never
+        // folded into the one above.
+        id: "eval-reviewer-nuxx-sonnet",
+        source: "nuxx",
+        dataset: "swe-bench-verified",
+        model: "claude-sonnet-5",
+        agentVersion: "1.4.0",
+        succeeded: 27,
+        total: 50,
+        ranAt: ago(60 * 24 * 3),
+      },
+      {
+        id: "eval-reviewer-workspace",
+        source: "workspace",
+        dataset: "社内PR 100本",
+        model: "claude-opus-5",
+        agentVersion: "1.4.0",
+        succeeded: 9,
+        total: 11,
+        ranAt: ago(60 * 20),
+      },
+    ],
+    "agent-release": [
+      {
+        id: "eval-release-workspace",
+        source: "workspace",
+        dataset: "過去のリリース手順",
+        model: "claude-sonnet-5",
+        agentVersion: "0.9.1",
+        succeeded: 38,
+        total: 41,
+        ranAt: ago(60 * 24 * 5),
       },
     ],
   },
