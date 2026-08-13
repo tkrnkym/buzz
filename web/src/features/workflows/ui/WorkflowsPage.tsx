@@ -6,8 +6,7 @@ import { toast } from "sonner";
 import { formatRelativeTime } from "@/features/agents/agent-model";
 import {
   latestRun,
-  RUN_STATE_CLASSES,
-  RUN_STATE_LABELS,
+  RUN_STATE_PROGRESS,
   sortWorkflows,
   totalPendingApprovals,
 } from "@/features/workflows/workflow-model";
@@ -24,6 +23,7 @@ import {
   useShowcaseUpdate,
 } from "@/features/showcase/use-showcase";
 import { cn } from "@/shared/lib/cn";
+import { ProgressBadge } from "@/shared/ui/ProgressBadge";
 
 /**
  * The workflow list.
@@ -103,15 +103,12 @@ export function WorkflowsPage() {
                       {workflow.name}
                     </span>
                     {workflow.pendingApprovals > 0 && (
-                      <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-badge text-primary">
-                        承認待ち {workflow.pendingApprovals}
-                      </span>
+                      <ProgressBadge
+                        count={workflow.pendingApprovals}
+                        status="awaiting-approval"
+                      />
                     )}
-                    {!workflow.enabled && (
-                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-badge text-muted-foreground">
-                        停止中
-                      </span>
-                    )}
+                    {!workflow.enabled && <ProgressBadge status="stopped" />}
                   </p>
                   <p className="mt-0.5 truncate text-2xs text-muted-foreground">
                     {workflow.description}
@@ -135,14 +132,7 @@ export function WorkflowsPage() {
                 </div>
 
                 {run && (
-                  <span
-                    className={cn(
-                      "shrink-0 rounded px-1.5 py-0.5 text-badge font-medium",
-                      RUN_STATE_CLASSES[run.state],
-                    )}
-                  >
-                    {RUN_STATE_LABELS[run.state]}
-                  </span>
+                  <ProgressBadge status={RUN_STATE_PROGRESS[run.state]} />
                 )}
               </Link>
             </li>

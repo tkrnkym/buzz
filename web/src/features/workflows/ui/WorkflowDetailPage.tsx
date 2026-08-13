@@ -7,8 +7,7 @@ import { formatRelativeTime } from "@/features/agents/agent-model";
 import {
   formatDuration,
   latestRun,
-  RUN_STATE_CLASSES,
-  RUN_STATE_LABELS,
+  RUN_STATE_PROGRESS,
 } from "@/features/workflows/workflow-model";
 import { WorkflowRunTrace } from "@/features/workflows/ui/WorkflowRunTrace";
 import {
@@ -25,8 +24,8 @@ import {
   useShowcase,
   useShowcaseUpdate,
 } from "@/features/showcase/use-showcase";
-import { cn } from "@/shared/lib/cn";
 import { Dialog } from "@/shared/ui/dialog";
+import { ProgressBadge } from "@/shared/ui/ProgressBadge";
 
 /**
  * One workflow: what starts it, what it does, and what happened last time.
@@ -171,14 +170,10 @@ export function WorkflowDetailPage({ workflowId }: { workflowId: string }) {
         <section className="mt-6">
           <h2 className="flex items-center gap-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
             最新の実行
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 text-badge font-medium normal-case tracking-normal",
-                RUN_STATE_CLASSES[run.state],
-              )}
-            >
-              {RUN_STATE_LABELS[run.state]}
-            </span>
+            <ProgressBadge
+              className="normal-case tracking-normal"
+              status={RUN_STATE_PROGRESS[run.state]}
+            />
             <span className="font-normal normal-case tracking-normal text-muted-foreground">
               {formatRelativeTime(run.startedAt, nowSeconds)} ·{" "}
               {formatDuration(run.durationMs || null)}
@@ -212,14 +207,7 @@ export function WorkflowDetailPage({ workflowId }: { workflowId: string }) {
                 <span className="shrink-0 text-badge text-muted-foreground">
                   {formatDuration(entry.durationMs || null)}
                 </span>
-                <span
-                  className={cn(
-                    "shrink-0 rounded px-1.5 py-0.5 text-badge font-medium",
-                    RUN_STATE_CLASSES[entry.state],
-                  )}
-                >
-                  {RUN_STATE_LABELS[entry.state]}
-                </span>
+                <ProgressBadge status={RUN_STATE_PROGRESS[entry.state]} />
               </li>
             ))}
           </ul>

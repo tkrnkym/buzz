@@ -11,25 +11,32 @@ import type {
   WorkflowRun,
   WorkflowRunState,
 } from "@/mock/showcase";
-
-export const RUN_STATE_LABELS: Record<WorkflowRunState, string> = {
-  succeeded: "成功",
-  failed: "失敗",
-  running: "実行中",
-  waiting: "待機",
-};
+import {
+  PROGRESS_STATUS,
+  type ProgressStatus,
+} from "@/shared/lib/progress-status";
 
 /**
- * Tailwind classes for a run's badge.
+ * A run state, in the app-wide progress vocabulary.
  *
- * Waiting is tinted rather than grey: a run held for an approval is not idle,
- * it is a task assigned to a human, and greying it out is how it waits a week.
+ * The mapping is here rather than in `shared/` so the shared vocabulary does
+ * not have to know what a workflow is. `waiting` is an approval specifically —
+ * a held run is a task assigned to a named human, not an idle one — which is
+ * why it lands on the clock rather than the person.
  */
-export const RUN_STATE_CLASSES: Record<WorkflowRunState, string> = {
-  succeeded: "bg-secondary text-secondary-foreground",
-  failed: "bg-destructive/10 text-destructive",
-  running: "bg-primary/10 text-primary",
-  waiting: "bg-primary/10 text-primary",
+export const RUN_STATE_PROGRESS: Record<WorkflowRunState, ProgressStatus> = {
+  succeeded: "done",
+  failed: "failed",
+  running: "running",
+  waiting: "awaiting-approval",
+};
+
+/** Labels, taken from the shared table so the two cannot drift apart. */
+export const RUN_STATE_LABELS: Record<WorkflowRunState, string> = {
+  succeeded: PROGRESS_STATUS[RUN_STATE_PROGRESS.succeeded].label,
+  failed: PROGRESS_STATUS[RUN_STATE_PROGRESS.failed].label,
+  running: PROGRESS_STATUS[RUN_STATE_PROGRESS.running].label,
+  waiting: PROGRESS_STATUS[RUN_STATE_PROGRESS.waiting].label,
 };
 
 /** The run a reader means when they say "the last run". */

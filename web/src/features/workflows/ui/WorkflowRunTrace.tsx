@@ -1,25 +1,10 @@
-import { Check, CircleDashed, Loader2, X } from "lucide-react";
-
 import {
   formatDuration,
-  RUN_STATE_LABELS,
+  RUN_STATE_PROGRESS,
 } from "@/features/workflows/workflow-model";
-import type { WorkflowRun, WorkflowRunState } from "@/mock/showcase";
+import type { WorkflowRun } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
-
-const STEP_ICONS: Record<WorkflowRunState, typeof Check> = {
-  succeeded: Check,
-  failed: X,
-  running: Loader2,
-  waiting: CircleDashed,
-};
-
-const STEP_ICON_CLASSES: Record<WorkflowRunState, string> = {
-  succeeded: "bg-secondary text-secondary-foreground",
-  failed: "bg-destructive text-destructive-foreground",
-  running: "bg-primary text-primary-foreground",
-  waiting: "bg-muted text-muted-foreground",
-};
+import { PROGRESS_STATUS } from "@/shared/lib/progress-status";
 
 /**
  * A run, step by step.
@@ -27,12 +12,18 @@ const STEP_ICON_CLASSES: Record<WorkflowRunState, string> = {
  * The rail down the left is what makes it read as a sequence rather than a
  * list: a workflow's steps are ordered and a reader is looking for where it
  * stopped, which is the first icon that is not a tick.
+ *
+ * The discs take their icon and colour from the shared progress table rather
+ * than a local one. They had a local one, and it had drifted into saying the
+ * opposite in two places — a finished step was grey while a held step was
+ * greyer, so the rail's colours ranked nothing.
  */
 export function WorkflowRunTrace({ run }: { run: WorkflowRun }) {
   return (
     <ol className="flex flex-col" data-testid="workflow-run-trace">
       {run.steps.map((step, index) => {
-        const Icon = STEP_ICONS[step.state];
+        const status = PROGRESS_STATUS[RUN_STATE_PROGRESS[step.state]];
+        const Icon = status.Icon;
         const isLast = index === run.steps.length - 1;
         return (
           <li className="flex gap-3" key={step.id}>
@@ -40,10 +31,13 @@ export function WorkflowRunTrace({ run }: { run: WorkflowRun }) {
               <span
                 className={cn(
                   "flex size-6 shrink-0 items-center justify-center rounded-full",
-                  STEP_ICON_CLASSES[step.state],
+                  status.className,
                 )}
               >
-                <Icon aria-hidden className="size-3" />
+                <Icon
+                  aria-hidden
+                  className={cn("size-3", status.spins && "animate-spin")}
+                />
               </span>
               {!isLast && <span className="w-px flex-1 bg-border" />}
             </div>
@@ -55,8 +49,7 @@ export function WorkflowRunTrace({ run }: { run: WorkflowRun }) {
                   {step.action}
                 </span>
                 <span className="text-badge text-muted-foreground">
-                  {RUN_STATE_LABELS[step.state]} ·{" "}
-                  {formatDuration(step.durationMs)}
+                  {status.label} · {formatDuration(step.durationMs)}
                 </span>
               </p>
               {step.condition && (
