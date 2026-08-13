@@ -8,12 +8,12 @@ import {
   SETTINGS_PANELS,
 } from "@/features/settings/settings-nav";
 
-test("the nav is three groups and seventeen screens", () => {
+test("the nav is three groups and eighteen screens", () => {
   assert.deepEqual(
     SETTINGS_GROUPS.map((group) => group.label),
     ["Personal", "Communities", "App"],
   );
-  assert.equal(SETTINGS_PANELS.length, 17);
+  assert.equal(SETTINGS_PANELS.length, 18);
 });
 
 test("every panel has an id, a label, an icon, and a description", () => {

@@ -1,5 +1,5 @@
 /**
- * The settings surface: seventeen screens in three groups.
+ * The settings surface: eighteen screens in three groups.
  *
  * Settings is its own full-window destination rather than a page inside the app
  * shell. It was a page, and that was wrong in a way that is easy to miss: with the
@@ -23,6 +23,7 @@ import {
   Bell,
   Bot,
   Cpu,
+  Database,
   Download,
   FlaskConical,
   Keyboard,
@@ -52,6 +53,7 @@ export type SettingsPanelId =
   | "invites"
   | "security"
   | "secrets"
+  | "data"
   | "agents"
   | "compute"
   | "experiments"
@@ -65,7 +67,7 @@ export interface SettingsPanel {
   /**
    * The screen's heading, when it differs from the nav row.
    *
-   * "Compute" is enough in a list of seventeen; on the screen itself the heading has
+   * "Compute" is enough in a list of eighteen; on the screen itself the heading has
    * a whole line to be specific with, and "Share compute" says what the screen does
    * rather than what subject it belongs to.
    */
@@ -170,6 +172,14 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         Icon: KeyRound,
         description:
           "エージェント・ワークフロー・プラグインが使う秘密情報を預かります。値そのものは、登録後どの画面にも出しません。",
+      },
+      {
+        id: "data",
+        label: "Data",
+        title: "Data & Retention",
+        Icon: Database,
+        description:
+          "データがどこに置かれ、どれだけ残るか。消したあとバックアップから消えるまでの時間も含めて書いています。",
       },
     ],
   },

@@ -541,6 +541,10 @@ export interface Showcase {
   approvalDeadlines: Record<string, number>;
   /** Bumped on every policy edit; a run pins the value it started under. */
   approvalPolicyVersion: number;
+  /** Chosen at workspace creation; a legal question, so never inferred. */
+  dataRegion: "apac" | "eu" | "us";
+  /** Only the configurable rows appear; the rest are fixed by policy. */
+  retentionOverrides: Record<string, number>;
   communities: ShowcaseCommunity[];
 }
 
@@ -1568,6 +1572,10 @@ export const SHOWCASE: Showcase = {
     destructive: 3_600,
   },
   approvalPolicyVersion: 4,
+  dataRegion: "apac",
+  // One row moved off its default, so the screen has a case where "既定" is
+  // worth showing beside the current value.
+  retentionOverrides: { "execution-logs": 30 * 24 * 3_600 },
 
   communities: [
     {

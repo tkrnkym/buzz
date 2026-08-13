@@ -1366,6 +1366,66 @@ test("personal connections are kept apart from workspace secrets", async ({
   );
 });
 
+test("content with no expiry offers no control to change it", async ({
+  page,
+}) => {
+  // A greyed-out dropdown invites someone to go looking for the permission to
+  // use it, and there is none to find — so those rows have no control at all.
+  await openSettings(page, "data");
+  const table = page.getByTestId("retention-table");
+  await expect(table.getByTestId("retention-fixed-content")).toContainText(
+    "Workspace 存続中",
+  );
+  await expect(table.getByTestId("retention-picker-content")).toHaveCount(0);
+  // The clocked rows do have one.
+  await expect(
+    table.getByTestId("retention-picker-execution-logs"),
+  ).toBeVisible();
+});
+
+test("the backup window is stated, and is longer than the trash", async ({
+  page,
+}) => {
+  // Someone told "deleted" who later finds it in a restore has been misled.
+  await openSettings(page, "data");
+  await expect(page.getByTestId("retention-fixed-backup")).toContainText(
+    "35日",
+  );
+  await expect(page.getByTestId("retention-trash")).toContainText("30日");
+});
+
+test("a changed retention says what the default was", async ({ page }) => {
+  await openSettings(page, "data");
+  const row = page.getByTestId("retention-execution-logs");
+  // The fixture moves this one off its default, so the comparison is shown.
+  await expect(row).toContainText("既定 90日");
+
+  await page.getByTestId("retention-picker-execution-logs").click();
+  await page
+    .getByTestId(`retention-picker-execution-logs-${180 * 24 * 3600}`)
+    .click();
+  await leaveAndReturn(page, "data");
+  await expect(row).toContainText("180日");
+});
+
+test("Community Edition promises no recovery time rather than inventing one", async ({
+  page,
+}) => {
+  await openSettings(page, "data");
+  await expect(page.getByTestId("recovery-community")).toContainText(
+    "構成によります",
+  );
+  await expect(page.getByTestId("recovery-saas")).toContainText("15分以内");
+});
+
+test("the region is shown as settled, not as a dropdown", async ({ page }) => {
+  // Moving it is a migration, not a setting; a dropdown would imply otherwise.
+  await openSettings(page, "data");
+  const row = page.getByTestId("data-region-row");
+  await expect(row).toContainText("Asia Pacific");
+  await expect(row.locator("button")).toHaveCount(0);
+});
+
 /** Asserts `first` appears before `second` in a list of rendered rows. */
 function assertOrder(rows: string[], first: string, second: string) {
   const firstAt = rows.findIndex((row) => row.includes(first));

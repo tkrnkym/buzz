@@ -3,6 +3,7 @@ import { AgentsPanel } from "@/features/settings/ui/panels/AgentsPanel";
 import { AppearancePanel } from "@/features/settings/ui/panels/AppearancePanel";
 import { ArchivePanel } from "@/features/settings/ui/panels/ArchivePanel";
 import { ComputePanel } from "@/features/settings/ui/panels/ComputePanel";
+import { DataPanel } from "@/features/settings/ui/panels/DataPanel";
 import { EmojiPanel } from "@/features/settings/ui/panels/EmojiPanel";
 import { ExperimentsPanel } from "@/features/settings/ui/panels/ExperimentsPanel";
 import { HostedPanel } from "@/features/settings/ui/panels/HostedPanel";
@@ -38,6 +39,7 @@ const PANELS: Record<SettingsPanelId, () => React.ReactElement> = {
   invites: InvitesPanel,
   security: SecurityPanel,
   secrets: SecretsPanel,
+  data: DataPanel,
   agents: AgentsPanel,
   compute: ComputePanel,
   experiments: ExperimentsPanel,
