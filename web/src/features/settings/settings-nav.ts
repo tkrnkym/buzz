@@ -1,5 +1,5 @@
 /**
- * The settings surface: eighteen screens in three groups.
+ * The settings surface: nineteen screens in three groups.
  *
  * Settings is its own full-window destination rather than a page inside the app
  * shell. It was a page, and that was wrong in a way that is easy to miss: with the
@@ -21,6 +21,7 @@
 import {
   Archive,
   Bell,
+  Building2,
   Bot,
   Cpu,
   Database,
@@ -51,6 +52,7 @@ export type SettingsPanelId =
   | "hosted"
   | "templates"
   | "invites"
+  | "workspace"
   | "security"
   | "secrets"
   | "data"
@@ -67,7 +69,7 @@ export interface SettingsPanel {
   /**
    * The screen's heading, when it differs from the nav row.
    *
-   * "Compute" is enough in a list of eighteen; on the screen itself the heading has
+   * "Compute" is enough in a list of nineteen; on the screen itself the heading has
    * a whole line to be specific with, and "Share compute" says what the screen does
    * rather than what subject it belongs to.
    */
@@ -157,6 +159,13 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         label: "Invites",
         Icon: Ticket,
         description: "メンバーと、コミュニティへの入り方を管理します。",
+      },
+      {
+        id: "workspace",
+        label: "Workspace",
+        Icon: Building2,
+        description:
+          "この Workspace のアドレスと、サインインが切れるまでの時間。",
       },
       {
         id: "security",

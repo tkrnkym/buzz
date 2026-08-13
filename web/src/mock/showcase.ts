@@ -543,6 +543,8 @@ export interface Showcase {
   approvalPolicyVersion: number;
   /** Chosen at workspace creation; a legal question, so never inferred. */
   dataRegion: "apac" | "eu" | "us";
+  /** The subdomain this workspace answers at. Renaming keeps the internal id. */
+  workspaceSlug: string;
   /** Only the configurable rows appear; the rest are fixed by policy. */
   retentionOverrides: Record<string, number>;
   communities: ShowcaseCommunity[];
@@ -1573,6 +1575,7 @@ export const SHOWCASE: Showcase = {
   },
   approvalPolicyVersion: 4,
   dataRegion: "apac",
+  workspaceSlug: "acme",
   // One row moved off its default, so the screen has a case where "既定" is
   // worth showing beside the current value.
   retentionOverrides: { "execution-logs": 30 * 24 * 3_600 },

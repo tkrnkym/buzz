@@ -1366,6 +1366,64 @@ test("personal connections are kept apart from workspace secrets", async ({
   );
 });
 
+test("renaming the workspace says what happens to the old address", async ({
+  page,
+}) => {
+  // "Will the link I sent last week still work" is the question a rename
+  // actually raises, so it is answered before it is asked.
+  await openSettings(page, "workspace");
+  await expect(page.getByTestId("workspace-host")).toHaveText("acme.nuxx.ai");
+  // Both halves of the promise: the old address keeps working, and the freed
+  // name is not handed to a different organisation in the meantime.
+  await expect(page.getByText(/90\s*日間こちらへつながります/)).toBeVisible();
+  await expect(
+    page.getByText(/他の Workspace\s*に割り当てられることはありません/),
+  ).toBeVisible();
+
+  await page.getByTestId("edit-workspace-slug").click();
+  await page.getByTestId("workspace-slug-input").fill("acme-jp");
+  await page.getByTestId("save-workspace-slug").click();
+  await expect(page.getByTestId("workspace-host")).toHaveText(
+    "acme-jp.nuxx.ai",
+  );
+});
+
+test("an address that could not be a subdomain is refused with a reason", async ({
+  page,
+}) => {
+  await openSettings(page, "workspace");
+  await page.getByTestId("edit-workspace-slug").click();
+
+  await page.getByTestId("workspace-slug-input").fill("My Team");
+  await expect(page.getByTestId("workspace-slug-problem")).toContainText(
+    "英小文字",
+  );
+  await expect(page.getByTestId("save-workspace-slug")).toBeDisabled();
+
+  // A hostname the platform already answers at cannot be taken either.
+  await page.getByTestId("workspace-slug-input").fill("app");
+  await expect(page.getByTestId("workspace-slug-problem")).toContainText(
+    "システム",
+  );
+  await expect(page.getByTestId("save-workspace-slug")).toBeDisabled();
+
+  await page.getByTestId("workspace-slug-input").fill("acme-jp");
+  await expect(page.getByTestId("workspace-slug-problem")).toHaveCount(0);
+  await expect(page.getByTestId("save-workspace-slug")).toBeEnabled();
+});
+
+test("the session lifetimes are shown, and none of them is settable", async ({
+  page,
+}) => {
+  // A workspace that could extend its own absolute ceiling could opt out of it.
+  await openSettings(page, "workspace");
+  const card = page.getByTestId("session-lifetimes");
+  await expect(card.getByTestId("session-access")).toContainText("15分");
+  await expect(card.getByTestId("session-refresh")).toContainText("12時間");
+  await expect(card.getByTestId("session-absolute")).toContainText("7日");
+  await expect(card.locator("button")).toHaveCount(0);
+});
+
 test("content with no expiry offers no control to change it", async ({
   page,
 }) => {

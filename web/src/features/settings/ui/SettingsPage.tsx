@@ -17,6 +17,7 @@ import { ShortcutsPanel } from "@/features/settings/ui/panels/ShortcutsPanel";
 import { TemplatesPanel } from "@/features/settings/ui/panels/TemplatesPanel";
 import { UpdatesPanel } from "@/features/settings/ui/panels/UpdatesPanel";
 import { VoicePanel } from "@/features/settings/ui/panels/VoicePanel";
+import { WorkspacePanel } from "@/features/settings/ui/panels/WorkspacePanel";
 import { SettingsShell } from "@/features/settings/ui/SettingsShell";
 import type { SettingsPanelId } from "@/features/settings/settings-nav";
 
@@ -37,6 +38,7 @@ const PANELS: Record<SettingsPanelId, () => React.ReactElement> = {
   hosted: HostedPanel,
   templates: TemplatesPanel,
   invites: InvitesPanel,
+  workspace: WorkspacePanel,
   security: SecurityPanel,
   secrets: SecretsPanel,
   data: DataPanel,
