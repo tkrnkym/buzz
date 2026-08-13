@@ -1,4 +1,4 @@
-import { Users } from "lucide-react";
+import { Globe, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -26,6 +26,7 @@ import {
 } from "@/features/channels/channel-roster-model";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
 import { ChannelRosterPanel } from "@/features/channels/ui/ChannelRosterPanel";
+import { PublishChannelDialog } from "@/features/channels/ui/PublishChannelDialog";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
 import { useMuteList } from "@/features/moderation/use-moderation";
 import { useProfiles } from "@/features/profile/profile-store";
@@ -130,6 +131,7 @@ export function ChatPage({
   } | null>(null);
   const openPane = pane?.channelId === channelId ? pane.pane : null;
   const openThreadRootId = openPane?.kind === "thread" ? openPane.rootId : null;
+  const [publishing, setPublishing] = useState(false);
   // In `full`, the thread replaces the timeline rather than sitting beside it.
   const timelineVisible =
     openThreadRootId === null || showsTimelineBesideThread(threadLayout);
@@ -370,8 +372,19 @@ export function ChatPage({
               error={readState.error}
             />
             <RelayStatus />
-            {/* Only where there is a room to have members. A search has no
-                roster, and neither does the welcome screen. */}
+            {/* Only on a private room, and only from the room itself — the scan
+                needs the messages, which is what the sidebar does not have. */}
+            {activeChannel?.isPrivate && !query && (
+              <button
+                aria-label={`${activeChannel.name} を公開する`}
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                data-testid="open-publish-channel"
+                onClick={() => setPublishing(true)}
+                type="button"
+              >
+                <Globe aria-hidden className="size-4" />
+              </button>
+            )}
             {channelId && !query && (
               <button
                 aria-label="メンバー"
@@ -452,6 +465,24 @@ export function ChatPage({
           channelName={isDm ? null : activeLabel}
           onClose={onClosePane}
           statusOf={presence.statusOf}
+        />
+      )}
+
+      {publishing && activeChannel && (
+        <PublishChannelDialog
+          channelId={activeChannel.id}
+          channelName={activeLabel ?? activeChannel.name}
+          messageCount={rows.length}
+          onClose={() => setPublishing(false)}
+          onPublished={() => setPublishing(false)}
+          // The loaded timeline, which is what this client can actually read.
+          // A scan that claimed to cover history it never fetched would be the
+          // more dangerous kind of wrong.
+          scanTargets={rows.map((row) => ({
+            where: row.message.id,
+            text: row.message.content,
+          }))}
+          selfPubkey={myPubkey}
         />
       )}
     </div>

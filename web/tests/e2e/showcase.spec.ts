@@ -661,6 +661,61 @@ test("an existing reaction can be joined, then withdrawn", async ({ page }) => {
   await expect(chip).toHaveAttribute("aria-pressed", "false");
 });
 
+// --- Making a private channel public ---------------------------------------
+
+const CH_INCIDENT = "77777777-7777-4777-8777-777777777777";
+
+test("a credential in the history stops the channel being published", async ({
+  page,
+}) => {
+  // The seeded room holds an API key. There is no second approver and no
+  // waiting period behind this dialog, so the scan is the only thing standing
+  // between a private history and a public one — and a blocking finding has to
+  // be a refusal rather than a warning someone can click past.
+  await page.goto(`/c/${CH_INCIDENT}`);
+  await page.getByTestId("open-publish-channel").click();
+
+  const dialog = page.getByTestId("publish-channel-dialog");
+  await expect(dialog).toBeVisible();
+
+  // The scope comes first: the whole history goes, which is the part people
+  // underestimate.
+  await expect(dialog.getByTestId("publish-preview")).toContainText(
+    "過去の投稿",
+  );
+  await page.getByTestId("publish-to-findings").click();
+
+  await expect(dialog.getByTestId("publish-findings-summary")).toContainText(
+    "公開できません",
+  );
+  await expect(dialog).toContainText("Anthropic API キー");
+  // Redacted — the finding must not be a second copy of the leak.
+  await expect(dialog).not.toContainText("AAAABBBBCCCC");
+
+  // And there is no way on. Not a confirm-anyway, not an acknowledgement.
+  await expect(page.getByTestId("publish-to-confirm")).toBeDisabled();
+  await expect(page.getByTestId("publish-acknowledge")).toHaveCount(0);
+  await expect(page.getByTestId("publish-confirm")).toHaveCount(0);
+});
+
+test("the scan says it did not send the content anywhere", async ({ page }) => {
+  // "検査のために内容を外部AIへ送信しない" is a promise the reader cannot verify
+  // by looking, so the screen states it.
+  await page.goto(`/c/${CH_INCIDENT}`);
+  await page.getByTestId("open-publish-channel").click();
+  await page.getByTestId("publish-to-findings").click();
+  await expect(page.getByTestId("publish-findings")).toContainText(
+    "外部に送信していません",
+  );
+});
+
+test("a public channel is not offered a way to be published again", async ({
+  page,
+}) => {
+  await page.goto(`/c/${CH_DEV}`);
+  await expect(page.getByTestId("open-publish-channel")).toHaveCount(0);
+});
+
 // --- Channel roster --------------------------------------------------------
 
 test("a channel says who is in it, with agents kept apart from people", async ({

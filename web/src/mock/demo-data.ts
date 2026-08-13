@@ -59,6 +59,8 @@ export const CH_DEV = "22222222-2222-4222-8222-222222222222";
 export const CH_DESIGN = "33333333-3333-4333-8333-333333333333";
 export const CH_RANDOM = "44444444-4444-4444-8444-444444444444";
 export const CH_ANNOUNCE = "66666666-6666-4666-8666-666666666666";
+/** A private room, which is what the make-public flow acts on. */
+export const CH_INCIDENT = "77777777-7777-4777-8777-777777777777";
 /** A DM, which the sidebar lists apart from the channels. */
 export const CH_DM = "55555555-5555-4555-8555-555555555555";
 
@@ -83,6 +85,7 @@ function channel(
   name: string,
   about: string,
   topic: string,
+  { isPrivate = false }: { isPrivate?: boolean } = {},
 ): NostrEvent {
   return {
     id: id(`chan:${channelId}`),
@@ -94,7 +97,7 @@ function channel(
       ["name", name],
       ["about", about],
       ["topic", topic],
-      ["public"],
+      isPrivate ? ["private"] : ["public"],
       ["closed"],
       ["t", "stream"],
     ],
@@ -287,6 +290,9 @@ export const CHANNELS: NostrEvent[] = [
   channel(CH_DESIGN, "design", "デザインシステム", "文字サイズは rem のみ"),
   channel(CH_RANDOM, "random", "雑談", ""),
   channel(CH_ANNOUNCE, "announcements", "お知らせ", "リリースノート"),
+  channel(CH_INCIDENT, "incident-0731", "障害対応の記録", "復旧済み", {
+    isPrivate: true,
+  }),
   dmChannel(CH_DM, [MISAKI, KEN]),
 ];
 
@@ -336,6 +342,11 @@ export const MEMBER_LISTS: NostrEvent[] = [
   memberList(CH_ANNOUNCE, [
     [MISAKI, "owner"],
     [RELAY, "admin"],
+  ]),
+  memberList(CH_INCIDENT, [
+    [MISAKI, "owner"],
+    [KEN, "member"],
+    [AYA, "member"],
   ]),
 ];
 
@@ -526,6 +537,39 @@ export const MESSAGES: NostrEvent[] = [
     ago(6),
     "**0.4 をデプロイしました。** 変更点はリリースノートをご覧ください。不具合があれば #dev までお願いします",
   ),
+
+  // --- #incident-0731: private, and the make-public flow's subject ---
+  // Seeded so the scan has all three verdicts to find in one room: ordinary
+  // prose, a contextual match a maintainer has to judge, and a credential that
+  // stops the publication outright.
+  message(
+    "inc-1",
+    CH_INCIDENT,
+    MISAKI,
+    ago(60 * 30),
+    "07:31 にリレーが応答しなくなりました。まず接続数を確認します",
+  ),
+  message(
+    "inc-2",
+    CH_INCIDENT,
+    KEN,
+    ago(60 * 29),
+    "報告してくれた 田中様 に一次回答を返しました。連絡先は tanaka@example.com です",
+  ),
+  message(
+    "inc-3",
+    CH_INCIDENT,
+    AYA,
+    ago(60 * 28),
+    "復旧用に一時キーを共有します: sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFF",
+  ),
+  message(
+    "inc-4",
+    CH_INCIDENT,
+    MISAKI,
+    ago(60 * 26),
+    "08:05 復旧を確認しました。恒久対応は #dev で続けます",
+  ),
 ];
 
 /**
@@ -648,6 +692,7 @@ export const ACTIVITY: Record<string, number> = {
   [CH_DESIGN]: ago(1_050),
   [CH_RANDOM]: ago(1_380),
   [CH_ANNOUNCE]: ago(6),
+  [CH_INCIDENT]: ago(60 * 26),
   [CH_DM]: ago(24),
 };
 
