@@ -127,7 +127,13 @@ CI ガード `pnpm -C web check:px-text`（`web/scripts/check-px-text.mjs`）が
 ## 5. アイコン・アセット
 
 - ロゴ/アプリアイコン: web は `@/assets/app-icon@3x.png`（`nuxxAppIcon` として
-  invite / repos ページで使用）、mobile は `assets/images/nuxx-icon.png`
+  コミュニティレール / ウェルカム / repos / invite の 4 か所で使用）、mobile は
+  `assets/images/nuxx-icon.png`
+- `app-icon@3x.png` は `@/assets/nuxxicon1024.png`（配布されたマスター）からの
+  派生。マスターは透明余白の上に角丸正方形が乗った 1024px 版で、アセット側は
+  正方形部分だけを切り出した**全面不透明・角丸なし**の 512px 版にする。角丸は
+  4 か所すべてが自前で `border-radius: 22.37%` + `overflow-hidden` で掛けるので、
+  アセットに焼き込むと二重になる
 - ブランド表示名は **channels.nuxx.ai**（タイトル、NIP-11 のリレー名、
   ウェルカム画面、同意文言）
 
