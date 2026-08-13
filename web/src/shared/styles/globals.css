@@ -145,7 +145,11 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Inter Variable", Inter, "Avenir Next", "Segoe UI", sans-serif;
+    /* Kept in step with `theme.extend.fontFamily.sans` in tailwind.config.js —
+       this rule is what paints before a utility class applies. */
+    font-family:
+      "NType82-Regular", "Inter Variable", Inter, "Avenir Next", "Segoe UI",
+      sans-serif;
   }
 
   /* The backdrop of a native <dialog> is a pseudo-element, so it cannot be

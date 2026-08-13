@@ -40,7 +40,13 @@ export default {
         4.5: "1.125rem",
       },
       fontFamily: {
+        // NType82 is the brand face. Nothing bundles it yet — there is no
+        // @font-face and no file in the repo — so this resolves only where the
+        // reader has it installed, and everyone else falls through to the
+        // stack that was here before. Naming it costs nothing until the woff2
+        // lands: a family with no @font-face is looked up locally, not fetched.
         sans: [
+          '"NType82-Regular"',
           '"Inter Variable"',
           "Inter",
           '"Avenir Next"',

@@ -1,20 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 466 309">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 600">
   <style>
     .mark { fill: #231e1e; }
     @media (prefers-color-scheme: dark) {
-      .mark { fill: #d7d72e; }
+      .mark { fill: #f5f5f7; }
     }
   </style>
-  <defs>
-    <mask id="bee-mask">
-      <circle cx="91.7" cy="154.5" r="91.7" fill="white"/>
-      <circle cx="374.3" cy="154.5" r="91.7" fill="white"/>
-      <rect x="128" y="0" width="210" height="309" rx="34" fill="white"/>
-      <circle cx="193.3" cy="84.4" r="27" fill="black"/>
-      <circle cx="276" cy="84.4" r="27" fill="black"/>
-      <rect x="166.3" y="157.2" width="136.9" height="38.3" rx="5" fill="black"/>
-      <rect x="166.9" y="235.1" width="136.2" height="37.6" rx="5" fill="black"/>
-    </mask>
-  </defs>
-  <rect class="mark" width="466" height="309" mask="url(#bee-mask)"/>
+  <rect class="mark" x="0" y="0" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="0" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="0" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="0" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="40" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="40" y="40" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="40" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="40" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="40" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="80" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="80" y="80" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="80" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="80" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="80" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="120" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="120" y="120" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="120" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="120" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="120" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="160" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="160" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="160" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="160" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="200" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="200" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="200" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="200" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="240" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="240" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="280" y="240" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="320" y="240" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="360" y="240" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="320" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="320" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="320" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="320" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="360" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="360" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="360" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="360" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="40" y="400" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="120" y="400" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="280" y="400" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="360" y="400" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="80" y="440" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="320" y="440" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="40" y="480" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="120" y="480" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="280" y="480" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="360" y="480" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="520" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="520" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="520" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="520" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="0" y="560" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="160" y="560" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="240" y="560" width="40" height="40" rx="3.2"/>
+  <rect class="mark" x="400" y="560" width="40" height="40" rx="3.2"/>
 </svg>

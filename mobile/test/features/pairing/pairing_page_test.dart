@@ -6,7 +6,7 @@ import 'package:nuxx/features/pairing/pairing_page.dart';
 import 'package:nuxx/features/pairing/pairing_provider.dart';
 import 'package:nuxx/shared/theme/theme.dart';
 import 'package:nuxx/shared/widgets/nuxx_loading_indicator.dart';
-import 'package:nuxx/shared/widgets/tappable_flapping_bee.dart';
+import 'package:nuxx/shared/widgets/nuxx_mark.dart';
 
 import '../../helpers/widget_helpers.dart';
 
@@ -19,7 +19,7 @@ void main() {
         WidgetHelpers.testable(child: const PairingPage()),
       );
 
-      expect(find.byType(TappableFlappingBee), findsOneWidget);
+      expect(find.byType(NuxxMark), findsOneWidget);
       expect(find.text('Welcome to channels.nuxx.ai'), findsOneWidget);
       expect(find.text('Scan a QR code'), findsOneWidget);
       expect(find.text('Use pairing code'), findsOneWidget);

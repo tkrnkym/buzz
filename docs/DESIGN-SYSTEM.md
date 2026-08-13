@@ -126,16 +126,34 @@ CI ガード `pnpm -C web check:px-text`（`web/scripts/check-px-text.mjs`）が
 
 ## 5. アイコン・アセット
 
-- ロゴ/アプリアイコン: web は `@/assets/app-icon@3x.png`（`nuxxAppIcon` として
-  コミュニティレール / ウェルカム / repos / invite の 4 か所で使用）、mobile は
-  `assets/images/nuxx-icon.png`
-- `app-icon@3x.png` は `@/assets/nuxxicon1024.png`（配布されたマスター）からの
-  派生。マスターは透明余白の上に角丸正方形が乗った 1024px 版で、アセット側は
-  正方形部分だけを切り出した**全面不透明・角丸なし**の 512px 版にする。角丸は
-  4 か所すべてが自前で `border-radius: 22.37%` + `overflow-hidden` で掛けるので、
-  アセットに焼き込むと二重になる
+- **すべてのアイコンは `web/src/assets/nuxxicon1024.png`（配布されたマスター）
+  からの派生**で、生成は `scripts/gen-app-icons.py` の 1 か所。手で書き出した
+  ものはリポジトリに無い。マスター自体はどこからも参照されない
+- 生成物は 2 系統:
+  - **プレート**（グリフ + 地）: web `@/assets/app-icon@3x.png`、iOS AppIcon
+    15 枚、Android `ic_launcher` / `ic_launcher_round` 5 密度。**全面不透明・
+    角丸なし**にする。角丸は web の 4 か所（`border-radius: 22.37%` +
+    `overflow-hidden`）も iOS も Android も自前で掛けるので、アセットに
+    焼き込むと二重になる。マスターの角丸で欠けた四隅は、その行の色で埋め戻して
+    縦グラデーションを継続させる（黒で潰すと上端 `#2F2F32` との段差が出る）
+  - **マーク**（グリフのみ・透明）: iOS LaunchImage 3 枚、Android
+    `ic_launcher_foreground` / `launch_image` 各 5 密度、
+    `mobile/assets/images/nuxx-icon.png`。いずれも黒地の上に載る
+    （`launch_background.xml` / `LaunchScreen.storyboard` /
+    `ic_launcher_background`）ので、プレートだと黒に沈む
+- マークは 40px グリッド上の 58 セル（11×15）で、各セルが**個別に角丸**。
+  ストロークに継ぎ目が出るのは仕様であって描画バグではない。同じグリッドから
+  `admin-web/public/favicon.svg`（ベクタ）と
+  `mobile/lib/shared/widgets/nuxx_mark.dart`（Flutter の CustomPainter）も
+  作られる
+- web は `nuxxAppIcon` としてコミュニティレール / ウェルカム / repos / invite の
+  4 か所で使用
 - ブランド表示名は **channels.nuxx.ai**（タイトル、NIP-11 のリレー名、
   ウェルカム画面、同意文言）
+- ブランド書体は **NType82-Regular**。`tailwind.config.js` の
+  `fontFamily.sans` と `globals.css` の `body` の先頭に置いてあるが、woff2 は
+  まだリポジトリに無く `@font-face` も無い。**入っている環境でだけ効き、
+  それ以外は従来の Inter 系にフォールバックする**
 
 ## 6. 新画面を作るときのチェックリスト
 

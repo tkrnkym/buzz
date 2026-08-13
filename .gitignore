@@ -68,3 +68,6 @@ identity.key
 
 # Helm dependency tarballs — regenerable from Chart.lock via `helm dependency build`
 deploy/charts/*/charts/*.tgz
+
+# Bytecode from scripts/gen-app-icons.py, if it is ever imported rather than run
+__pycache__/
