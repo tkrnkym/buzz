@@ -1366,6 +1366,73 @@ test("personal connections are kept apart from workspace secrets", async ({
   );
 });
 
+test("a self-hosted deployment sends nothing until it is asked to", async ({
+  page,
+}) => {
+  await openSettings(page, "privacy");
+  await page.getByTestId("edition-community").click();
+  // Every category is a switch, and none of them is required.
+  await expect(page.getByTestId("telemetry-toggle-operational")).toBeVisible();
+  await expect(page.getByTestId("telemetry-required-operational")).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByTestId("telemetry-toggle-operational"),
+  ).not.toBeChecked();
+});
+
+test("the hosted service says required rather than showing a dead switch", async ({
+  page,
+}) => {
+  await openSettings(page, "privacy");
+  await page.getByTestId("edition-saas").click();
+  await expect(page.getByTestId("telemetry-required-operational")).toHaveText(
+    "必須",
+  );
+  // Product analytics stays separable and off.
+  await expect(
+    page.getByTestId("telemetry-toggle-product-analytics"),
+  ).not.toBeChecked();
+});
+
+test("the four things never collected are named on the screen", async ({
+  page,
+}) => {
+  await openSettings(page, "privacy");
+  const list = page.getByTestId("never-collected");
+  for (const item of [
+    "メッセージ本文",
+    "Files の内容",
+    "Secrets",
+    "Agent の入出力",
+  ]) {
+    await expect(list).toContainText(item);
+  }
+});
+
+test("an undecided deadline is shown as undecided", async ({ page }) => {
+  // The doc records this as open; showing it as settled is how a placeholder
+  // becomes the answer by default.
+  await openSettings(page, "privacy");
+  await expect(page.getByTestId("staleness-provisional")).toContainText(
+    "まだ決まっていません",
+  );
+  await expect(page.getByTestId("staleness-saas")).toContainText("1時間");
+  await expect(page.getByTestId("staleness-community")).toContainText("7日");
+});
+
+test("only a revocation takes something out of search and execution", async ({
+  page,
+}) => {
+  await openSettings(page, "privacy");
+  await expect(page.getByTestId("revocation-revoked")).toContainText(
+    "実行の対象から外れます",
+  );
+  await expect(page.getByTestId("revocation-deprecated")).toContainText(
+    "使えます",
+  );
+});
+
 test("renaming the workspace says what happens to the old address", async ({
   page,
 }) => {

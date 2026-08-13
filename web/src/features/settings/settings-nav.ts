@@ -1,5 +1,5 @@
 /**
- * The settings surface: nineteen screens in three groups.
+ * The settings surface: twenty screens in three groups.
  *
  * Settings is its own full-window destination rather than a page inside the app
  * shell. It was a page, and that was wrong in a way that is easy to miss: with the
@@ -32,6 +32,7 @@ import {
   LayoutTemplate,
   MessagesSquare,
   MonitorSmartphone,
+  Radio,
   ShieldCheck,
   Smartphone,
   Smile,
@@ -59,6 +60,7 @@ export type SettingsPanelId =
   | "agents"
   | "compute"
   | "experiments"
+  | "privacy"
   | "mobile"
   | "updates";
 
@@ -69,7 +71,7 @@ export interface SettingsPanel {
   /**
    * The screen's heading, when it differs from the nav row.
    *
-   * "Compute" is enough in a list of nineteen; on the screen itself the heading has
+   * "Compute" is enough in a list of twenty; on the screen itself the heading has
    * a whole line to be specific with, and "Share compute" says what the screen does
    * rather than what subject it belongs to.
    */
@@ -216,6 +218,14 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         Icon: FlaskConical,
         description:
           "動きはしますが、まだ調整中の機能です。有効にすると先に試せます。",
+      },
+      {
+        id: "privacy",
+        label: "Privacy",
+        title: "Telemetry & Federation",
+        Icon: Radio,
+        description:
+          "この配備から何が外に出るか。そして、公開したものを取り下げたときに何が起きるか。",
       },
       {
         id: "mobile",
