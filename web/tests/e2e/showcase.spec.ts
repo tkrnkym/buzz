@@ -686,11 +686,14 @@ for (const [name, path] of [
     // reached the screen were spread across a tooltip, an avatar's initials,
     // and five separate truncation call sites.
     //
-    // What this does *not* cover: paths the fixtures never reach. Every person
-    // in the demo has a display name, so an avatar's initials fallback and
-    // `resolveUserLabel`'s last resort are both unreachable here — reverting
-    // either to a key does not fail this test. The pure-function tests in
-    // `membership.test.mjs` are what hold those.
+    // What this does *not* cover: every person in the demo has a display name,
+    // so the label fallback and the avatar's initials fallback are unreachable
+    // in *this* bundle — reverting either does not fail this test.
+    //
+    // They are covered, though not here. The smoke project runs the ordinary
+    // bundle, where nothing resolves a kind:0, so `an author with no profile
+    // still has a name to show` is what holds the label fallback; the pure
+    // functions in `membership.test.mjs` hold the rest.
     await page.goto(path);
     await page.waitForTimeout(400);
     // `textContent`, not `innerText`: the latter reports only what is laid out,
