@@ -867,6 +867,49 @@ test("selecting a room and then a mention moves the pane both ways", async ({
   await expect(first).toHaveAttribute("aria-current", "true");
 });
 
+// --- Files -----------------------------------------------------------------
+
+test("a file the reader cannot open shows the lock line and nothing else", async ({
+  page,
+}) => {
+  await page.goto("/files");
+  const list = page.getByTestId("file-list");
+  await expect(list).toBeVisible();
+
+  const locked = page.getByTestId("file-locked-file-locked");
+  await expect(locked).toContainText("このFileを表示する権限がありません");
+
+  // The whole rule. A name alone tells you most of what a document was for, and
+  // the size and owner tell you the rest — so none of it may reach the page.
+  await expect(list).not.toContainText("決算");
+  await expect(list).not.toContainText("xlsx");
+  await expect(list).not.toContainText("SharePoint");
+  await expect(list).not.toContainText("500.0 KB");
+  // And there is no thumbnail or icon standing in for the content either.
+  await expect(locked.locator("img")).toHaveCount(0);
+});
+
+test("a readable file says where its authoritative copy lives", async ({
+  page,
+}) => {
+  // The link/import distinction is what decides whether a row can go locked
+  // tomorrow, so it is stated rather than left to an icon.
+  await page.goto("/files");
+  await expect(page.getByTestId("file-file-runbook")).toContainText(
+    "Nuxx · 取り込み",
+  );
+  await expect(page.getByTestId("file-file-arch")).toContainText(
+    "Google Drive · リンク",
+  );
+});
+
+test("the count admits how many files are withheld", async ({ page }) => {
+  // "4 件" with one hidden would be a lie, and silently showing 3 leaves
+  // "why does this say 4" unanswerable.
+  await page.goto("/files");
+  await expect(page.getByText("うち 1 件は権限がありません")).toBeVisible();
+});
+
 // --- Pulse cards and forum reactions ---------------------------------------
 
 test("a stopped agent does not look like a memo", async ({ page }) => {

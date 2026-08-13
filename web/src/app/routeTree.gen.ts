@@ -18,6 +18,7 @@ import { Route as pulseRouteImport } from "./routes/pulse";
 import { Route as projectsRouteImport } from "./routes/projects";
 import { Route as homeRouteImport } from "./routes/home";
 import { Route as forumRouteImport } from "./routes/forum";
+import { Route as filesRouteImport } from "./routes/files";
 import { Route as cRouteImport } from "./routes/c";
 import { Route as browseRouteImport } from "./routes/browse";
 import { Route as agentsRouteImport } from "./routes/agents";
@@ -91,6 +92,11 @@ const forumRoute = forumRouteImport.update({
   path: "/forum",
   getParentRoute: () => shellRoute,
 } as any);
+const filesRoute = filesRouteImport.update({
+  id: "/files",
+  path: "/files",
+  getParentRoute: () => shellRoute,
+} as any);
 const cRoute = cRouteImport.update({
   id: "/c",
   path: "/c",
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
+  "/files": typeof filesRoute;
   "/forum": typeof forumRoute;
   "/home": typeof homeRoute;
   "/projects": typeof projectsRoute;
@@ -163,6 +170,7 @@ export interface FileRoutesByTo {
   "/agents": typeof agentsRoute;
   "/browse": typeof browseRoute;
   "/c": typeof cRoute;
+  "/files": typeof filesRoute;
   "/forum": typeof forumRoute;
   "/home": typeof homeRoute;
   "/projects": typeof projectsRoute;
@@ -187,6 +195,7 @@ export interface FileRoutesById {
   "/_shell/agents": typeof agentsRoute;
   "/_shell/browse": typeof browseRoute;
   "/_shell/c": typeof cRoute;
+  "/_shell/files": typeof filesRoute;
   "/_shell/forum": typeof forumRoute;
   "/_shell/home": typeof homeRoute;
   "/_shell/projects": typeof projectsRoute;
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | "/agents"
     | "/browse"
     | "/c"
+    | "/files"
     | "/forum"
     | "/home"
     | "/projects"
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | "/agents"
     | "/browse"
     | "/c"
+    | "/files"
     | "/forum"
     | "/home"
     | "/projects"
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | "/_shell/agents"
     | "/_shell/browse"
     | "/_shell/c"
+    | "/_shell/files"
     | "/_shell/forum"
     | "/_shell/home"
     | "/_shell/projects"
@@ -375,6 +387,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof forumRouteImport;
       parentRoute: typeof shellRoute;
     };
+    "/_shell/files": {
+      id: "/_shell/files";
+      path: "/files";
+      fullPath: "/files";
+      preLoaderRoute: typeof filesRouteImport;
+      parentRoute: typeof shellRoute;
+    };
     "/_shell/c": {
       id: "/_shell/c";
       path: "/c";
@@ -439,6 +458,7 @@ interface shellRouteChildren {
   agentsRoute: typeof agentsRoute;
   browseRoute: typeof browseRoute;
   cRoute: typeof cRoute;
+  filesRoute: typeof filesRoute;
   forumRoute: typeof forumRoute;
   homeRoute: typeof homeRoute;
   projectsRoute: typeof projectsRoute;
@@ -455,6 +475,7 @@ const shellRouteChildren: shellRouteChildren = {
   agentsRoute: agentsRoute,
   browseRoute: browseRoute,
   cRoute: cRoute,
+  filesRoute: filesRoute,
   forumRoute: forumRoute,
   homeRoute: homeRoute,
   projectsRoute: projectsRoute,

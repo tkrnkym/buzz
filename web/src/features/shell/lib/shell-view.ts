@@ -19,6 +19,7 @@ export type ShellView =
   | "pulse"
   | "reminders"
   | "forum"
+  | "files"
   | "other";
 
 const PREFIXES: [prefix: string, view: ShellView][] = [
@@ -31,6 +32,7 @@ const PREFIXES: [prefix: string, view: ShellView][] = [
   ["/pulse", "pulse"],
   ["/reminders", "reminders"],
   ["/forum", "forum"],
+  ["/files", "files"],
 ];
 
 export function resolveShellView(pathname: string): ShellView {

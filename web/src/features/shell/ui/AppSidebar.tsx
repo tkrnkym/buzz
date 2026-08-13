@@ -5,6 +5,7 @@ import {
   Bot,
   Compass,
   FileText,
+  Files,
   FolderGit2,
   FolderKanban,
   Inbox,
@@ -299,6 +300,18 @@ export function AppSidebar({
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+          <SidebarMenuItem data-testid="nav-files">
+            <SidebarMenuButton
+              asChild
+              isActive={view === "files"}
+              tooltip="Files"
+            >
+              <Link to="/files">
+                <Files className="size-4" />
+                <span>Files</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

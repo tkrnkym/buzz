@@ -59,6 +59,33 @@ export interface ShowcaseAgent {
   turnsToday: number;
 }
 
+/** Where a file's bytes come from. */
+export type FileOrigin = "nuxx" | "google-drive" | "sharepoint" | "github";
+
+export interface ShowcaseFile {
+  id: string;
+  name: string;
+  origin: FileOrigin;
+  /**
+   * `link` points at a source that stays authoritative and can revoke access at
+   * any time; `import` was copied into Nuxx storage and is Nuxx's to serve.
+   */
+  kind: "link" | "import";
+  sizeBytes: number;
+  authorPubkey: string;
+  updatedAt: number;
+  /** Versions are immutable once written; this is the newest. */
+  version: number;
+  hash: string;
+  /** The channel it is associated with — files are not owned by one. */
+  channel: string | null;
+  /**
+   * Whether *this* reader may see it. A denied file shows the lock line and
+   * nothing else, which `files-model.ts` enforces structurally.
+   */
+  access: "granted" | "denied";
+}
+
 /**
  * Who ran an evaluation. Never merged — see `evaluation-model.ts`.
  *
@@ -488,6 +515,7 @@ export interface Showcase {
   agentSessions: Record<string, AgentSessionEvent[]>;
   /** Keyed by agent id. Absent or empty means nobody has evaluated it. */
   agentEvaluations: Record<string, EvaluationResult[]>;
+  files: ShowcaseFile[];
   communities: ShowcaseCommunity[];
 }
 
@@ -1405,6 +1433,66 @@ export const SHOWCASE: Showcase = {
       },
     ],
   },
+
+  // One of each shape the spec distinguishes: an import Nuxx serves itself, two
+  // links whose sources stay authoritative, and one the reader has lost access
+  // to at the source — which must render as the lock line and nothing else. The
+  // denied row is given a deliberately revealing name and a real size, so a
+  // regression that leaks either is visible rather than subtle.
+  files: [
+    {
+      id: "file-runbook",
+      name: "障害対応ランブック.md",
+      origin: "nuxx",
+      kind: "import",
+      sizeBytes: 18_400,
+      authorPubkey: MISAKI,
+      updatedAt: ago(60 * 26),
+      version: 4,
+      hash: "sha256:9f2c…",
+      channel: "incident-0731",
+      access: "granted",
+    },
+    {
+      id: "file-arch",
+      name: "リレー構成図.pdf",
+      origin: "google-drive",
+      kind: "link",
+      sizeBytes: 2_400_000,
+      authorPubkey: KEN,
+      updatedAt: ago(60 * 24 * 4),
+      version: 1,
+      hash: "sha256:1a77…",
+      channel: "dev",
+      access: "granted",
+    },
+    {
+      id: "file-locked",
+      name: "決算_最終版_役員会.xlsx",
+      origin: "sharepoint",
+      kind: "link",
+      sizeBytes: 512_000,
+      authorPubkey: AYA,
+      updatedAt: ago(60 * 24 * 9),
+      version: 2,
+      hash: "sha256:c0de…",
+      channel: "dev",
+      access: "denied",
+    },
+    {
+      id: "file-schema",
+      name: "schema.sql",
+      origin: "github",
+      kind: "link",
+      sizeBytes: 46_800,
+      authorPubkey: AYA,
+      updatedAt: ago(60 * 24 * 2),
+      version: 12,
+      hash: "sha256:77ab…",
+      channel: "dev",
+      access: "granted",
+    },
+  ],
 
   communities: [
     {
