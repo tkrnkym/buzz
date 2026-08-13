@@ -131,9 +131,15 @@ export function WorkflowsPage() {
                   </div>
                 </div>
 
-                {run && (
-                  <ProgressBadge status={RUN_STATE_PROGRESS[run.state]} />
-                )}
+                {/* Suppressed where it would repeat the pending badge beside
+                    the name. Both are true — one counts what is held, the
+                    other is the last run's state — but "承認待ち" twice on one
+                    row reads as a rendering mistake rather than as two facts. */}
+                {run &&
+                  !(
+                    workflow.pendingApprovals > 0 &&
+                    RUN_STATE_PROGRESS[run.state] === "awaiting-approval"
+                  ) && <ProgressBadge status={RUN_STATE_PROGRESS[run.state]} />}
               </Link>
             </li>
           );

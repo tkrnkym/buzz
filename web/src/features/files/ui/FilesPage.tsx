@@ -1,4 +1,4 @@
-import { ExternalLink, FileText, Hash, Lock } from "lucide-react";
+import { ExternalLink, FileText, Hash } from "lucide-react";
 import { useMemo } from "react";
 
 import {
@@ -75,12 +75,13 @@ export function FilesPage() {
           view.locked ? (
             // Everything this row is allowed to say. No name, no origin, no
             // size, no author, no thumbnail — see `files-model.ts`.
+            // The message carries its own 🔒, so there is no icon beside it —
+            // two locks on one row reads as a mistake rather than as emphasis.
             <li
-              className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-2xs text-muted-foreground"
+              className="rounded-lg border border-dashed border-border px-3 py-2.5 text-2xs text-muted-foreground"
               data-testid={`file-locked-${view.id}`}
               key={view.id}
             >
-              <Lock aria-hidden className="size-3.5 shrink-0" />
               {LOCKED_FILE_MESSAGE}
             </li>
           ) : (

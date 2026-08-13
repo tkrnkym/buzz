@@ -25,11 +25,13 @@ import {
   type ChannelPane,
 } from "@/features/channels/channel-roster-model";
 import { resolveChannelLabel } from "@/features/channels/dm-label";
+import { formatRelativeTime } from "@/features/agents/agent-model";
 import { CanvasPanel } from "@/features/canvas/ui/CanvasPanel";
 import { ChannelRosterPanel } from "@/features/channels/ui/ChannelRosterPanel";
 import { PublishChannelDialog } from "@/features/channels/ui/PublishChannelDialog";
 import { computeChannelUnreadMarker } from "@/features/messages/lib/unread-marker";
 import { useMuteList } from "@/features/moderation/use-moderation";
+import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import type { MessageRowActions } from "@/features/messages/ui/MessageRow";
 import { MessageTimeline } from "@/features/messages/ui/MessageTimeline";
@@ -532,8 +534,15 @@ export function ChatPage({
           // The loaded timeline, which is what this client can actually read.
           // A scan that claimed to cover history it never fetched would be the
           // more dangerous kind of wrong.
+          // Named by who wrote it and when, not by event id: the point of the
+          // field is that a maintainer can go and find the passage, and a
+          // 64-character hex string is not somewhere anyone can go.
           scanTargets={rows.map((row) => ({
-            where: row.message.id,
+            where: `${resolveUserLabel({
+              pubkey: row.message.pubkey,
+              profiles,
+              preferResolvedSelfLabel: true,
+            })} · ${formatRelativeTime(row.message.createdAt, Math.floor(Date.now() / 1000))}`,
             text: row.message.content,
           }))}
           selfPubkey={myPubkey}

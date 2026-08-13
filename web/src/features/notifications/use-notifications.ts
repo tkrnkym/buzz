@@ -149,7 +149,10 @@ export function useNotifications(): NotificationsApi {
     // this is the one source of "action" items and only exists in the demo
     // build — a client pointed at a real relay never shows an invented one.
     const fromActions = showcase
-      ? buildActionNotifications(showcase.workflows)
+      ? buildActionNotifications(
+          showcase.workflows,
+          Math.floor(Date.now() / 1000),
+        )
       : [];
     return fromActions.length === 0
       ? fromMessages

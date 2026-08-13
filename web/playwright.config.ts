@@ -36,7 +36,7 @@ export default defineConfig({
       // deliberately null, so the smoke project cannot reach them at all. Hence
       // a second bundle and a second preview server rather than a flag.
       name: "showcase",
-      testMatch: ["**/showcase.spec.ts"],
+      testMatch: ["**/showcase.spec.ts", "**/audit.spec.ts"],
       use: {
         ...devices["Desktop Chrome"],
         ...(executablePath ? { launchOptions: { executablePath } } : {}),
