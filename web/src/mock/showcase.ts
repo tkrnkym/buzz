@@ -59,6 +59,26 @@ export interface ShowcaseAgent {
   turnsToday: number;
 }
 
+/**
+ * A secret, as everything except its value.
+ *
+ * There is deliberately no `value` field. A secret is referenced by id and
+ * injected by the runtime for the duration of one operation; nothing that
+ * renders, logs or fans out ever holds the value, so nothing here can leak one.
+ */
+export interface ShowcaseSecret {
+  id: string;
+  /** The reference a resource is configured with. */
+  name: string;
+  scope: "workspace" | "personal";
+  /** What last used it, for the "is this still needed" question. */
+  lastUsedBy: string | null;
+  lastUsedAt: number | null;
+  createdAt: number;
+  /** How many agents, workflows or plugins name it. */
+  referenceCount: number;
+}
+
 /** Where a file's bytes come from. */
 export type FileOrigin = "nuxx" | "google-drive" | "sharepoint" | "github";
 
@@ -516,6 +536,11 @@ export interface Showcase {
   /** Keyed by agent id. Absent or empty means nobody has evaluated it. */
   agentEvaluations: Record<string, EvaluationResult[]>;
   files: ShowcaseFile[];
+  secrets: ShowcaseSecret[];
+  /** Per-risk approval deadlines, in seconds. Overridable only downward. */
+  approvalDeadlines: Record<string, number>;
+  /** Bumped on every policy edit; a run pins the value it started under. */
+  approvalPolicyVersion: number;
   communities: ShowcaseCommunity[];
 }
 
@@ -1493,6 +1518,56 @@ export const SHOWCASE: Showcase = {
       access: "granted",
     },
   ],
+
+  // Values are absent by construction, not redacted — see `ShowcaseSecret`.
+  secrets: [
+    {
+      id: "sec-anthropic",
+      name: "ANTHROPIC_API_KEY",
+      scope: "workspace",
+      lastUsedBy: "レビュー係",
+      lastUsedAt: ago(3),
+      createdAt: ago(60 * 24 * 40),
+      referenceCount: 3,
+    },
+    {
+      id: "sec-github",
+      name: "GITHUB_TOKEN",
+      scope: "workspace",
+      lastUsedBy: "リリース番",
+      lastUsedAt: ago(60 * 20),
+      createdAt: ago(60 * 24 * 62),
+      referenceCount: 2,
+    },
+    {
+      // Nothing references it and nothing has used it — the case the screen
+      // exists to make visible, since an unused credential is still a live one.
+      id: "sec-legacy",
+      name: "LEGACY_WEBHOOK_SECRET",
+      scope: "workspace",
+      lastUsedBy: null,
+      lastUsedAt: null,
+      createdAt: ago(60 * 24 * 300),
+      referenceCount: 0,
+    },
+    {
+      id: "sec-personal-drive",
+      name: "MY_DRIVE_TOKEN",
+      scope: "personal",
+      lastUsedBy: null,
+      lastUsedAt: ago(60 * 24 * 2),
+      createdAt: ago(60 * 24 * 10),
+      referenceCount: 1,
+    },
+  ],
+
+  approvalDeadlines: {
+    standard: 7 * 24 * 3_600,
+    "external-send": 24 * 3_600,
+    "production-change": 24 * 3_600,
+    destructive: 3_600,
+  },
+  approvalPolicyVersion: 4,
 
   communities: [
     {

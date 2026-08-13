@@ -1,5 +1,5 @@
 /**
- * The settings surface: fifteen screens in three groups.
+ * The settings surface: seventeen screens in three groups.
  *
  * Settings is its own full-window destination rather than a page inside the app
  * shell. It was a page, and that was wrong in a way that is easy to miss: with the
@@ -26,9 +26,11 @@ import {
   Download,
   FlaskConical,
   Keyboard,
+  KeyRound,
   LayoutTemplate,
   MessagesSquare,
   MonitorSmartphone,
+  ShieldCheck,
   Smartphone,
   Smile,
   Ticket,
@@ -48,6 +50,8 @@ export type SettingsPanelId =
   | "hosted"
   | "templates"
   | "invites"
+  | "security"
+  | "secrets"
   | "agents"
   | "compute"
   | "experiments"
@@ -61,7 +65,7 @@ export interface SettingsPanel {
   /**
    * The screen's heading, when it differs from the nav row.
    *
-   * "Compute" is enough in a list of fifteen; on the screen itself the heading has
+   * "Compute" is enough in a list of seventeen; on the screen itself the heading has
    * a whole line to be specific with, and "Share compute" says what the screen does
    * rather than what subject it belongs to.
    */
@@ -151,6 +155,21 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         label: "Invites",
         Icon: Ticket,
         description: "メンバーと、コミュニティへの入り方を管理します。",
+      },
+      {
+        id: "security",
+        label: "Security",
+        title: "Approval Policies",
+        Icon: ShieldCheck,
+        description:
+          "何に承認が要るか、そして返事がないまま何日で期限切れにするかを決めます。",
+      },
+      {
+        id: "secrets",
+        label: "Secrets",
+        Icon: KeyRound,
+        description:
+          "エージェント・ワークフロー・プラグインが使う秘密情報を預かります。値そのものは、登録後どの画面にも出しません。",
       },
     ],
   },

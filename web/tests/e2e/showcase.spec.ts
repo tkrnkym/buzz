@@ -1282,6 +1282,98 @@ test("a right-hand panel casts the sideways edge its token describes", async ({
   expect(shadow).toContain("-16px");
 });
 
+// --- Approval policies and secrets -----------------------------------------
+
+test("the approval deadline shortens as the risk rises", async ({ page }) => {
+  // The table is the policy. If a destructive operation may wait as long as an
+  // ordinary one, the risk classes are decoration.
+  await openSettings(page, "security");
+  const card = page.getByTestId("approval-deadlines");
+  await expect(card.getByTestId("deadline-row-standard")).toContainText("7日");
+  await expect(card.getByTestId("deadline-row-destructive")).toContainText(
+    "1時間",
+  );
+});
+
+test("editing the policy bumps the version a run would be pinned to", async ({
+  page,
+}) => {
+  await openSettings(page, "security");
+  const version = page.getByTestId("policy-version");
+  const before = await version.innerText();
+
+  await page.getByTestId("deadline-standard").click();
+  // Options are keyed by their value in seconds; 3 days is 259200.
+  await page.getByTestId("deadline-standard-259200").click();
+  await expect(version).not.toHaveText(before);
+  await leaveAndReturn(page, "security");
+  await expect(page.getByTestId("deadline-row-standard")).toContainText("3日");
+});
+
+test("the evaluation order ends in a denial rather than a fallthrough", async ({
+  page,
+}) => {
+  await openSettings(page, "security");
+  const order = page.getByTestId("evaluation-order");
+  // Default Deny is the last row, and an explicit deny sits above every grant.
+  await expect(order.getByTestId("stage-default")).toContainText("Deny");
+  const stages = await order.locator("[data-testid^='stage-']").allInnerTexts();
+  assertOrder(stages, "明示的 Deny", "Role の Capability");
+});
+
+test("a secret is stored without ever being displayable again", async ({
+  page,
+}) => {
+  await openSettings(page, "secrets");
+  await page.getByTestId("add-secret").click();
+  await page.getByTestId("secret-name").fill("NEW_TOKEN");
+  // The input is a password field, so it is not shoulder-read while pasting.
+  await expect(page.getByTestId("secret-value")).toHaveAttribute(
+    "type",
+    "password",
+  );
+  await page.getByTestId("secret-value").fill("super-secret-value");
+  await page.getByTestId("save-secret").click();
+
+  const list = page.getByTestId("workspace-secrets");
+  await expect(list).toContainText("NEW_TOKEN");
+  // The value is gone from the page entirely — not masked, absent. A "••••••"
+  // stand-in would imply there is something here to reveal.
+  await expect(page.locator("body")).not.toContainText("super-secret-value");
+  await leaveAndReturn(page, "secrets");
+  await expect(page.locator("body")).not.toContainText("super-secret-value");
+});
+
+test("deleting a referenced secret says what will break", async ({ page }) => {
+  await openSettings(page, "secrets");
+  await page.getByTestId("delete-secret-sec-anthropic").click();
+  await expect(page.getByTestId("delete-secret-dialog")).toContainText(
+    "3 箇所から参照されています",
+  );
+});
+
+test("personal connections are kept apart from workspace secrets", async ({
+  page,
+}) => {
+  // A personal token stops working when its owner leaves and a workspace one
+  // does not; one list is how a workflow ends up depending on an individual.
+  await openSettings(page, "secrets");
+  await expect(page.getByTestId("personal-secrets")).toContainText(
+    "MY_DRIVE_TOKEN",
+  );
+  await expect(page.getByTestId("workspace-secrets")).not.toContainText(
+    "MY_DRIVE_TOKEN",
+  );
+});
+
+/** Asserts `first` appears before `second` in a list of rendered rows. */
+function assertOrder(rows: string[], first: string, second: string) {
+  const firstAt = rows.findIndex((row) => row.includes(first));
+  const secondAt = rows.findIndex((row) => row.includes(second));
+  expect(firstAt).toBeGreaterThanOrEqual(0);
+  expect(secondAt).toBeGreaterThan(firstAt);
+}
+
 // --- The rebuilt settings screens ------------------------------------------
 
 test("a theme is picked from a grid of what it looks like", async ({

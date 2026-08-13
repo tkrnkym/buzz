@@ -10,6 +10,8 @@ import { InvitesPanel } from "@/features/settings/ui/panels/InvitesPanel";
 import { MobilePanel } from "@/features/settings/ui/panels/MobilePanel";
 import { NotificationsPanel } from "@/features/settings/ui/panels/NotificationsPanel";
 import { ProfilePanel } from "@/features/settings/ui/panels/ProfilePanel";
+import { SecretsPanel } from "@/features/settings/ui/panels/SecretsPanel";
+import { SecurityPanel } from "@/features/settings/ui/panels/SecurityPanel";
 import { ShortcutsPanel } from "@/features/settings/ui/panels/ShortcutsPanel";
 import { TemplatesPanel } from "@/features/settings/ui/panels/TemplatesPanel";
 import { UpdatesPanel } from "@/features/settings/ui/panels/UpdatesPanel";
@@ -34,6 +36,8 @@ const PANELS: Record<SettingsPanelId, () => React.ReactElement> = {
   hosted: HostedPanel,
   templates: TemplatesPanel,
   invites: InvitesPanel,
+  security: SecurityPanel,
+  secrets: SecretsPanel,
   agents: AgentsPanel,
   compute: ComputePanel,
   experiments: ExperimentsPanel,
