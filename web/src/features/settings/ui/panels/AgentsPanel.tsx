@@ -82,7 +82,7 @@ export function AgentsPanel() {
         <div>
           <SettingGroupHeading>Agent runtimes</SettingGroupHeading>
           <p className="mt-0.5 text-2xs text-muted-foreground">
-            この端末で Buzz が使えるエージェントのツールを選びます。
+            この端末で Nuxx が使えるエージェントのツールを選びます。
           </p>
         </div>
         <button
@@ -180,7 +180,7 @@ export function AgentsPanel() {
                     <span className="text-2xs text-muted-foreground">
                       {harness.available
                         ? `${harness.command}${harness.version ? ` · ${harness.version}` : ""}`
-                        : `Buzz は ${harness.command} を通して ${harness.name} と話します。`}
+                        : `Nuxx は ${harness.command} を通して ${harness.name} と話します。`}
                     </span>
                     {!harness.available && (
                       <a

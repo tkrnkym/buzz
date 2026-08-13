@@ -15,7 +15,7 @@ import {
   useShowcase,
   useShowcaseUpdate,
 } from "@/features/showcase/use-showcase";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { derivedMembershipId } from "@/features/identity/membership";
 import { Checkbox } from "@/shared/ui/checkbox";
 
 /**
@@ -293,7 +293,7 @@ export function IdentityArchiveSettings() {
                   })}
                 </span>
                 <span className="block text-badge text-muted-foreground">
-                  {truncatePubkey(row.pubkey)} ·{" "}
+                  {derivedMembershipId(row.pubkey)} ·{" "}
                   {formatRelativeTime(row.archivedAt, nowSeconds)}に{" "}
                   {resolveUserLabel({
                     pubkey: row.archivedBy,

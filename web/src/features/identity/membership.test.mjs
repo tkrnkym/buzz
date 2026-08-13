@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  derivedMembershipId,
   isSameAccount,
   isSelf,
   membershipForPubkey,
+  membershipIdForPubkey,
   membershipLabel,
   membershipsOfAccount,
 } from "@/features/identity/membership";
@@ -93,4 +95,47 @@ test("a membership is labelled by name, never by key", () => {
   const anonymous = membership({ displayName: "" });
   assert.equal(membershipLabel(anonymous), "mem-acme-1");
   assert.ok(!membershipLabel(anonymous).includes("aaaa"));
+});
+
+test("a key with no membership record still resolves to a membership id", () => {
+  // Always a case: an event signed by someone who has left, or by a member of a
+  // workspace whose roster this client does not hold. "Never show a pubkey" has
+  // to cover that one too.
+  const id = membershipIdForPubkey([], "f".repeat(64));
+  assert.match(id, /^mem_/);
+  assert.ok(!id.includes("ffff"), "the key must not leak into the fallback");
+});
+
+test("a derived id is stable and visibly a placeholder", () => {
+  const key = "9".repeat(64);
+  assert.equal(derivedMembershipId(key), derivedMembershipId(key));
+  assert.equal(
+    derivedMembershipId(key),
+    derivedMembershipId(key.toUpperCase()),
+  );
+  assert.match(derivedMembershipId(key), /^mem_/);
+  assert.notEqual(
+    derivedMembershipId(key),
+    derivedMembershipId("a".repeat(64)),
+  );
+});
+
+test("a recorded membership wins over a derived one", () => {
+  const list = [membership()];
+  assert.equal(membershipIdForPubkey(list, "a".repeat(64)), "mem-acme-1");
+  // The recorded id, not the derived placeholder shape.
+  assert.ok(!/^mem_/.test(membershipIdForPubkey(list, "a".repeat(64))));
+});
+
+test("no membership id contains a run of hex from the key", () => {
+  // The property that matters: whatever the format, a pubkey must not survive
+  // into it. A format change that started echoing the key would fail here.
+  const key = "deadbeef".repeat(8);
+  for (const id of [
+    derivedMembershipId(key),
+    membershipIdForPubkey([], key),
+    membershipIdForPubkey([membership({ pubkey: key })], key),
+  ]) {
+    assert.ok(!id.includes("deadbeef"), id);
+  }
 });

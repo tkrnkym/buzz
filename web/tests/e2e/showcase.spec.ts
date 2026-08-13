@@ -661,6 +661,60 @@ test("an existing reaction can be joined, then withdrawn", async ({ page }) => {
   await expect(chip).toHaveAttribute("aria-pressed", "false");
 });
 
+// --- Identity: membership ids, not keys ------------------------------------
+
+/**
+ * A run of hex long enough to be a key or a slice of one.
+ *
+ * No `\b` anchors: a truncated key rendered next to another string has no word
+ * boundary in front of it, which is exactly the case this missed on the first
+ * attempt — `mem_0qs4e0w99999999…` matched nothing at all.
+ */
+const HEX_RUN = /[0-9a-f]{8,}/;
+
+for (const [name, path] of [
+  ["the channel", "/c/22222222-2222-4222-8222-222222222222"],
+  ["the agents screen", "/agents"],
+  ["the inbox", "/home"],
+  ["the repo list", "/repos"],
+  ["the invites screen", "/settings/invites"],
+  ["the local archive", "/settings/archive"],
+] as const) {
+  test(`${name} names people by membership, never by key`, async ({ page }) => {
+    // §7 demotes the pubkey to a verification attribute. The check is on the
+    // rendered text rather than on any one component, because the ways a key
+    // reached the screen were spread across a tooltip, an avatar's initials,
+    // and five separate truncation call sites.
+    //
+    // What this does *not* cover: paths the fixtures never reach. Every person
+    // in the demo has a display name, so an avatar's initials fallback and
+    // `resolveUserLabel`'s last resort are both unreachable here — reverting
+    // either to a key does not fail this test. The pure-function tests in
+    // `membership.test.mjs` are what hold those.
+    await page.goto(path);
+    await page.waitForTimeout(400);
+    // `textContent`, not `innerText`: the latter reports only what is laid out,
+    // so anything below the fold escaped it — which is how the first version of
+    // this check passed while a truncated key sat in the archive list.
+    const text = (await page.locator("body").textContent()) ?? "";
+    const hex = text.match(HEX_RUN);
+    expect(
+      hex,
+      hex ? `a key-shaped string reached the screen: ${hex[0]}` : "",
+    ).toBeNull();
+  });
+}
+
+test("an agent is identified by its membership, not its signing key", async ({
+  page,
+}) => {
+  await page.goto("/agents");
+  await page.getByTestId("agent-select-レビュー係").click();
+  const panel = page.getByTestId("agent-detail-panel");
+  await expect(panel).toContainText("Membership ID");
+  await expect(panel).not.toContainText("公開鍵");
+});
+
 // --- Channel canvas --------------------------------------------------------
 
 test("the canvas holds what is true, beside the stream of what happened", async ({
@@ -1837,17 +1891,18 @@ test("a runtime that needs a CLI says so, and links to its guide", async ({
   await expect(page.getByTestId("harness-claude-code")).toContainText("Ready");
 });
 
-test("the hosted screen does not offer a sign-in it cannot do", async ({
+test("the hosted screen carries no other company's sign-in", async ({
   page,
 }) => {
-  // A button that reports success and does nothing is the failure this client has
-  // already been through once.
+  // The desktop client this was ported from was Block's, and its hosted screen
+  // signed in with Builderlab. Reproducing that would have been faithful to a
+  // screenshot and wrong about the product — a Nuxx workspace signs in at its
+  // own account host, which the Workspace screen describes.
   await page.goto("/settings/hosted");
-  await expect(page.getByTestId("hosted-signin-button")).toBeDisabled();
-  await expect(
-    page.getByText("まだホスティングのサインインがありません"),
-  ).toBeVisible();
-  // The demo creation flow is still reachable, and says that is what it is.
+  await expect(page.locator("body")).not.toContainText("Builderlab");
+  await expect(page.locator("body")).not.toContainText("Block");
+  await expect(page.getByTestId("hosted-signin-button")).toHaveCount(0);
+  // What the screen is actually for is still reachable.
   await expect(page.getByTestId("create-hosted")).toBeEnabled();
 });
 

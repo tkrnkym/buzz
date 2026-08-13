@@ -145,7 +145,7 @@ test("no pubkeys means no request at all", () => {
   assert.deepEqual(buildProfileFilters([]), []);
 });
 
-test("label precedence: display name, name, nip05, fallback, pubkey", () => {
+test("label precedence: display name, name, nip05, fallback, membership id", () => {
   const profiles = toProfileLookup([
     profileEvent(ALICE, {
       display_name: "Alice A",
@@ -175,7 +175,11 @@ test("label precedence: display name, name, nip05, fallback, pubkey", () => {
     resolveUserLabel({ pubkey: ALICE, fallbackName: "from the channel" }),
     "from the channel",
   );
-  assert.equal(resolveUserLabel({ pubkey: ALICE }), "aaaaaaaa…aaaa");
+  // The last resort is a membership id, not the key. That one line is what
+  // used to put hex on screen wherever a profile had not resolved yet.
+  const unresolved = resolveUserLabel({ pubkey: ALICE });
+  assert.match(unresolved, /^mem_/);
+  assert.ok(!unresolved.includes("aaaa"), "the key must not leak into a label");
 });
 
 test("the reader is You", () => {

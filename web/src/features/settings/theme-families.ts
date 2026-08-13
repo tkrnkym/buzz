@@ -37,10 +37,10 @@ const HALF_WORDS = new Set(["light", "dark", "lighter", "darker"]);
  * distinguishing word *after* the half.
  */
 export function familyLabel(name: SyntaxThemeName): string {
-  // The theme files are still named for the relay; the picker is read by someone
-  // using the app, and the app is Buzz — the same name the rest of this surface
-  // uses ("Buzz のテーマを選びます").
-  if (name === "nuxx" || name === "nuxx-dark") return "Buzz";
+  // The theme files are named for the relay; the picker is read by someone
+  // using the app, and the app is Nuxx — the same name the rest of this surface
+  // uses ("Nuxx のテーマを選びます").
+  if (name === "nuxx" || name === "nuxx-dark") return "Nuxx";
   const words = name
     .split("-")
     .filter((word) => !HALF_WORDS.has(word))

@@ -95,13 +95,13 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         label: "Profile",
         Icon: User,
         description:
-          "名前・アイコン・自己紹介が Buzz でどう見えるかを変えます。",
+          "名前・アイコン・自己紹介が Nuxx でどう見えるかを変えます。",
       },
       {
         id: "appearance",
         label: "Appearance",
         Icon: MonitorSmartphone,
-        description: "Buzz のテーマを選びます。",
+        description: "Nuxx のテーマを選びます。",
       },
       {
         id: "notifications",
@@ -147,7 +147,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         label: "Hosted communities",
         Icon: MessagesSquare,
         description:
-          "Buzz はどのリレーでも動きます。この画面は、ホスティングを使う場合のためのものです。",
+          "Nuxx はどのリレーでも動きます。この画面は、Nuxx が用意するホスティングを使う場合のためのものです。",
       },
       {
         id: "templates",
@@ -238,7 +238,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<SettingsGroup> = [
         label: "Updates",
         title: "Software Updates",
         Icon: Download,
-        description: "Buzz を最新の機能と修正に追いつかせます。",
+        description: "Nuxx を最新の機能と修正に追いつかせます。",
       },
     ],
   },

@@ -23,8 +23,8 @@ test("a family label drops the half-word wherever it sits", () => {
 
 test("the first-party pair is named for the product, not its id", () => {
   // The files are named for the relay, the picker is read by someone using the app.
-  assert.equal(familyLabel("nuxx"), "Buzz");
-  assert.equal(familyLabel("nuxx-dark"), "Buzz");
+  assert.equal(familyLabel("nuxx"), "Nuxx");
+  assert.equal(familyLabel("nuxx-dark"), "Nuxx");
 });
 
 test("both halves of a pair land in one family", () => {
@@ -37,7 +37,7 @@ test("both halves of a pair land in one family", () => {
 
 test("the first-party family comes first", () => {
   // `THEME_PAIRS` order, which puts it first deliberately.
-  assert.equal(themeFamilies()[0].label, "Buzz");
+  assert.equal(themeFamilies()[0].label, "Nuxx");
 });
 
 test("every theme belongs to exactly one family", () => {

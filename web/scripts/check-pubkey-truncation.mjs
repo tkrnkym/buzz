@@ -13,10 +13,8 @@ const rules = [
 ];
 
 const overrides = new Set([
-  // Avatar fallback initials — two glyphs inside an avatar disc, not an
-  // identity string. The one place allowed to do it; every avatar goes through
-  // this component, and it prefers the display name's initials when there is one.
-  "src/shared/ui/PubkeyAvatar.tsx:87",
+  // (PubkeyAvatar no longer slices a key at all — its initials and its tooltip
+  // both read the membership id now, so the allowance it used to need is gone.)
   // Array window (first N pubkeys), not string truncation.
   "src/features/repos/ui/OrgSidebar.tsx:22",
   // Also an array window: the first few thread participants for the avatar
@@ -28,7 +26,10 @@ await runPubkeyTruncationCheck({
   projectRoot,
   rules,
   overrides,
-  allowedFiles: new Set(["src/shared/lib/pubkey.ts"]),
+  // Nothing is allowed to truncate a key any more. `shared/lib/pubkey.ts` held
+  // the one canonical shortener and is gone: after §7 the product names people
+  // by membership id, so a truncated key has no place left to be displayed.
+  allowedFiles: new Set(),
   label: "Web",
   scriptPath: "web/scripts/check-pubkey-truncation.mjs",
 });

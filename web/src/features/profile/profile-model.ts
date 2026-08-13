@@ -7,14 +7,14 @@
  * component inventing its own precedence.
  *
  * A profile is self-asserted: kind:0 is signed by its subject, so a display name
- * proves only that the key holder chose it. That is why `truncatePubkey` remains
+ * proves only that the key holder chose it. That is why a membership id remains
  * the last resort rather than "Unknown", and why nothing here is ever used to
  * make an authorization decision.
  */
 
 import { KIND_PROFILE } from "@/shared/constants/kinds";
 import type { NostrEvent, NostrFilter } from "@/shared/lib/nostr-client";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { derivedMembershipId } from "@/features/identity/membership";
 
 export interface UserProfile {
   pubkey: string;
@@ -132,7 +132,7 @@ export function toProfileLookup(events: NostrEvent[]): ProfileLookup {
  *
  * Precedence: the reader is "You" (unless the caller asked for their real
  * label), then `display_name`, then `name`, then the NIP-05 handle, then a
- * caller-supplied fallback, then the truncated pubkey.
+ * caller-supplied fallback, then a membership id. Never the key itself.
  */
 export function resolveUserLabel(input: {
   pubkey: string;
@@ -164,7 +164,10 @@ export function resolveUserLabel(input: {
     profile?.name ??
     profile?.nip05 ??
     fallbackName?.trim() ??
-    truncatePubkey(pubkey)
+    // The last resort is a membership id, not a truncated key. This is the one
+    // line that used to put hex on screen wherever a profile had not resolved —
+    // which is most of the app on a cold load.
+    derivedMembershipId(pubkey)
   );
 }
 

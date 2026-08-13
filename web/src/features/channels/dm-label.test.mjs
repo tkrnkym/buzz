@@ -92,11 +92,12 @@ test("a note-to-self DM is titled with the reader's own name", () => {
   );
 });
 
-test("an unresolved participant falls back to their truncated key", () => {
-  assert.equal(
-    resolveChannelLabel({ channel: channel(), currentPubkey: ME }),
-    "aaaaaaaa…aaaa",
-  );
+test("an unresolved participant falls back to their membership id", () => {
+  // Not a truncated key. §7 makes the membership id what the product names
+  // people by, and this is the path a DM takes before profiles resolve.
+  const label = resolveChannelLabel({ channel: channel(), currentPubkey: ME });
+  assert.match(label, /^mem_/);
+  assert.ok(!label.includes("aaaa"), "the key must not leak into the label");
 });
 
 test("every generic name the relay uses is replaced", () => {

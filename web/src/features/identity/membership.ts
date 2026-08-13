@@ -101,3 +101,43 @@ export function membershipForPubkey(
 export function membershipLabel(membership: Membership): string {
   return membership.displayName || membership.id;
 }
+
+/**
+ * A membership id for a key that has no membership record here.
+ *
+ * There is always such a case: an event signed by someone who has since left,
+ * or by a member of a workspace this client does not hold the roster for. The
+ * migration says the product never shows a pubkey, and "never" has to cover
+ * this one too — so a derived id stands in rather than the key falling through.
+ *
+ * Deterministic, so the same absent signer reads the same way twice, and
+ * visibly a placeholder (`mem_`) so nobody mistakes it for a recorded id.
+ *
+ * The shape is this client's choice, not the spec's: §7 fixes that a Membership
+ * ID is what the product refers to people by, and says nothing about its
+ * format. Change it here and every surface follows.
+ */
+export function derivedMembershipId(pubkey: string): string {
+  let hash = 0;
+  const normalized = pubkey.trim().toLowerCase();
+  for (let index = 0; index < normalized.length; index++) {
+    hash = (hash * 31 + normalized.charCodeAt(index)) | 0;
+  }
+  return `mem_${Math.abs(hash).toString(36).padStart(7, "0").slice(0, 7)}`;
+}
+
+/**
+ * The membership id to display for a signing key.
+ *
+ * The recorded one when this client knows it, a derived one otherwise. Never
+ * the key — that is the whole point of the migration, and a fallback that
+ * leaked hex would put it back on every screen showing an unknown signer.
+ */
+export function membershipIdForPubkey(
+  memberships: Membership[],
+  pubkey: string,
+): string {
+  return (
+    membershipForPubkey(memberships, pubkey)?.id ?? derivedMembershipId(pubkey)
+  );
+}

@@ -6,7 +6,7 @@ import { UserPicker } from "@/features/directory/ui/UserPicker";
 import { useDirectory } from "@/features/directory/use-directory";
 import { normalizePubkey } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { derivedMembershipId } from "@/features/identity/membership";
 
 /**
  * Start a direct message.
@@ -159,7 +159,10 @@ export function NewDmDialog({
               }
               if (event.key === "Enter" && pastedKey) {
                 event.preventDefault();
-                add({ pubkey: pastedKey, label: truncatePubkey(pastedKey) });
+                add({
+                  pubkey: pastedKey,
+                  label: derivedMembershipId(pastedKey),
+                });
               }
             }}
             placeholder="Name or public key"
@@ -172,11 +175,14 @@ export function NewDmDialog({
               className="rounded-md border border-border px-2.5 py-2 text-left text-2xs hover:bg-accent"
               data-testid="new-dm-add-pubkey"
               onClick={() =>
-                add({ pubkey: pastedKey, label: truncatePubkey(pastedKey) })
+                add({
+                  pubkey: pastedKey,
+                  label: derivedMembershipId(pastedKey),
+                })
               }
               type="button"
             >
-              Add {truncatePubkey(pastedKey)}
+              Add {derivedMembershipId(pastedKey)}
             </button>
           ) : (
             !full && (

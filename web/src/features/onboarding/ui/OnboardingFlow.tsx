@@ -31,7 +31,7 @@ import { useAvatarUpload } from "@/features/profile/use-avatar-upload";
 import { usePublishProfile } from "@/features/profile/use-profile";
 import { cn } from "@/shared/lib/cn";
 import { resolveSigner } from "@/shared/lib/signer";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { derivedMembershipId } from "@/features/identity/membership";
 import { PubkeyAvatar } from "@/shared/ui/PubkeyAvatar";
 
 const FIELD_CLASS =
@@ -199,7 +199,7 @@ export function OnboardingFlow() {
               {myPubkey && (
                 <PubkeyAvatar
                   avatarUrl={avatarUrl || null}
-                  label={displayName || truncatePubkey(myPubkey)}
+                  label={displayName || derivedMembershipId(myPubkey)}
                   pubkey={myPubkey}
                 />
               )}

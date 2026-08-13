@@ -14,7 +14,7 @@ import type { AgentDefaults, Showcase, ShowcaseAgent } from "@/mock/showcase";
  *
  * Derived from the id so it is stable and readable in a test failure, and padded
  * to 64 hex characters because everything downstream — the avatar, the memory
- * lookup, `truncatePubkey` — assumes a real-shaped key.
+ * lookup, the membership id — assumes a real-shaped key.
  */
 function mockPubkey(seed: string): string {
   const hex = [...seed]

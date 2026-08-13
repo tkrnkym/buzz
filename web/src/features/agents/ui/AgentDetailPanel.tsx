@@ -26,7 +26,7 @@ import { resolveUserLabel } from "@/features/profile/profile-model";
 import { useProfiles } from "@/features/profile/profile-store";
 import type { ShowcaseAgent } from "@/mock/showcase";
 import { cn } from "@/shared/lib/cn";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { derivedMembershipId } from "@/features/identity/membership";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 type PanelTab = "overview" | "session" | "memory";
@@ -149,7 +149,13 @@ export function AgentDetailPanel({
               <Field label="ハーネス" value={agent.harness} />
               <Field label="モデル" value={agent.model} />
               <Field label="作成者" value={owner} />
-              <Field label="公開鍵" value={truncatePubkey(agent.pubkey)} />
+              {/* Not the signing key. An agent has a membership like anyone
+                  else, and the key is the verification attribute behind it —
+                  showing the key here made it look like the identifier. */}
+              <Field
+                label="Membership ID"
+                value={derivedMembershipId(agent.pubkey)}
+              />
               <Field
                 label="参加チャンネル"
                 value={

@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Badge } from "@/shared/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { relativeTime } from "@/shared/lib/relative-time";
-import { truncatePubkey } from "@/shared/lib/pubkey";
+import { derivedMembershipId } from "@/features/identity/membership";
 import type { Repo } from "../use-repos";
 
 export function RepoListItem({
@@ -47,10 +47,12 @@ export function RepoListItem({
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="cursor-default font-mono">
-              {truncatePubkey(repo.owner)}
+              {derivedMembershipId(repo.owner)}
             </span>
           </TooltipTrigger>
-          <TooltipContent>{repo.owner}</TooltipContent>
+          {/* The membership id in both places. The tooltip used to expand to
+              the full key, which made the row a two-step reveal of hex. */}
+          <TooltipContent>{derivedMembershipId(repo.owner)}</TooltipContent>
         </Tooltip>
         <span>Updated {relativeTime(repo.createdAt)}</span>
       </div>

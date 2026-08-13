@@ -139,7 +139,9 @@ test("someone with no profile is still addressable", () => {
     profiles: {},
     roles: new Map([[ALICE, "member"]]),
   });
-  assert.equal(entries[0].label, "aaaaaaaa…aaaa");
+  // A membership id, not a truncated key — see §7.
+  assert.match(entries[0].label, /^mem_/);
+  assert.ok(!entries[0].label.includes("aaaa"));
   assert.equal(entries[0].handle, null);
 });
 

@@ -1,14 +1,16 @@
 import { useState, type ReactNode } from "react";
 
+import { derivedMembershipId } from "@/features/identity/membership";
 import { cn } from "@/shared/lib/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 /**
- * Stable hue from a hex pubkey, so one identity always draws the same colour.
+ * Stable hue from the signing key, so one identity always draws the same colour.
  *
- * A recognition aid only. Two pubkeys can collide on a hue, which is exactly
- * why the tooltip carries the full key and the initials are never the thing a
- * reader is asked to trust.
+ * A recognition aid only. Two keys can collide on a hue, which is why the
+ * tooltip carries the membership id and the initials are never the thing a
+ * reader is asked to trust. The key is used here and nowhere visible — a colour
+ * is not an identifier, so this stays within §7's "verification attribute".
  */
 function pubkeyToHue(hex: string): number {
   let hash = 0;
@@ -21,8 +23,8 @@ function pubkeyToHue(hex: string): number {
 /**
  * Initials from a display name: one glyph per word, at most two.
  *
- * Falls back to the empty string, which the caller reads as "use the pubkey" —
- * a name of only punctuation should not produce a disc of punctuation.
+ * Falls back to the empty string, which the caller reads as "use the membership
+ * id" — a name of only punctuation should not produce a disc of punctuation.
  */
 function initialsOf(label: string): string {
   const words = label
@@ -38,9 +40,10 @@ function initialsOf(label: string): string {
 /**
  * The identity disc.
  *
- * The single place allowed to slice a pubkey for display — the truncation guard
- * allowlists this line and nothing else, so every avatar in the app goes through
- * here and none of them invents its own shortening.
+ * Nothing here shows a pubkey. It used to: the tooltip carried the full key and
+ * the initials fell back to its first two characters, which put hex on every
+ * avatar in the app. Both now read the membership id, which is what §7 makes
+ * the identifier — the key stays only as the seed for the colour.
  *
  * A profile picture is used when there is one, and the coloured initials stand
  * in when there is not. A picture that fails to load falls back to the same
@@ -62,6 +65,7 @@ export function PubkeyAvatar({
   badge,
   className,
   label,
+  membershipId,
   pubkey,
   shape = "square",
   size = "md",
@@ -73,6 +77,18 @@ export function PubkeyAvatar({
   className?: string;
   /** Display name, for the initials and the tooltip. */
   label?: string | null;
+  /**
+   * The recorded membership id, where the caller knows it.
+   *
+   * Derived from the key when absent — the two must not be allowed to disagree,
+   * so a caller that has the real one passes it rather than letting the fallback
+   * invent a different string for the same person.
+   */
+  membershipId?: string | null;
+  /**
+   * Signature-verification attribute, kept because it is what makes the colour
+   * stable per identity. Not shown, and not the identifier — see §7.
+   */
   pubkey: string;
   /**
    * `square` is the rounded-rectangle disc used in rows and headers. `circle` is
@@ -84,7 +100,11 @@ export function PubkeyAvatar({
   const [imageFailed, setImageFailed] = useState(false);
   const hue = pubkeyToHue(pubkey);
   const sizeClasses = SIZE_CLASSES[size];
-  const initials = (label ? initialsOf(label) : "") || pubkey.slice(0, 2);
+  const identity = membershipId ?? derivedMembershipId(pubkey);
+  // Sliced from the membership id, not the key: two hex characters in a disc is
+  // still hex on screen, and it was on every avatar without a resolved name.
+  const initials =
+    (label ? initialsOf(label) : "") || identity.slice(-2).toUpperCase();
   const showImage = Boolean(avatarUrl) && !imageFailed;
 
   return (
@@ -120,13 +140,17 @@ export function PubkeyAvatar({
         </span>
       </TooltipTrigger>
       <TooltipContent>
+        {/* The membership id, never the signing key. This tooltip is on every
+            avatar in the app, so it was the single largest hex surface there
+            was — and after §7 the key is not the identifier anyway: the same
+            person's other membership signs with a different one. */}
         {label ? (
           <span className="flex flex-col items-start">
             <span>{label}</span>
-            <span className="font-mono text-2xs opacity-70">{pubkey}</span>
+            <span className="font-mono text-2xs opacity-70">{identity}</span>
           </span>
         ) : (
-          <span className="font-mono text-xs">{pubkey}</span>
+          <span className="font-mono text-xs">{identity}</span>
         )}
       </TooltipContent>
     </Tooltip>
