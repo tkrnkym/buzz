@@ -3818,6 +3818,13 @@ test.describe("private-beta waitlist", () => {
 
     await expect(heading("ご不明点や相談")).toBeVisible();
     await expect(dialog.getByText("6 / 6")).toBeVisible();
+    // Focused like every other step, including this one — it is a textarea
+    // rather than an input, and arriving here from a choice means the control
+    // that had focus was just unmounted.
+    await page.keyboard.type("相談したいことがあります。");
+    await expect(
+      dialog.getByRole("textbox", { name: "ご不明点や相談" }),
+    ).toHaveValue("相談したいことがあります。");
     // The last question is the optional one, so the submit is already live.
     await expect(page.getByTestId("waitlist-next")).toBeEnabled();
   });

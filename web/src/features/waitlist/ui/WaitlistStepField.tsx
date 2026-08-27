@@ -41,12 +41,15 @@ export function WaitlistStepField({
   step: WaitlistStep;
 }) {
   const fieldId = React.useId();
-  const firstControl = React.useRef<HTMLInputElement>(null);
-
   // The question can be answered by typing as soon as it appears — the whole
   // point of one-at-a-time is that the keyboard never has to leave the field.
-  React.useEffect(() => {
-    firstControl.current?.focus();
+  //
+  // A callback ref rather than a ref plus a mount effect, because the control it
+  // lands on is an input on four steps and a textarea on the last: one
+  // `RefObject` cannot be both without a cast at every use. Typed on the union's
+  // base, which a ref for either element accepts.
+  const focusOnMount = React.useCallback((node: HTMLElement | null) => {
+    node?.focus();
   }, []);
 
   const enterAdvances = (event: React.KeyboardEvent) => {
@@ -72,7 +75,7 @@ export function WaitlistStepField({
             onChange={(event) => onChange({ firstName: event.target.value })}
             onKeyDown={enterAdvances}
             placeholder="太郎"
-            ref={firstControl}
+            ref={focusOnMount}
             value={answers.firstName}
           />
         </div>
@@ -124,7 +127,7 @@ export function WaitlistStepField({
                 onChange={() =>
                   onCommit({ [step.field]: option } as Partial<WaitlistAnswers>)
                 }
-                ref={optionIndex === 0 ? firstControl : undefined}
+                ref={optionIndex === 0 ? focusOnMount : undefined}
                 type="radio"
                 value={option}
               />
@@ -152,6 +155,7 @@ export function WaitlistStepField({
           }
         }}
         placeholder={step.placeholder}
+        ref={focusOnMount}
         rows={4}
         value={answers[step.field]}
       />
@@ -167,7 +171,7 @@ export function WaitlistStepField({
       onChange={(event) => onChange({ [step.field]: event.target.value })}
       onKeyDown={enterAdvances}
       placeholder={step.placeholder}
-      ref={firstControl}
+      ref={focusOnMount}
       type={step.kind === "email" ? "email" : "text"}
       value={answers[step.field]}
     />
